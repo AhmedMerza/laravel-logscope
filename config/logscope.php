@@ -109,4 +109,31 @@ return [
         'max_per_page' => 100,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Theme
+    |--------------------------------------------------------------------------
+    |
+    | Customize the appearance of LogScope's web interface. You can override
+    | the primary color and log level colors. Colors should be valid CSS values.
+    |
+    */
+
+    'theme' => [
+        // Primary accent color (used for buttons, links, etc.)
+        'primary' => '#6366f1', // Indigo
+
+        // Log level colors
+        'levels' => [
+            'emergency' => ['bg' => '#7f1d1d', 'text' => '#fecaca'],
+            'alert'     => ['bg' => '#9a3412', 'text' => '#fed7aa'],
+            'critical'  => ['bg' => '#991b1b', 'text' => '#fecaca'],
+            'error'     => ['bg' => '#dc2626', 'text' => '#ffffff'],
+            'warning'   => ['bg' => '#f59e0b', 'text' => '#1f2937'],
+            'notice'    => ['bg' => '#06b6d4', 'text' => '#ffffff'],
+            'info'      => ['bg' => '#3b82f6', 'text' => '#ffffff'],
+            'debug'     => ['bg' => '#6b7280', 'text' => '#ffffff'],
+        ],
+    ],
+
 ];

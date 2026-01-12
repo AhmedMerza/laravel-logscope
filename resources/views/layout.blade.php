@@ -1,55 +1,125 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-100">
+<html lang="en" x-data="{ darkMode: localStorage.getItem('logscope-dark') === 'true' }"
+    x-init="$watch('darkMode', val => localStorage.setItem('logscope-dark', val))"
+    :class="{ 'dark': darkMode }">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>LogScope - Log Viewer</title>
+    <title>LogScope</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
-        [x-cloak] { display: none !important; }
-        .log-debug { @apply bg-gray-100 text-gray-700; }
-        .log-info { @apply bg-blue-100 text-blue-800; }
-        .log-notice { @apply bg-cyan-100 text-cyan-800; }
-        .log-warning { @apply bg-yellow-100 text-yellow-800; }
-        .log-error { @apply bg-red-100 text-red-800; }
-        .log-critical { @apply bg-red-200 text-red-900; }
-        .log-alert { @apply bg-orange-200 text-orange-900; }
-        .log-emergency { @apply bg-red-300 text-red-950; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
-                extend: {}
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
             }
         }
     </script>
-</head>
-<body class="h-full">
-    <div class="min-h-full">
-        <!-- Header -->
-        <nav class="bg-gray-800">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div class="flex h-16 items-center justify-between">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <span class="text-white text-xl font-bold">LogScope</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-gray-300 text-sm" x-data x-text="new Date().toLocaleString()"></span>
-                    </div>
-                </div>
-            </div>
-        </nav>
+    @php
+        $theme = config('logscope.theme', []);
+        $levelColors = $theme['levels'] ?? [];
+    @endphp
+    <style>
+        [x-cloak] { display: none !important; }
 
-        <!-- Main content -->
-        <main>
-            <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                @yield('content')
-            </div>
-        </main>
-    </div>
+        :root {
+            --color-debug: {{ $levelColors['debug']['bg'] ?? '#64748b' }};
+            --color-info: {{ $levelColors['info']['bg'] ?? '#0ea5e9' }};
+            --color-notice: {{ $levelColors['notice']['bg'] ?? '#8b5cf6' }};
+            --color-warning: {{ $levelColors['warning']['bg'] ?? '#eab308' }};
+            --color-error: {{ $levelColors['error']['bg'] ?? '#ef4444' }};
+            --color-critical: {{ $levelColors['critical']['bg'] ?? '#dc2626' }};
+            --color-alert: {{ $levelColors['alert']['bg'] ?? '#ea580c' }};
+            --color-emergency: {{ $levelColors['emergency']['bg'] ?? '#7f1d1d' }};
+        }
+
+        html, body { height: 100%; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+
+        /* Level colors */
+        .level-debug { --level-color: var(--color-debug); }
+        .level-info { --level-color: var(--color-info); }
+        .level-notice { --level-color: var(--color-notice); }
+        .level-warning { --level-color: var(--color-warning); }
+        .level-error { --level-color: var(--color-error); }
+        .level-critical { --level-color: var(--color-critical); }
+        .level-alert { --level-color: var(--color-alert); }
+        .level-emergency { --level-color: var(--color-emergency); }
+
+        .level-indicator {
+            width: 3px;
+            background-color: var(--level-color);
+        }
+
+        .level-badge {
+            background-color: var(--level-color);
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .level-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--level-color);
+        }
+
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Slide panel */
+        .slide-panel {
+            transition: transform 0.25s ease-out;
+        }
+        .slide-panel.closed {
+            transform: translateX(100%);
+        }
+
+        /* Focus ring */
+        .focus-ring:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Log row */
+        .log-row {
+            transition: background-color 0.1s ease;
+        }
+        .log-row:hover {
+            background-color: rgba(59, 130, 246, 0.04);
+        }
+        .dark .log-row:hover {
+            background-color: rgba(59, 130, 246, 0.08);
+        }
+        .log-row.selected {
+            background-color: rgba(59, 130, 246, 0.08);
+        }
+        .dark .log-row.selected {
+            background-color: rgba(59, 130, 246, 0.15);
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    @yield('content')
 </body>
 </html>
