@@ -1,0 +1,54 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build output
+/build/
+/dist/
+
+# IDE
+/.fleet/
+/.idea/
+/.nova/
+/.vscode/
+/.zed/
+.phpactor.json
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Testing
+.phpunit.result.cache
+.phpunit.cache/
+/coverage/
+
+# Logs
+npm-debug.log
+yarn-error.log
+
+# AI Assistant files (personal/local only)
+CLAUDE.md
+GEMINI.md
+.claude/
+.mcp.json
+boost.json
+
+# Composer auth
+/auth.json
+
+# Composer lock (packages shouldn't commit this)
+composer.lock
+
+# Editor config (personal preference)
+.editorconfig
+
+# GitHub workflows (not needed yet)
+.github/
