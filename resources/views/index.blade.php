@@ -15,75 +15,116 @@
             <span class="font-semibold text-gray-900 dark:text-white">LogScope</span>
         </div>
 
-        <!-- Stats -->
-        <div class="p-4 border-b border-gray-200 dark:border-gray-800">
-            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Overview</h3>
-            <div class="space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-600 dark:text-gray-400">Total</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="stats.total?.toLocaleString() || '0'"></span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-600 dark:text-gray-400">Today</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="stats.today?.toLocaleString() || '0'"></span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-600 dark:text-gray-400">This hour</span>
-                    <span class="font-medium text-gray-900 dark:text-white" x-text="stats.this_hour?.toLocaleString() || '0'"></span>
+        <!-- Scrollable Filters -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+            <!-- Overview Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.overview = !sections.overview"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>Overview</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.overview }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="sections.overview" x-collapse class="px-4 pb-4">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">Total</span>
+                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.total?.toLocaleString() || '0'"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">Today</span>
+                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.today?.toLocaleString() || '0'"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">This hour</span>
+                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.this_hour?.toLocaleString() || '0'"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Level Filters -->
-        <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex-1 overflow-y-auto custom-scrollbar">
-            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Severity</h3>
-            <div class="space-y-1">
-                @foreach(['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'] as $level)
-                <button @click="toggleLevel('{{ $level }}')"
-                    class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                    :class="filters.levels.includes('{{ $level }}')
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
-                    <span class="level-{{ $level }} level-dot flex-shrink-0"></span>
-                    <span class="flex-1 text-left capitalize">{{ $level }}</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums" x-text="stats.by_level?.{{ $level }} || 0"></span>
+            <!-- Severity Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.severity = !sections.severity"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>Severity</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.severity }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
                 </button>
-                @endforeach
+                <div x-show="sections.severity" x-collapse class="px-4 pb-4">
+                    <div class="space-y-1">
+                        @foreach(['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'] as $level)
+                        <button @click="toggleLevel('{{ $level }}')"
+                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
+                            :class="filters.levels.includes('{{ $level }}')
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                            <span class="level-{{ $level }} level-dot flex-shrink-0"></span>
+                            <span class="flex-1 text-left capitalize">{{ $level }}</span>
+                            <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums" x-text="stats.by_level?.{{ $level }} || 0"></span>
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
             </div>
 
             @if(count($channels) > 0)
-            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-3">Channels</h3>
-            <div class="space-y-1">
-                @foreach($channels as $channel)
-                <button @click="toggleChannel('{{ $channel }}')"
-                    class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                    :class="filters.channels.includes('{{ $channel }}')
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            <!-- Channels Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.channels = !sections.channels"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>Channels</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
-                    <span class="flex-1 text-left">{{ $channel }}</span>
                 </button>
-                @endforeach
+                <div x-show="sections.channels" x-collapse class="px-4 pb-4">
+                    <div class="space-y-1">
+                        @foreach($channels as $channel)
+                        <button @click="toggleChannel('{{ $channel }}')"
+                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
+                            :class="filters.channels.includes('{{ $channel }}')
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                            <span class="flex-1 text-left">{{ $channel }}</span>
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
             </div>
             @endif
 
             @if(count($environments) > 0)
-            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-6 mb-3">Environment</h3>
-            <div class="space-y-1">
-                @foreach($environments as $env)
-                <button @click="toggleEnvironment('{{ $env }}')"
-                    class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                    :class="filters.environments.includes('{{ $env }}')
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+            <!-- Environment Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.environments = !sections.environments"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>Environment</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.environments }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
-                    <span class="flex-1 text-left">{{ $env }}</span>
                 </button>
-                @endforeach
+                <div x-show="sections.environments" x-collapse class="px-4 pb-4">
+                    <div class="space-y-1">
+                        @foreach($environments as $env)
+                        <button @click="toggleEnvironment('{{ $env }}')"
+                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
+                            :class="filters.environments.includes('{{ $env }}')
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+                            </svg>
+                            <span class="flex-1 text-left">{{ $env }}</span>
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
             </div>
             @endif
         </div>
@@ -106,51 +147,111 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">
         <!-- Header -->
-        <header class="h-14 flex items-center gap-4 px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-            <!-- Sidebar Toggle -->
-            <button @click="sidebarOpen = !sidebarOpen"
-                class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-            </button>
-
-            <!-- Search -->
-            <div class="flex-1 max-w-2xl relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                <input type="text" x-model.debounce.300ms="filters.search" @input="fetchLogs()"
-                    placeholder="Search logs... (message, context, source)"
-                    class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <!-- Date Range -->
-            <div class="flex items-center gap-2">
-                <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
-                    class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    title="From date">
-                <span class="text-gray-400">-</span>
-                <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
-                    class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    title="To date">
-            </div>
-
-            <!-- Actions -->
-            <div class="flex items-center gap-1">
-                <button @click="clearFilters()"
-                    class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    title="Clear filters">
-                    Clear
-                </button>
-                <button @click="fetchLogs(); fetchStats()"
-                    class="h-9 px-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2">
-                    <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <!-- Main header row -->
+            <div class="h-14 flex items-center gap-4 px-4">
+                <!-- Sidebar Toggle -->
+                <button @click="sidebarOpen = !sidebarOpen"
+                    class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
-                    Refresh
                 </button>
+
+                <!-- Primary Search -->
+                <div class="flex-1 flex items-center gap-2">
+                    <div class="flex-1 max-w-xl flex items-center gap-2">
+                        <select x-model="searches[0].field"
+                            class="h-9 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="any">Any field</option>
+                            <option value="message">Message</option>
+                            <option value="context">Context</option>
+                            <option value="source">Source</option>
+                        </select>
+                        <div class="flex-1 relative">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <input type="text" x-model.debounce.300ms="searches[0].value" @input="fetchLogs()"
+                                placeholder="Search logs..."
+                                class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Add search button -->
+                    <button @click="addSearch()"
+                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        title="Add search condition">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </button>
+
+                    <!-- AND/OR toggle (only show if multiple searches) -->
+                    <div x-show="searches.length > 1" class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                        <button @click="searchMode = 'and'"
+                            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                            :class="searchMode === 'and' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            AND
+                        </button>
+                        <button @click="searchMode = 'or'"
+                            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                            :class="searchMode === 'or' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            OR
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="flex items-center gap-2">
+                    <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
+                        class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="From date">
+                    <span class="text-gray-400">-</span>
+                    <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
+                        class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="To date">
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-1">
+                    <button @click="clearFilters()"
+                        class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        title="Clear filters">
+                        Clear
+                    </button>
+                    <button @click="fetchLogs(); fetchStats()"
+                        class="h-9 px-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
             </div>
+
+            <!-- Additional search rows -->
+            <template x-for="(search, index) in searches.slice(1)" :key="index + 1">
+                <div class="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+                    <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-10" x-text="searchMode.toUpperCase()"></span>
+                    <select x-model="searches[index + 1].field"
+                        class="h-8 px-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="any">Any field</option>
+                        <option value="message">Message</option>
+                        <option value="context">Context</option>
+                        <option value="source">Source</option>
+                    </select>
+                    <input type="text" x-model.debounce.300ms="searches[index + 1].value" @input="fetchLogs()"
+                        placeholder="Search..."
+                        class="flex-1 h-8 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button @click="removeSearch(index + 1)"
+                        class="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </template>
         </header>
 
         <!-- Active Filters Bar -->
@@ -176,10 +277,13 @@
                         <button @click="toggleEnvironment(env)" class="hover:text-purple-900 dark:hover:text-white">&times;</button>
                     </span>
                 </template>
-                <span x-show="filters.search" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                    Search: <span x-text="filters.search" class="max-w-[100px] truncate"></span>
-                    <button @click="filters.search = ''; fetchLogs()" class="hover:text-gray-900 dark:hover:text-white">&times;</button>
-                </span>
+                <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                        <span x-text="search.field === 'any' ? '' : search.field + ':'"></span>
+                        <span x-text="search.value" class="max-w-[100px] truncate"></span>
+                        <button @click="search.value = ''; fetchLogs()" class="hover:text-gray-900 dark:hover:text-white">&times;</button>
+                    </span>
+                </template>
             </div>
         </div>
 
@@ -373,8 +477,9 @@ function logScope() {
         stats: {},
         loading: true,
         selectedLog: null,
+        searches: [{ field: 'any', value: '' }],
+        searchMode: 'and',
         filters: {
-            search: '',
             levels: [],
             channels: [],
             environments: [],
@@ -382,17 +487,38 @@ function logScope() {
             to: '',
             fingerprint: ''
         },
+        sections: {
+            overview: JSON.parse(localStorage.getItem('logscope-section-overview') ?? 'true'),
+            severity: JSON.parse(localStorage.getItem('logscope-section-severity') ?? 'true'),
+            channels: JSON.parse(localStorage.getItem('logscope-section-channels') ?? 'true'),
+            environments: JSON.parse(localStorage.getItem('logscope-section-environments') ?? 'true'),
+        },
         page: 1,
 
         async init() {
+            // Watch section states and persist to localStorage
+            this.$watch('sections.overview', val => localStorage.setItem('logscope-section-overview', JSON.stringify(val)));
+            this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
+            this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
+            this.$watch('sections.environments', val => localStorage.setItem('logscope-section-environments', JSON.stringify(val)));
+
             await Promise.all([this.fetchLogs(), this.fetchStats()]);
+        },
+
+        addSearch() {
+            this.searches.push({ field: 'any', value: '' });
+        },
+
+        removeSearch(index) {
+            this.searches.splice(index, 1);
+            this.fetchLogs();
         },
 
         hasActiveFilters() {
             return this.filters.levels.length > 0 ||
                 this.filters.channels.length > 0 ||
                 this.filters.environments.length > 0 ||
-                this.filters.search ||
+                this.searches.some(s => s.value) ||
                 this.filters.from ||
                 this.filters.to ||
                 this.filters.fingerprint;
@@ -421,13 +547,22 @@ function logScope() {
             try {
                 const params = new URLSearchParams();
                 params.append('page', this.page);
-                if (this.filters.search) params.append('search', this.filters.search);
                 if (this.filters.from) params.append('from', this.filters.from);
                 if (this.filters.to) params.append('to', this.filters.to);
                 if (this.filters.fingerprint) params.append('fingerprint', this.filters.fingerprint);
                 this.filters.levels.forEach(l => params.append('levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
                 this.filters.environments.forEach(e => params.append('environments[]', e));
+
+                // Add advanced search params
+                const activeSearches = this.searches.filter(s => s.value);
+                if (activeSearches.length > 0) {
+                    activeSearches.forEach((s, i) => {
+                        params.append(`searches[${i}][field]`, s.field);
+                        params.append(`searches[${i}][value]`, s.value);
+                    });
+                    params.append('search_mode', this.searchMode);
+                }
 
                 const response = await fetch(`{{ route('logscope.logs') }}?${params}`);
                 const data = await response.json();
@@ -491,7 +626,9 @@ function logScope() {
         },
 
         clearFilters() {
-            this.filters = { search: '', levels: [], channels: [], environments: [], from: '', to: '', fingerprint: '' };
+            this.searches = [{ field: 'any', value: '' }];
+            this.searchMode = 'and';
+            this.filters = { levels: [], channels: [], environments: [], from: '', to: '', fingerprint: '' };
             this.page = 1;
             this.fetchLogs();
         },

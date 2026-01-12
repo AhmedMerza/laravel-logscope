@@ -50,7 +50,38 @@ class LogController extends Controller
             $query->environment((array) $request->input('environments'));
         }
 
-        if ($request->filled('search')) {
+        // Handle advanced search with multiple conditions
+        if ($request->filled('searches')) {
+            $searches = $request->input('searches');
+            $searchMode = $request->input('search_mode', 'and');
+
+            if (is_array($searches) && count($searches) > 0) {
+                $method = $searchMode === 'or' ? 'orWhere' : 'where';
+
+                $query->where(function ($q) use ($searches, $searchMode) {
+                    foreach ($searches as $index => $search) {
+                        if (empty($search['value'])) {
+                            continue;
+                        }
+
+                        $field = $search['field'] ?? 'any';
+                        $value = '%' . $search['value'] . '%';
+                        $boolean = ($index === 0 || $searchMode === 'and') ? 'and' : 'or';
+
+                        if ($field === 'any') {
+                            $q->where(function ($subQ) use ($value) {
+                                $subQ->where('message', 'like', $value)
+                                    ->orWhere('context', 'like', $value)
+                                    ->orWhere('source', 'like', $value);
+                            }, null, null, $boolean);
+                        } else {
+                            $q->where($field, 'like', $value, $boolean);
+                        }
+                    }
+                });
+            }
+        } elseif ($request->filled('search')) {
+            // Fallback to simple search for backwards compatibility
             $query->search($request->input('search'));
         }
 
