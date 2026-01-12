@@ -45,6 +45,29 @@ The config file will be published to `config/logscope.php`. Options include:
 
 ## Usage
 
+### Real-Time Log Capture
+
+To capture logs in real-time, add the LogScope channel to your `config/logging.php`:
+
+```php
+'channels' => [
+    // Add logscope to your stack
+    'stack' => [
+        'driver' => 'stack',
+        'channels' => ['single', 'logscope'],
+    ],
+
+    // Add the logscope channel
+    'logscope' => [
+        'driver' => 'custom',
+        'via' => \LogScope\Logging\LogScopeChannel::class,
+        'level' => env('LOG_LEVEL', 'debug'),
+    ],
+],
+```
+
+Now all logs will be stored in the database automatically.
+
 ### Import Existing Logs
 
 ```bash
