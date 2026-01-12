@@ -798,7 +798,18 @@ function logScope() {
         clearFilters() {
             this.searches = [{ field: 'any', value: '' }];
             this.searchMode = 'and';
-            this.filters = { levels: [], channels: [], environments: [], from: '', to: '', fingerprint: '' };
+            this.filters = {
+                levels: [],
+                channels: [],
+                environments: [],
+                httpMethods: [],
+                from: '',
+                to: '',
+                trace_id: '',
+                user_id: '',
+                ip_address: '',
+                url: ''
+            };
             this.page = 1;
             this.fetchLogs();
         },

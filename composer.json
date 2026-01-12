@@ -35,8 +35,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "LogScope\\Tests\\": "tests/",
-            "LogScope\\Database\\Factories\\": "database/factories/"
+            "LogScope\\Tests\\": "tests/"
         }
     },
     "extra": {

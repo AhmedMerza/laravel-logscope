@@ -6,14 +6,25 @@ namespace LogScope\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Support\Carbon;
+use LogScope\Database\Factories\LogEntryFactory;
 
 class LogEntry extends Model
 {
+    use HasFactory;
     use HasUlids;
     use Prunable;
+
+    /**
+     * Create a new factory instance for the model.
+     */
+    protected static function newFactory(): LogEntryFactory
+    {
+        return LogEntryFactory::new();
+    }
 
     public $timestamps = false;
 

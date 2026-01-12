@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
+use LogScope\Console\Commands\SeedCommand;
 use LogScope\Http\Middleware\CaptureRequestContext;
 
 class LogScopeServiceProvider extends ServiceProvider
@@ -58,6 +59,7 @@ class LogScopeServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 ImportCommand::class,
                 PruneCommand::class,
+                SeedCommand::class,
             ]);
         }
     }
