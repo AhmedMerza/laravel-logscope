@@ -127,6 +127,70 @@
                 </div>
             </div>
             @endif
+
+            @if(count($httpMethods) > 0)
+            <!-- HTTP Method Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.httpMethods = !sections.httpMethods"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>HTTP Method</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.httpMethods }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="sections.httpMethods" x-collapse class="px-4 pb-4">
+                    <div class="space-y-1">
+                        @foreach($httpMethods as $method)
+                        <button @click="toggleHttpMethod('{{ $method }}')"
+                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
+                            :class="filters.httpMethods.includes('{{ $method }}')
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                            <span class="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-400">{{ substr($method, 0, 1) }}</span>
+                            <span class="flex-1 text-left">{{ $method }}</span>
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Request Context Section -->
+            <div class="border-b border-gray-200 dark:border-gray-800">
+                <button @click="sections.request = !sections.request"
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <span>Request</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.request }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="sections.request" x-collapse class="px-4 pb-4 space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Trace ID</label>
+                        <input type="text" x-model="filters.trace_id" @input.debounce.300ms="fetchLogs()"
+                            placeholder="Filter by trace..."
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">User ID</label>
+                        <input type="text" x-model="filters.user_id" @input.debounce.300ms="fetchLogs()"
+                            placeholder="Filter by user..."
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">IP Address</label>
+                        <input type="text" x-model="filters.ip_address" @input.debounce.300ms="fetchLogs()"
+                            placeholder="Filter by IP..."
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">URL</label>
+                        <input type="text" x-model="filters.url" @input.debounce.300ms="fetchLogs()"
+                            placeholder="Filter by URL..."
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Theme Toggle -->
@@ -172,7 +236,7 @@
                             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
-                            <input type="text" x-model.debounce.300ms="searches[0].value" @input="fetchLogs()"
+                            <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
                                 placeholder="Search logs..."
                                 class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
@@ -241,7 +305,7 @@
                         <option value="context">Context</option>
                         <option value="source">Source</option>
                     </select>
-                    <input type="text" x-model.debounce.300ms="searches[index + 1].value" @input="fetchLogs()"
+                    <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
                         placeholder="Search..."
                         class="flex-1 h-8 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button @click="removeSearch(index + 1)"
@@ -302,8 +366,23 @@
                     </div>
                 </div>
 
+                <!-- Error Alert -->
+                <div x-show="error" x-cloak class="mx-4 mt-4">
+                    <div class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-sm text-red-700 dark:text-red-300" x-text="error"></p>
+                        <button @click="error = null" class="ml-auto text-red-500 hover:text-red-700 dark:hover:text-red-300">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Empty State -->
-                <div x-show="!loading && logs.length === 0" x-cloak class="flex-1 flex items-center justify-center">
+                <div x-show="!loading && !error && logs.length === 0" x-cloak class="flex-1 flex items-center justify-center">
                     <div class="text-center">
                         <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -441,14 +520,57 @@
                             x-text="JSON.stringify(selectedLog?.context, null, 2)"></pre>
                     </div>
 
-                    <!-- Fingerprint -->
-                    <div x-show="selectedLog?.fingerprint">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Fingerprint</p>
-                        <button @click="filterByFingerprint(selectedLog?.fingerprint)"
-                            class="w-full p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm font-mono text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-left break-all transition-colors">
-                            <span x-text="selectedLog?.fingerprint"></span>
-                            <span class="block mt-1 text-xs text-blue-500 dark:text-blue-500">Click to find similar logs</span>
-                        </button>
+                    <!-- Request Context -->
+                    <div x-show="selectedLog?.trace_id || selectedLog?.user_id || selectedLog?.ip_address || selectedLog?.url">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Request Context</p>
+                        <div class="space-y-2">
+                            <!-- Trace ID -->
+                            <div x-show="selectedLog?.trace_id" class="flex items-center gap-2">
+                                <button @click="filterByTraceId(selectedLog?.trace_id)"
+                                    class="flex-1 p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-sm font-mono text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-left break-all transition-colors">
+                                    <span class="text-xs text-purple-500 dark:text-purple-500 block">Trace ID</span>
+                                    <span x-text="selectedLog?.trace_id" class="text-xs"></span>
+                                </button>
+                            </div>
+                            <!-- User ID -->
+                            <div x-show="selectedLog?.user_id" class="flex items-center gap-2">
+                                <button @click="filterByUserId(selectedLog?.user_id)"
+                                    class="flex-1 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-sm font-mono text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 text-left transition-colors">
+                                    <span class="text-xs text-green-500 dark:text-green-500 block">User ID</span>
+                                    <span x-text="selectedLog?.user_id"></span>
+                                </button>
+                            </div>
+                            <!-- IP Address -->
+                            <div x-show="selectedLog?.ip_address" class="flex items-center gap-2">
+                                <button @click="filterByIpAddress(selectedLog?.ip_address)"
+                                    class="flex-1 p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-sm font-mono text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-left transition-colors">
+                                    <span class="text-xs text-orange-500 dark:text-orange-500 block">IP Address</span>
+                                    <span x-text="selectedLog?.ip_address"></span>
+                                </button>
+                            </div>
+                            <!-- HTTP Method & URL -->
+                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span x-show="selectedLog?.http_method" class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300" x-text="selectedLog?.http_method"></span>
+                                    <span x-show="selectedLog?.url" class="font-mono text-gray-600 dark:text-gray-300 break-all text-xs" x-text="selectedLog?.url"></span>
+                                </div>
+                                <div x-show="selectedLog?.http_status" class="mt-1">
+                                    <span class="text-xs"
+                                        :class="{
+                                            'text-green-600 dark:text-green-400': selectedLog?.http_status >= 200 && selectedLog?.http_status < 300,
+                                            'text-yellow-600 dark:text-yellow-400': selectedLog?.http_status >= 300 && selectedLog?.http_status < 400,
+                                            'text-red-600 dark:text-red-400': selectedLog?.http_status >= 400
+                                        }">
+                                        Status: <span x-text="selectedLog?.http_status"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- User Agent -->
+                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                                <span class="text-xs text-gray-500 dark:text-gray-500 block">User Agent</span>
+                                <span class="text-xs font-mono text-gray-600 dark:text-gray-400 break-all" x-text="selectedLog?.user_agent"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -476,6 +598,7 @@ function logScope() {
         meta: { current_page: 1, last_page: 1, per_page: 50, total: 0 },
         stats: {},
         loading: true,
+        error: null,
         selectedLog: null,
         searches: [{ field: 'any', value: '' }],
         searchMode: 'and',
@@ -483,15 +606,21 @@ function logScope() {
             levels: [],
             channels: [],
             environments: [],
+            httpMethods: [],
             from: '',
             to: '',
-            fingerprint: ''
+            trace_id: '',
+            user_id: '',
+            ip_address: '',
+            url: ''
         },
         sections: {
             overview: JSON.parse(localStorage.getItem('logscope-section-overview') ?? 'true'),
             severity: JSON.parse(localStorage.getItem('logscope-section-severity') ?? 'true'),
             channels: JSON.parse(localStorage.getItem('logscope-section-channels') ?? 'true'),
             environments: JSON.parse(localStorage.getItem('logscope-section-environments') ?? 'true'),
+            httpMethods: JSON.parse(localStorage.getItem('logscope-section-httpMethods') ?? 'true'),
+            request: JSON.parse(localStorage.getItem('logscope-section-request') ?? 'false'),
         },
         page: 1,
 
@@ -501,6 +630,8 @@ function logScope() {
             this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
             this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
             this.$watch('sections.environments', val => localStorage.setItem('logscope-section-environments', JSON.stringify(val)));
+            this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
+            this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
             await Promise.all([this.fetchLogs(), this.fetchStats()]);
         },
@@ -518,10 +649,35 @@ function logScope() {
             return this.filters.levels.length > 0 ||
                 this.filters.channels.length > 0 ||
                 this.filters.environments.length > 0 ||
+                this.filters.httpMethods.length > 0 ||
                 this.searches.some(s => s.value) ||
                 this.filters.from ||
                 this.filters.to ||
-                this.filters.fingerprint;
+                this.filters.trace_id ||
+                this.filters.user_id ||
+                this.filters.ip_address ||
+                this.filters.url;
+        },
+
+        toggleHttpMethod(method) {
+            const i = this.filters.httpMethods.indexOf(method);
+            i === -1 ? this.filters.httpMethods.push(method) : this.filters.httpMethods.splice(i, 1);
+            this.fetchLogs();
+        },
+
+        filterByTraceId(traceId) {
+            this.filters.trace_id = traceId;
+            this.fetchLogs();
+        },
+
+        filterByUserId(userId) {
+            this.filters.user_id = userId;
+            this.fetchLogs();
+        },
+
+        filterByIpAddress(ip) {
+            this.filters.ip_address = ip;
+            this.fetchLogs();
         },
 
         toggleLevel(level) {
@@ -544,15 +700,20 @@ function logScope() {
 
         async fetchLogs() {
             this.loading = true;
+            this.error = null;
             try {
                 const params = new URLSearchParams();
                 params.append('page', this.page);
                 if (this.filters.from) params.append('from', this.filters.from);
                 if (this.filters.to) params.append('to', this.filters.to);
-                if (this.filters.fingerprint) params.append('fingerprint', this.filters.fingerprint);
+                if (this.filters.trace_id) params.append('trace_id', this.filters.trace_id);
+                if (this.filters.user_id) params.append('user_id', this.filters.user_id);
+                if (this.filters.ip_address) params.append('ip_address', this.filters.ip_address);
+                if (this.filters.url) params.append('url', this.filters.url);
                 this.filters.levels.forEach(l => params.append('levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
                 this.filters.environments.forEach(e => params.append('environments[]', e));
+                this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
 
                 // Add advanced search params
                 const activeSearches = this.searches.filter(s => s.value);
@@ -566,10 +727,19 @@ function logScope() {
 
                 const response = await fetch(`{{ route('logscope.logs') }}?${params}`);
                 const data = await response.json();
+
+                if (!response.ok) {
+                    this.error = data.message || data.error || 'Failed to fetch logs';
+                    this.logs = [];
+                    this.meta = { current_page: 1, last_page: 1, per_page: 50, total: 0 };
+                    return;
+                }
+
                 this.logs = data.data;
                 this.meta = data.meta;
             } catch (error) {
                 console.error('Failed to fetch logs:', error);
+                this.error = 'Failed to fetch logs. Please try again.';
             } finally {
                 this.loading = false;
             }
@@ -633,12 +803,6 @@ function logScope() {
             this.fetchLogs();
         },
 
-        filterByFingerprint(fingerprint) {
-            this.filters.fingerprint = fingerprint;
-            this.page = 1;
-            this.selectedLog = null;
-            this.fetchLogs();
-        },
 
         prevPage() {
             if (this.meta.current_page > 1) {

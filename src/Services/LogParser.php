@@ -66,7 +66,7 @@ class LogParser
                     ];
                 } elseif ($currentEntry !== null) {
                     // Continuation of the previous entry (stack trace, multi-line message)
-                    $currentEntry['message'] .= "\n" . rtrim($line);
+                    $currentEntry['message'] .= "\n".rtrim($line);
                 }
             }
 
@@ -167,7 +167,7 @@ class LogParser
 
         $files = [];
 
-        foreach (glob($path . '/*.log') as $file) {
+        foreach (glob($path.'/*.log') as $file) {
             $files[] = [
                 'path' => $file,
                 'name' => basename($file),

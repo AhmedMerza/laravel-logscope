@@ -67,7 +67,7 @@ class ImportCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->components->info('Found ' . count($files) . ' log file(s) to import.');
+        $this->components->info('Found '.count($files).' log file(s) to import.');
 
         $totalImported = 0;
         $totalSkipped = 0;
@@ -75,7 +75,7 @@ class ImportCommand extends Command
 
         foreach ($files as $file) {
             $this->components->task(
-                "Importing {$file['name']} (" . $this->formatBytes($file['size']) . ')',
+                "Importing {$file['name']} (".$this->formatBytes($file['size']).')',
                 function () use ($file, $since, $chunkSize, &$totalImported, &$totalSkipped, &$totalErrors) {
                     $result = $this->importFile($file['path'], $since, $chunkSize);
                     $totalImported += $result['imported'];
@@ -241,6 +241,6 @@ class ImportCommand extends Command
             $i++;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace LogScope\Logging;
 
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Context;
 use LogScope\Models\LogEntry;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
@@ -39,6 +39,9 @@ class LogScopeHandler extends AbstractProcessingHandler
         try {
             $this->ensureInitialized();
 
+            // Get request context from Laravel Context (set by middleware)
+            $requestContext = Context::get('logscope', []);
+
             LogEntry::createEntry([
                 'level' => strtolower($record->level->name),
                 'message' => $record->message,
@@ -47,13 +50,20 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'environment' => app()->environment(),
                 'source' => $this->extractSource($record),
                 'source_line' => $this->extractSourceLine($record),
+                'trace_id' => $requestContext['trace_id'] ?? null,
+                'user_id' => $requestContext['user_id'] ?? null,
+                'ip_address' => $requestContext['ip_address'] ?? null,
+                'user_agent' => $requestContext['user_agent'] ?? null,
+                'http_method' => $requestContext['http_method'] ?? null,
+                'url' => $requestContext['url'] ?? null,
+                'http_status' => $requestContext['http_status'] ?? null,
                 'occurred_at' => $record->datetime,
             ]);
         } catch (Throwable $e) {
             // Silently fail - don't break the application if logging fails
             // Optionally log to a fallback channel
             if (config('app.debug')) {
-                error_log('LogScope: Failed to write log entry: ' . $e->getMessage());
+                error_log('LogScope: Failed to write log entry: '.$e->getMessage());
             }
         }
     }
@@ -127,7 +137,7 @@ class LogScopeHandler extends AbstractProcessingHandler
             } elseif (is_resource($value)) {
                 $result[$key] = '[Resource]';
             } elseif (is_string($value) && strlen($value) > 10000) {
-                $result[$key] = substr($value, 0, 10000) . '... [truncated]';
+                $result[$key] = substr($value, 0, 10000).'... [truncated]';
             } else {
                 $result[$key] = $value;
             }
@@ -173,7 +183,7 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'data' => get_object_vars($object),
             ];
         } catch (Throwable) {
-            return '[Object: ' . get_class($object) . ']';
+            return '[Object: '.get_class($object).']';
         }
     }
 

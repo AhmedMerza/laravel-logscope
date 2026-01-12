@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace LogScope;
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
+use LogScope\Http\Middleware\CaptureRequestContext;
 
 class LogScopeServiceProvider extends ServiceProvider
 {
@@ -32,6 +34,18 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerRoutes();
         $this->registerViews();
         $this->registerMigrations();
+        $this->registerMiddleware();
+    }
+
+    /**
+     * Register the request context middleware.
+     */
+    protected function registerMiddleware(): void
+    {
+        if (config('logscope.middleware.enabled', true)) {
+            $kernel = $this->app->make(Kernel::class);
+            $kernel->pushMiddleware(CaptureRequestContext::class);
+        }
     }
 
     /**
@@ -68,6 +82,11 @@ class LogScopeServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/views' => resource_path('views/vendor/logscope'),
             ], 'logscope-views');
+
+            // Public assets (images, etc.)
+            $this->publishes([
+                __DIR__.'/../public' => public_path('vendor/logscope'),
+            ], 'logscope-assets');
         }
     }
 

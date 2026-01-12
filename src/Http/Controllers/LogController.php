@@ -22,6 +22,7 @@ class LogController extends Controller
             'levels' => $this->getAvailableLevels(),
             'channels' => $this->getAvailableChannels(),
             'environments' => $this->getAvailableEnvironments(),
+            'httpMethods' => $this->getAvailableHttpMethods(),
             'presets' => FilterPreset::ordered()->get(),
         ]);
     }
@@ -65,7 +66,7 @@ class LogController extends Controller
                         }
 
                         $field = $search['field'] ?? 'any';
-                        $value = '%' . $search['value'] . '%';
+                        $value = '%'.$search['value'].'%';
                         $boolean = ($index === 0 || $searchMode === 'and') ? 'and' : 'or';
 
                         if ($field === 'any') {
@@ -86,13 +87,40 @@ class LogController extends Controller
         }
 
         if ($request->filled('from') || $request->filled('to')) {
-            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from')) : null;
-            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to')) : null;
-            $query->dateRange($from, $to);
+            try {
+                $from = $request->filled('from') ? \Illuminate\Support\Carbon::parse($request->input('from')) : null;
+                $to = $request->filled('to') ? \Illuminate\Support\Carbon::parse($request->input('to')) : null;
+                $query->dateRange($from, $to);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'error' => 'Invalid date format',
+                    'message' => 'Please provide valid dates in a recognized format (e.g., YYYY-MM-DD)',
+                ], 422);
+            }
         }
 
-        if ($request->filled('fingerprint')) {
-            $query->fingerprint($request->input('fingerprint'));
+        if ($request->filled('trace_id')) {
+            $query->traceId($request->input('trace_id'));
+        }
+
+        if ($request->filled('user_id')) {
+            $query->userId($request->input('user_id'));
+        }
+
+        if ($request->filled('ip_address')) {
+            $query->ipAddress($request->input('ip_address'));
+        }
+
+        if ($request->filled('http_method')) {
+            $query->httpMethod((array) $request->input('http_method'));
+        }
+
+        if ($request->filled('http_status')) {
+            $query->httpStatus((array) $request->input('http_status'));
+        }
+
+        if ($request->filled('url')) {
+            $query->url($request->input('url'));
         }
 
         $perPage = min(
@@ -224,6 +252,19 @@ class LogController extends Controller
         return LogEntry::distinct()
             ->whereNotNull('environment')
             ->pluck('environment')
+            ->sort()
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Get available HTTP methods.
+     */
+    protected function getAvailableHttpMethods(): array
+    {
+        return LogEntry::distinct()
+            ->whereNotNull('http_method')
+            ->pluck('http_method')
             ->sort()
             ->values()
             ->toArray();

@@ -7,7 +7,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Run LogScope migrations
-    $this->artisan('migrate', ['--path' => __DIR__ . '/../../database/migrations']);
+    $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
 });
 
 it('creates a log entry with auto-generated fields', function () {
@@ -24,7 +24,6 @@ it('creates a log entry with auto-generated fields', function () {
         ->level->toBe('error')
         ->message->toBe('Test error message')
         ->message_preview->toBe('Test error message')
-        ->fingerprint->not->toBeNull()
         ->occurred_at->not->toBeNull();
 });
 
@@ -40,15 +39,47 @@ it('generates preview for long messages', function () {
     expect($entry->message_preview)->toEndWith('...');
 });
 
-it('generates consistent fingerprints for similar messages', function () {
-    $fp1 = LogEntry::generateFingerprint('User 123 logged in', 'info', '/app/Http/Controllers/AuthController.php');
-    $fp2 = LogEntry::generateFingerprint('User 456 logged in', 'info', '/app/Http/Controllers/AuthController.php');
-    $fp3 = LogEntry::generateFingerprint('User 789 logged out', 'info', '/app/Http/Controllers/AuthController.php');
+it('filters by trace_id', function () {
+    $traceId = \Illuminate\Support\Str::uuid()->toString();
 
-    // Similar messages with different IDs should have same fingerprint
-    expect($fp1)->toBe($fp2);
-    // Different messages should have different fingerprints
-    expect($fp1)->not->toBe($fp3);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'trace_id' => $traceId]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'trace_id' => $traceId]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'trace_id' => \Illuminate\Support\Str::uuid()->toString()]);
+
+    expect(LogEntry::traceId($traceId)->count())->toBe(2);
+});
+
+it('filters by user_id', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'user_id' => 1]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'user_id' => 1]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'user_id' => 2]);
+
+    expect(LogEntry::userId(1)->count())->toBe(2);
+});
+
+it('filters by ip_address', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'ip_address' => '127.0.0.1']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'ip_address' => '127.0.0.1']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'ip_address' => '192.168.1.1']);
+
+    expect(LogEntry::ipAddress('127.0.0.1')->count())->toBe(2);
+});
+
+it('filters by http_method', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'http_method' => 'GET']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'http_method' => 'POST']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'http_method' => 'GET']);
+
+    expect(LogEntry::httpMethod('GET')->count())->toBe(2);
+    expect(LogEntry::httpMethod(['GET', 'POST'])->count())->toBe(3);
+});
+
+it('filters by url', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'url' => '/api/users']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'url' => '/api/users/1']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'url' => '/api/posts']);
+
+    expect(LogEntry::url('/api/users')->count())->toBe(2);
 });
 
 it('filters by level', function () {

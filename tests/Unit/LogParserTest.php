@@ -4,8 +4,8 @@ use Carbon\Carbon;
 use LogScope\Services\LogParser;
 
 beforeEach(function () {
-    $this->parser = new LogParser();
-    $this->testLogPath = sys_get_temp_dir() . '/test_laravel.log';
+    $this->parser = new LogParser;
+    $this->testLogPath = sys_get_temp_dir().'/test_laravel.log';
 });
 
 afterEach(function () {
@@ -29,7 +29,7 @@ it('parses a simple log entry', function () {
 });
 
 it('parses multiple log entries', function () {
-    $logContent = <<<LOG
+    $logContent = <<<'LOG'
 [2024-01-15 10:30:45] local.INFO: First message
 [2024-01-15 10:30:46] local.WARNING: Second message
 [2024-01-15 10:30:47] local.ERROR: Third message
@@ -45,11 +45,11 @@ LOG;
 });
 
 it('handles multi-line log entries with stack traces', function () {
-    $logContent = <<<LOG
+    $logContent = <<<'LOG'
 [2024-01-15 10:30:45] local.ERROR: Exception occurred {"exception":"[object] (Exception(code: 0): Something went wrong at /app/Http/Controllers/TestController.php:42)
 [stacktrace]
-#0 /vendor/laravel/framework/src/Illuminate/Routing/Controller.php(54): App\\Http\\Controllers\\TestController->index()
-#1 /vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction()"}
+#0 /vendor/laravel/framework/src/Illuminate/Routing/Controller.php(54): App\Http\Controllers\TestController->index()
+#1 /vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction()"}
 [2024-01-15 10:30:46] local.INFO: Next log entry
 LOG;
     file_put_contents($this->testLogPath, $logContent);
@@ -74,7 +74,7 @@ it('extracts source file and line from message', function () {
 });
 
 it('filters entries by date', function () {
-    $logContent = <<<LOG
+    $logContent = <<<'LOG'
 [2024-01-10 10:00:00] local.INFO: Old message
 [2024-01-15 10:00:00] local.INFO: Recent message
 [2024-01-16 10:00:00] local.INFO: Newer message
@@ -106,7 +106,7 @@ it('handles log entries without context', function () {
 });
 
 it('parses different log levels', function () {
-    $logContent = <<<LOG
+    $logContent = <<<'LOG'
 [2024-01-15 10:30:45] local.DEBUG: Debug
 [2024-01-15 10:30:45] local.INFO: Info
 [2024-01-15 10:30:45] local.NOTICE: Notice
@@ -127,7 +127,7 @@ LOG;
 });
 
 it('counts entries without loading all into memory', function () {
-    $logContent = <<<LOG
+    $logContent = <<<'LOG'
 [2024-01-15 10:30:45] local.INFO: Message 1
 [2024-01-15 10:30:46] local.INFO: Message 2
 [2024-01-15 10:30:47] local.INFO: Message 3

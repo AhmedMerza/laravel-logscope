@@ -50,6 +50,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Request Context Middleware
+    |--------------------------------------------------------------------------
+    |
+    | Enable automatic capturing of request context (trace ID, user ID, IP,
+    | etc.) for all log entries. This adds a global middleware that captures
+    | request information and attaches it to all logs.
+    |
+    */
+
+    'middleware' => [
+        'enabled' => env('LOGSCOPE_MIDDLEWARE_ENABLED', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Migrations
     |--------------------------------------------------------------------------
     |
@@ -126,13 +141,13 @@ return [
         // Log level colors
         'levels' => [
             'emergency' => ['bg' => '#7f1d1d', 'text' => '#fecaca'],
-            'alert'     => ['bg' => '#9a3412', 'text' => '#fed7aa'],
-            'critical'  => ['bg' => '#991b1b', 'text' => '#fecaca'],
-            'error'     => ['bg' => '#dc2626', 'text' => '#ffffff'],
-            'warning'   => ['bg' => '#f59e0b', 'text' => '#1f2937'],
-            'notice'    => ['bg' => '#06b6d4', 'text' => '#ffffff'],
-            'info'      => ['bg' => '#3b82f6', 'text' => '#ffffff'],
-            'debug'     => ['bg' => '#6b7280', 'text' => '#ffffff'],
+            'alert' => ['bg' => '#9a3412', 'text' => '#fed7aa'],
+            'critical' => ['bg' => '#991b1b', 'text' => '#fecaca'],
+            'error' => ['bg' => '#dc2626', 'text' => '#ffffff'],
+            'warning' => ['bg' => '#f59e0b', 'text' => '#1f2937'],
+            'notice' => ['bg' => '#06b6d4', 'text' => '#ffffff'],
+            'info' => ['bg' => '#3b82f6', 'text' => '#ffffff'],
+            'debug' => ['bg' => '#6b7280', 'text' => '#ffffff'],
         ],
     ],
 

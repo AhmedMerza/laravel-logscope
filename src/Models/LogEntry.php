@@ -124,11 +124,59 @@ class LogEntry extends Model
     }
 
     /**
-     * Scope: Filter by fingerprint (group similar logs).
+     * Scope: Filter by trace ID (group logs from same request).
      */
-    public function scopeFingerprint(Builder $query, string $fingerprint): Builder
+    public function scopeTraceId(Builder $query, string $traceId): Builder
     {
-        return $query->where('fingerprint', $fingerprint);
+        return $query->where('trace_id', $traceId);
+    }
+
+    /**
+     * Scope: Filter by user ID.
+     */
+    public function scopeUserId(Builder $query, int|string $userId): Builder
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope: Filter by IP address.
+     */
+    public function scopeIpAddress(Builder $query, string $ipAddress): Builder
+    {
+        return $query->where('ip_address', $ipAddress);
+    }
+
+    /**
+     * Scope: Filter by HTTP method.
+     */
+    public function scopeHttpMethod(Builder $query, string|array $method): Builder
+    {
+        if (is_array($method)) {
+            return $query->whereIn('http_method', $method);
+        }
+
+        return $query->where('http_method', $method);
+    }
+
+    /**
+     * Scope: Filter by HTTP status code.
+     */
+    public function scopeHttpStatus(Builder $query, int|array $status): Builder
+    {
+        if (is_array($status)) {
+            return $query->whereIn('http_status', $status);
+        }
+
+        return $query->where('http_status', $status);
+    }
+
+    /**
+     * Scope: Filter by URL (partial match).
+     */
+    public function scopeUrl(Builder $query, string $url): Builder
+    {
+        return $query->where('url', 'like', "%{$url}%");
     }
 
     /**
@@ -148,19 +196,6 @@ class LogEntry extends Model
     }
 
     /**
-     * Generate a fingerprint for grouping similar log entries.
-     */
-    public static function generateFingerprint(string $message, string $level, ?string $source = null): string
-    {
-        // Remove variable parts like timestamps, IDs, etc.
-        $normalized = preg_replace('/\d+/', '#', $message);
-        $normalized = preg_replace('/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i', '#UUID#', $normalized);
-        $normalized = preg_replace('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', '#EMAIL#', $normalized);
-
-        return hash('xxh64', $level . '|' . ($source ?? '') . '|' . $normalized);
-    }
-
-    /**
      * Create a preview from full content.
      */
     public static function createPreview(string $content, int $maxLength): string
@@ -169,7 +204,7 @@ class LogEntry extends Model
             return $content;
         }
 
-        return substr($content, 0, $maxLength - 3) . '...';
+        return substr($content, 0, $maxLength - 3).'...';
     }
 
     /**
@@ -210,15 +245,6 @@ class LogEntry extends Model
                 $attributes['context'] = ['_truncated' => true, '_original_size' => strlen($contextJson)];
                 $attributes['is_truncated'] = true;
             }
-        }
-
-        // Generate fingerprint
-        if (! isset($attributes['fingerprint']) && isset($attributes['message'], $attributes['level'])) {
-            $attributes['fingerprint'] = static::generateFingerprint(
-                $attributes['message'],
-                $attributes['level'],
-                $attributes['source'] ?? null
-            );
         }
 
         // Set occurred_at if not provided

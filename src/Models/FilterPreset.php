@@ -77,13 +77,29 @@ class FilterPreset extends Model
         }
 
         if (! empty($filters['from']) || ! empty($filters['to'])) {
-            $from = ! empty($filters['from']) ? \Carbon\Carbon::parse($filters['from']) : null;
-            $to = ! empty($filters['to']) ? \Carbon\Carbon::parse($filters['to']) : null;
+            $from = ! empty($filters['from']) ? \Illuminate\Support\Carbon::parse($filters['from']) : null;
+            $to = ! empty($filters['to']) ? \Illuminate\Support\Carbon::parse($filters['to']) : null;
             $query->dateRange($from, $to);
         }
 
-        if (! empty($filters['fingerprint'])) {
-            $query->fingerprint($filters['fingerprint']);
+        if (! empty($filters['trace_id'])) {
+            $query->traceId($filters['trace_id']);
+        }
+
+        if (! empty($filters['user_id'])) {
+            $query->userId($filters['user_id']);
+        }
+
+        if (! empty($filters['ip_address'])) {
+            $query->ipAddress($filters['ip_address']);
+        }
+
+        if (! empty($filters['http_method'])) {
+            $query->httpMethod($filters['http_method']);
+        }
+
+        if (! empty($filters['url'])) {
+            $query->url($filters['url']);
         }
 
         return $query;

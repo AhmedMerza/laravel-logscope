@@ -7,7 +7,7 @@ use LogScope\Models\LogEntry;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->artisan('migrate', ['--path' => __DIR__ . '/../../database/migrations']);
+    $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
 });
 
 it('creates a filter preset', function () {
