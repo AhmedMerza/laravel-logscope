@@ -99,35 +99,6 @@
             </div>
             @endif
 
-            @if(count($environments) > 0)
-            <!-- Environment Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
-                <button @click="sections.environments = !sections.environments"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
-                    <span>Environment</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.environments }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="sections.environments" x-collapse class="px-4 pb-4">
-                    <div class="space-y-1">
-                        @foreach($environments as $env)
-                        <button @click="toggleEnvironment('{{ $env }}')"
-                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                            :class="filters.environments.includes('{{ $env }}')
-                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
-                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
-                            </svg>
-                            <span class="flex-1 text-left">{{ $env }}</span>
-                        </button>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-            @endif
-
             @if(count($httpMethods) > 0)
             <!-- HTTP Method Section -->
             <div class="border-b border-gray-200 dark:border-slate-600">
@@ -335,12 +306,6 @@
                         <button @click="toggleChannel(channel)" class="hover:text-green-900 dark:hover:text-white">&times;</button>
                     </span>
                 </template>
-                <template x-for="env in filters.environments" :key="env">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200">
-                        <span x-text="env"></span>
-                        <button @click="toggleEnvironment(env)" class="hover:text-purple-900 dark:hover:text-white">&times;</button>
-                    </span>
-                </template>
                 <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-slate-500 text-gray-700 dark:text-gray-200">
                         <span x-text="search.field === 'any' ? '' : search.field + ':'"></span>
@@ -478,7 +443,7 @@
                 <!-- Panel Content -->
                 <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
                     <!-- Meta -->
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-3 gap-3">
                         <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Level</p>
                             <p class="mt-1">
@@ -490,12 +455,8 @@
                             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="selectedLog?.channel || '-'"></p>
                         </div>
                         <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
-                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Environment</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="selectedLog?.environment || '-'"></p>
-                        </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="formatDateTime(selectedLog?.occurred_at)"></p>
+                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap" x-text="formatTime(selectedLog?.occurred_at)"></p>
                         </div>
                     </div>
 
@@ -649,7 +610,6 @@ function logScope() {
         filters: {
             levels: [],
             channels: [],
-            environments: [],
             httpMethods: [],
             from: '',
             to: '',
@@ -662,7 +622,6 @@ function logScope() {
             overview: JSON.parse(localStorage.getItem('logscope-section-overview') ?? 'true'),
             severity: JSON.parse(localStorage.getItem('logscope-section-severity') ?? 'true'),
             channels: JSON.parse(localStorage.getItem('logscope-section-channels') ?? 'true'),
-            environments: JSON.parse(localStorage.getItem('logscope-section-environments') ?? 'true'),
             httpMethods: JSON.parse(localStorage.getItem('logscope-section-httpMethods') ?? 'true'),
             request: JSON.parse(localStorage.getItem('logscope-section-request') ?? 'false'),
         },
@@ -673,7 +632,6 @@ function logScope() {
             this.$watch('sections.overview', val => localStorage.setItem('logscope-section-overview', JSON.stringify(val)));
             this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
             this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
-            this.$watch('sections.environments', val => localStorage.setItem('logscope-section-environments', JSON.stringify(val)));
             this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
             this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
@@ -692,7 +650,6 @@ function logScope() {
         hasActiveFilters() {
             return this.filters.levels.length > 0 ||
                 this.filters.channels.length > 0 ||
-                this.filters.environments.length > 0 ||
                 this.filters.httpMethods.length > 0 ||
                 this.searches.some(s => s.value) ||
                 this.filters.from ||
@@ -742,12 +699,6 @@ function logScope() {
             this.fetchLogs();
         },
 
-        toggleEnvironment(env) {
-            const i = this.filters.environments.indexOf(env);
-            i === -1 ? this.filters.environments.push(env) : this.filters.environments.splice(i, 1);
-            this.fetchLogs();
-        },
-
         async fetchLogs() {
             this.loading = true;
             this.error = null;
@@ -762,7 +713,6 @@ function logScope() {
                 if (this.filters.url) params.append('url', this.filters.url);
                 this.filters.levels.forEach(l => params.append('levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
-                this.filters.environments.forEach(e => params.append('environments[]', e));
                 this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
 
                 // Add advanced search params
@@ -860,7 +810,6 @@ function logScope() {
             this.filters = {
                 levels: [],
                 channels: [],
-                environments: [],
                 httpMethods: [],
                 from: '',
                 to: '',
