@@ -67,6 +67,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Write Mode (Performance)
+    |--------------------------------------------------------------------------
+    |
+    | Choose how logs are written to the database:
+    |
+    | 'sync'  - Write immediately (simplest, but can slow requests)
+    |
+    | 'batch' - Buffer logs during request, write AFTER response is sent.
+    |           Best balance of performance and simplicity. (default)
+    |
+    | 'queue' - Dispatch a queued job for each log entry.
+    |           Best performance but requires queue worker running.
+    |           Uses the queue specified in 'queue_name'.
+    |
+    */
+
+    'write_mode' => env('LOGSCOPE_WRITE_MODE', 'batch'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Configuration
+    |--------------------------------------------------------------------------
+    |
+    | When write_mode is 'queue', these settings control the queue behavior.
+    |
+    */
+
+    'queue' => [
+        'name' => env('LOGSCOPE_QUEUE', 'default'),
+        'connection' => env('LOGSCOPE_QUEUE_CONNECTION'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Request Context Middleware
     |--------------------------------------------------------------------------
     |

@@ -14,11 +14,22 @@ use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
 use LogScope\Console\Commands\SeedCommand;
 use LogScope\Http\Middleware\CaptureRequestContext;
+use LogScope\Jobs\WriteLogEntry;
 use LogScope\Models\LogEntry;
 use Throwable;
 
 class LogScopeServiceProvider extends ServiceProvider
 {
+    /**
+     * Buffer for batch write mode.
+     */
+    protected static array $logBuffer = [];
+
+    /**
+     * Whether terminating callback is registered.
+     */
+    protected static bool $terminatingRegistered = false;
+
     /**
      * Register any application services.
      */
@@ -63,7 +74,7 @@ class LogScopeServiceProvider extends ServiceProvider
                 // Get request context from Laravel Context (set by middleware)
                 $requestContext = Context::get('logscope', []);
 
-                LogEntry::createEntry([
+                $data = [
                     'level' => $event->level,
                     'message' => $event->message,
                     'context' => $this->sanitizeContext($event->context),
@@ -79,7 +90,9 @@ class LogScopeServiceProvider extends ServiceProvider
                     'url' => $requestContext['url'] ?? null,
                     'http_status' => $requestContext['http_status'] ?? null,
                     'occurred_at' => now(),
-                ]);
+                ];
+
+                $this->writeLog($data);
             } catch (Throwable $e) {
                 // Silently fail - don't break the application
                 if (config('app.debug')) {
@@ -87,6 +100,60 @@ class LogScopeServiceProvider extends ServiceProvider
                 }
             }
         });
+    }
+
+    /**
+     * Write a log entry based on the configured write mode.
+     */
+    protected function writeLog(array $data): void
+    {
+        $mode = config('logscope.write_mode', 'batch');
+
+        match ($mode) {
+            'sync' => LogEntry::createEntry($data),
+            'queue' => WriteLogEntry::dispatch($data),
+            'batch' => $this->bufferLog($data),
+            default => LogEntry::createEntry($data),
+        };
+    }
+
+    /**
+     * Buffer a log entry for batch writing.
+     */
+    protected function bufferLog(array $data): void
+    {
+        self::$logBuffer[] = $data;
+
+        // Register terminating callback once
+        if (! self::$terminatingRegistered) {
+            self::$terminatingRegistered = true;
+
+            $this->app->terminating(function () {
+                $this->flushLogBuffer();
+            });
+        }
+    }
+
+    /**
+     * Flush the log buffer to the database.
+     */
+    protected function flushLogBuffer(): void
+    {
+        if (empty(self::$logBuffer)) {
+            return;
+        }
+
+        try {
+            foreach (self::$logBuffer as $data) {
+                LogEntry::createEntry($data);
+            }
+        } catch (Throwable $e) {
+            if (config('app.debug')) {
+                error_log('LogScope: Failed to flush log buffer: '.$e->getMessage());
+            }
+        } finally {
+            self::$logBuffer = [];
+        }
     }
 
     /**
