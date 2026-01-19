@@ -6,13 +6,16 @@ A fast, database-backed log viewer for Laravel applications.
 
 ## Features
 
+- **Automatic log capture** - Captures ALL logs from ALL channels automatically (zero config)
+- **Request context tracking** - Trace ID, user ID, IP address, URL, and user agent for every log
 - **Database-backed storage** - Fast queries with proper indexing
-- **Advanced filtering** - Filter by level, channel, environment, and date range
+- **Advanced filtering** - Filter by level, channel, environment, user, IP, and date range
 - **Full-text search** - Find what you need quickly (Scout integration optional)
 - **Exclusion filters** - Hide noise, focus on what matters
 - **Retention policies** - Auto-prune old logs after configurable period
 - **Saved presets** - Save and reuse your filter combinations
-- **Highly configurable** - Customize table names, retention periods, and more
+- **Performance optimized** - Batch writes after response, queue support for high-traffic apps
+- **Highly configurable** - Customize capture mode, write mode, table names, and more
 
 ## Requirements
 
@@ -37,27 +40,45 @@ php artisan migrate
 
 The config file will be published to `config/logscope.php`. Options include:
 
+- **Capture mode** - `all` (automatic) or `channel` (explicit)
+- **Write mode** - `sync`, `batch` (default), or `queue` for performance tuning
+- **Queue settings** - Queue name and connection for queue write mode
+- **Middleware** - Enable/disable request context capture
 - **Table names** - Customize the database table names
 - **Retention policy** - Enable/disable auto-pruning and set retention days
 - **Route configuration** - Customize prefix, middleware, and domain
 - **Content limits** - Configure preview lengths and truncation thresholds
 - **Search driver** - Choose between database or Scout for search
+- **Theme** - Customize colors for the web interface
 
 ## Usage
 
-### Real-Time Log Capture
+### Automatic Log Capture (Default)
 
-To capture logs in real-time, add the LogScope channel to your `config/logging.php`:
+By default, LogScope automatically captures **all logs from all channels** with zero configuration. Just install and you're done!
+
+```php
+// All of these are captured automatically
+Log::info('User logged in', ['user_id' => 1]);
+Log::channel('slack')->error('Payment failed');
+Log::stack(['daily', 'slack'])->warning('Low inventory');
+```
+
+### Capture Modes
+
+LogScope supports two capture modes:
+
+**`all` (default)** - Automatically captures logs from ALL channels using Laravel's `Log::listen()`. No configuration needed.
+
+**`channel`** - Only captures logs explicitly sent to the LogScope channel. Add the channel to your `config/logging.php`:
 
 ```php
 'channels' => [
-    // Add logscope to your stack
     'stack' => [
         'driver' => 'stack',
         'channels' => ['single', 'logscope'],
     ],
 
-    // Add the logscope channel
     'logscope' => [
         'driver' => 'custom',
         'via' => \LogScope\Logging\LogScopeChannel::class,
@@ -66,7 +87,40 @@ To capture logs in real-time, add the LogScope channel to your `config/logging.p
 ],
 ```
 
-Now all logs will be stored in the database automatically.
+Set the capture mode in your `.env`:
+
+```env
+LOGSCOPE_CAPTURE=all    # or 'channel'
+```
+
+### Write Modes (Performance)
+
+LogScope offers three write modes optimized for different use cases:
+
+**`batch` (default)** - Buffers logs during the request and writes them AFTER the response is sent. Best balance of performance and simplicity.
+
+**`sync`** - Writes immediately to the database. Simplest but can slow down requests.
+
+**`queue`** - Dispatches a queued job for each log entry. Best performance for high-traffic apps but requires a queue worker.
+
+```env
+LOGSCOPE_WRITE_MODE=batch    # 'sync', 'batch', or 'queue'
+LOGSCOPE_QUEUE=default       # Queue name (when using 'queue' mode)
+LOGSCOPE_QUEUE_CONNECTION=   # Optional queue connection
+```
+
+### Request Context
+
+LogScope automatically captures request context for every log entry:
+
+- **Trace ID** - Unique identifier to group all logs from a single request
+- **User ID** - Authenticated user (if any)
+- **IP Address** - Client IP
+- **User Agent** - Browser/client information
+- **HTTP Method** - GET, POST, PUT, etc.
+- **URL** - The request URL
+
+This makes it easy to trace issues across your application.
 
 ### Import Existing Logs
 
@@ -116,13 +170,37 @@ php artisan vendor:publish --tag=logscope-views
 ### Environment Variables
 
 ```env
+# Capture mode: 'all' (default) or 'channel'
+LOGSCOPE_CAPTURE=all
+
+# Write mode: 'sync', 'batch' (default), or 'queue'
+LOGSCOPE_WRITE_MODE=batch
+
+# Queue settings (when using 'queue' write mode)
+LOGSCOPE_QUEUE=default
+LOGSCOPE_QUEUE_CONNECTION=
+
+# Request context middleware
+LOGSCOPE_MIDDLEWARE_ENABLED=true
+
+# Database tables
 LOGSCOPE_TABLE_ENTRIES=log_entries
 LOGSCOPE_TABLE_PRESETS=filter_presets
+
+# Retention policy
 LOGSCOPE_RETENTION_ENABLED=true
 LOGSCOPE_RETENTION_DAYS=30
+
+# Routes
 LOGSCOPE_ROUTES_ENABLED=true
 LOGSCOPE_ROUTE_PREFIX=logscope
+LOGSCOPE_DOMAIN=
+
+# Search
 LOGSCOPE_SEARCH_DRIVER=database
+
+# Migrations
+LOGSCOPE_MIGRATIONS_ENABLED=true
 ```
 
 ## Contributing
