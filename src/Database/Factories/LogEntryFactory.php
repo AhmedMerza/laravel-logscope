@@ -130,9 +130,6 @@ class LogEntryFactory extends Factory
                 '/api/products',
                 '/checkout',
             ]) : null,
-            'http_status' => $hasRequestContext && $this->faker->boolean(40)
-                ? $this->faker->randomElement([200, 201, 204, 301, 400, 401, 403, 404, 500, 502, 503])
-                : null,
             'occurred_at' => $this->faker->dateTimeBetween('-7 days', 'now'),
         ];
     }

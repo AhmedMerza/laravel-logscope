@@ -413,7 +413,7 @@
                                         <div class="level-indicator h-full" :class="'level-' + log.level"></div>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums font-mono" x-text="formatTime(log.occurred_at)"></span>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums font-mono whitespace-nowrap" x-text="formatTime(log.occurred_at)"></span>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="level-badge" :class="'level-' + log.level" x-text="log.level"></span>
