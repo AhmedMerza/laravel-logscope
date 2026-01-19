@@ -3,7 +3,7 @@
 @section('content')
 <div x-data="logScope()" x-init="init()" class="h-full flex" @keydown.escape.window="closePanel()">
     <!-- Sidebar -->
-    <aside class="w-64 flex-shrink-0 bg-white dark:bg-slate-850 border-r border-gray-200 dark:border-slate-600 flex flex-col"
+    <aside class="w-64 flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-r border-gray-200 dark:border-slate-600 flex flex-col"
         :class="{ 'hidden': !sidebarOpen }" x-cloak>
         <!-- Logo -->
         <div class="h-14 flex items-center gap-2 px-4 border-b border-gray-200 dark:border-slate-600">
@@ -211,7 +211,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">
         <!-- Header -->
-        <header class="bg-white dark:bg-slate-850 border-b border-gray-200 dark:border-slate-600">
+        <header class="bg-slate-100 dark:bg-slate-850 border-b border-gray-200 dark:border-slate-600">
             <!-- Main header row -->
             <div class="h-14 flex items-center gap-4 px-4">
                 <!-- Sidebar Toggle -->
@@ -255,12 +255,12 @@
                     <div x-show="searches.length > 1" class="flex items-center bg-gray-100 dark:bg-slate-600 rounded-lg p-0.5">
                         <button @click="searchMode = 'and'"
                             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'and' ? 'bg-white dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            :class="searchMode === 'and' ? 'bg-slate-100 dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
                             AND
                         </button>
                         <button @click="searchMode = 'or'"
                             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'or' ? 'bg-white dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            :class="searchMode === 'or' ? 'bg-slate-100 dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
                             OR
                         </button>
                     </div>
@@ -299,7 +299,7 @@
                 <div class="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-600/30">
                     <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-10" x-text="searchMode.toUpperCase()"></span>
                     <select x-model="searches[index + 1].field"
-                        class="h-8 px-2 bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="h-8 px-2 bg-slate-100 dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="any">Any field</option>
                         <option value="message">Message</option>
                         <option value="context">Context</option>
@@ -307,7 +307,7 @@
                     </select>
                     <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
                         placeholder="Search..."
-                        class="flex-1 h-8 px-3 bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="flex-1 h-8 px-3 bg-slate-100 dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button @click="removeSearch(index + 1)"
                         class="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -433,7 +433,7 @@
 
                 <!-- Pagination -->
                 <div x-show="!loading && logs.length > 0" x-cloak
-                    class="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-850 border-t border-gray-200 dark:border-slate-600">
+                    class="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-850 border-t border-gray-200 dark:border-slate-600">
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         Showing <span class="font-medium text-gray-900 dark:text-gray-100" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
                         to <span class="font-medium text-gray-900 dark:text-gray-100" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
@@ -457,7 +457,7 @@
 
             <!-- Detail Panel -->
             <div x-show="selectedLog" x-cloak
-                class="w-[480px] flex-shrink-0 bg-white dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
+                class="w-[480px] flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-x-4"
                 x-transition:enter-end="opacity-100 translate-x-0"

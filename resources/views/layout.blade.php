@@ -125,7 +125,7 @@
         }
     </style>
 </head>
-<body class="h-full bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
+<body class="h-full bg-slate-200 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
     @yield('content')
 </body>
 </html>
