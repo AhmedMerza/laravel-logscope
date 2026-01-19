@@ -24,6 +24,7 @@ class LogController extends Controller
             'environments' => $this->getAvailableEnvironments(),
             'httpMethods' => $this->getAvailableHttpMethods(),
             'presets' => FilterPreset::ordered()->get(),
+            'quickFilters' => config('logscope.quick_filters', []),
         ]);
     }
 

@@ -13,6 +13,7 @@ A fast, database-backed log viewer for Laravel applications.
 - **Full-text search** - Find what you need quickly (Scout integration optional)
 - **Exclusion filters** - Hide noise, focus on what matters
 - **Retention policies** - Auto-prune old logs after configurable period
+- **Quick filters** - Configurable one-click filters for common queries
 - **Saved presets** - Save and reuse your filter combinations
 - **Performance optimized** - Batch writes after response, queue support for high-traffic apps
 - **Highly configurable** - Customize capture mode, write mode, table names, and more
@@ -49,6 +50,7 @@ The config file will be published to `config/logscope.php`. Options include:
 - **Route configuration** - Customize prefix, middleware, and domain
 - **Content limits** - Configure preview lengths and truncation thresholds
 - **Search driver** - Choose between database or Scout for search
+- **Quick filters** - Define one-click filters for common queries
 - **Theme** - Customize colors for the web interface
 
 ## Usage
@@ -121,6 +123,51 @@ LogScope automatically captures request context for every log entry:
 - **URL** - The request URL
 
 This makes it easy to trace issues across your application.
+
+### Quick Filters
+
+LogScope includes configurable quick filters for common queries. Customize them in `config/logscope.php`:
+
+```php
+'quick_filters' => [
+    [
+        'label' => 'Today',
+        'icon' => 'calendar',  // calendar, clock, alert, or filter
+        'from' => 'today',
+    ],
+    [
+        'label' => 'This Hour',
+        'icon' => 'clock',
+        'from' => '-1 hour',
+    ],
+    [
+        'label' => 'Last 24 Hours',
+        'icon' => 'clock',
+        'from' => '-24 hours',
+    ],
+    [
+        'label' => 'Errors Only',
+        'icon' => 'alert',
+        'levels' => ['error', 'critical', 'alert', 'emergency'],
+    ],
+    // Combine time and levels
+    [
+        'label' => 'Recent Errors',
+        'icon' => 'alert',
+        'levels' => ['error', 'critical'],
+        'from' => '-24 hours',
+    ],
+],
+```
+
+**Time format options:**
+- `'today'` - Start of today
+- `'-1 hour'` - 1 hour ago
+- `'-4 hours'` - 4 hours ago
+- `'-24 hours'` - 24 hours ago
+- `'-7 days'` - 7 days ago
+- `'-1 week'` - 1 week ago
+- `'-1 month'` - 1 month ago
 
 ### Import Existing Logs
 

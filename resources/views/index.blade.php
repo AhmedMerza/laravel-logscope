@@ -17,29 +17,58 @@
 
         <!-- Scrollable Filters -->
         <div class="flex-1 overflow-y-auto custom-scrollbar">
-            <!-- Overview Section -->
+            <!-- Quick Filters Section -->
             <div class="border-b border-gray-200 dark:border-slate-600">
-                <button @click="sections.overview = !sections.overview"
+                <button @click="sections.quickFilters = !sections.quickFilters"
                     class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
-                    <span>Overview</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.overview }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <span>Quick Filters</span>
+                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.quickFilters }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
-                <div x-show="sections.overview" x-collapse class="px-4 pb-4">
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">Total</span>
-                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.total?.toLocaleString() || '0'"></span>
+                <div x-show="sections.quickFilters" x-collapse class="px-4 pb-4">
+                    <div class="space-y-1">
+                        <!-- Quick Filters from Config -->
+                        @foreach($quickFilters as $index => $filter)
+                        <button @click="applyQuickFilter({{ $index }})"
+                            class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
+                            @php $icon = $filter['icon'] ?? 'filter'; @endphp
+                            @if($icon === 'calendar')
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            @elseif($icon === 'clock')
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            @elseif($icon === 'alert')
+                            <svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            @else
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                            </svg>
+                            @endif
+                            <span>{{ $filter['label'] }}</span>
+                        </button>
+                        @endforeach
+
+                        <!-- User Presets -->
+                        @if(isset($presets) && count($presets) > 0)
+                        <div class="border-t border-gray-200 dark:border-slate-500 mt-2 pt-2">
+                            <p class="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 uppercase">Saved Presets</p>
+                            @foreach($presets as $preset)
+                            <button @click="applyPreset({{ $preset->id }})"
+                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
+                                <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                                </svg>
+                                <span>{{ $preset->name }}</span>
+                            </button>
+                            @endforeach
                         </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">Today</span>
-                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.today?.toLocaleString() || '0'"></span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">This hour</span>
-                            <span class="font-medium text-gray-900 dark:text-white" x-text="stats.this_hour?.toLocaleString() || '0'"></span>
-                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -605,6 +634,7 @@ function logScope() {
         error: null,
         selectedLog: null,
         showDeleteDialog: false,
+        quickFilters: @json($quickFilters),
         searches: [{ field: 'any', value: '' }],
         searchMode: 'and',
         filters: {
@@ -619,7 +649,7 @@ function logScope() {
             url: ''
         },
         sections: {
-            overview: JSON.parse(localStorage.getItem('logscope-section-overview') ?? 'true'),
+            quickFilters: JSON.parse(localStorage.getItem('logscope-section-quickFilters') ?? 'true'),
             severity: JSON.parse(localStorage.getItem('logscope-section-severity') ?? 'true'),
             channels: JSON.parse(localStorage.getItem('logscope-section-channels') ?? 'true'),
             httpMethods: JSON.parse(localStorage.getItem('logscope-section-httpMethods') ?? 'true'),
@@ -629,7 +659,7 @@ function logScope() {
 
         async init() {
             // Watch section states and persist to localStorage
-            this.$watch('sections.overview', val => localStorage.setItem('logscope-section-overview', JSON.stringify(val)));
+            this.$watch('sections.quickFilters', val => localStorage.setItem('logscope-section-quickFilters', JSON.stringify(val)));
             this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
             this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
             this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
@@ -822,6 +852,75 @@ function logScope() {
             this.fetchLogs();
         },
 
+        applyQuickFilter(index) {
+            this.clearFilters();
+            const filter = this.quickFilters[index];
+            if (!filter) return;
+
+            // Handle levels
+            if (filter.levels && Array.isArray(filter.levels)) {
+                this.filters.levels = filter.levels;
+            }
+
+            // Handle time ranges
+            if (filter.from) {
+                const parsed = this.parseRelativeTime(filter.from);
+                this.filters.from = parsed.from;
+                if (parsed.to) this.filters.to = parsed.to;
+            }
+            if (filter.to) {
+                const parsed = this.parseRelativeTime(filter.to);
+                this.filters.to = parsed.from;
+            }
+
+            this.fetchLogs();
+        },
+
+        parseRelativeTime(timeStr) {
+            const now = new Date();
+            const todayDate = now.toISOString().split('T')[0];
+
+            // Handle 'today' keyword
+            if (timeStr === 'today') {
+                return {
+                    from: todayDate + 'T00:00',
+                    to: todayDate + 'T23:59'
+                };
+            }
+
+            // Handle relative times like '-1 hour', '-4 hours', '-7 days'
+            const match = timeStr.match(/^-(\d+)\s*(hour|hours|day|days|week|weeks|month|months)$/i);
+            if (match) {
+                const amount = parseInt(match[1]);
+                const unit = match[2].toLowerCase();
+                let ms = 0;
+                if (unit.startsWith('hour')) ms = amount * 60 * 60 * 1000;
+                else if (unit.startsWith('day')) ms = amount * 24 * 60 * 60 * 1000;
+                else if (unit.startsWith('week')) ms = amount * 7 * 24 * 60 * 60 * 1000;
+                else if (unit.startsWith('month')) ms = amount * 30 * 24 * 60 * 60 * 1000;
+                return { from: new Date(now.getTime() - ms).toISOString().slice(0, 16) };
+            }
+
+            return { from: timeStr }; // Return as-is if not a relative time
+        },
+
+        async applyPreset(presetId) {
+            try {
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/presets/${presetId}`);
+                const preset = await response.json();
+                if (preset.filters) {
+                    this.clearFilters();
+                    if (preset.filters.levels) this.filters.levels = preset.filters.levels;
+                    if (preset.filters.channels) this.filters.channels = preset.filters.channels;
+                    if (preset.filters.from) this.filters.from = preset.filters.from;
+                    if (preset.filters.to) this.filters.to = preset.filters.to;
+                    if (preset.filters.search) this.searches[0].value = preset.filters.search;
+                    this.fetchLogs();
+                }
+            } catch (error) {
+                console.error('Failed to apply preset:', error);
+            }
+        },
 
         prevPage() {
             if (this.meta.current_page > 1) {

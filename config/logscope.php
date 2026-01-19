@@ -202,4 +202,75 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Quick Filters
+    |--------------------------------------------------------------------------
+    |
+    | Define the quick filter buttons shown in the sidebar. Users can customize
+    | these to create any filter combination they need.
+    |
+    | Available options for each filter:
+    | - label: Display name (required)
+    | - icon: calendar, clock, alert, filter (default: filter)
+    | - levels: Array of log levels to filter by
+    | - from: Time filter - 'today', '-1 hour', '-4 hours', '-24 hours', '-7 days', etc.
+    | - to: End time filter (optional, defaults to now)
+    |
+    | Time format examples:
+    | - 'today' - Start of today
+    | - '-1 hour' - 1 hour ago
+    | - '-4 hours' - 4 hours ago
+    | - '-24 hours' - 24 hours ago
+    | - '-7 days' - 7 days ago
+    | - '-1 week' - 1 week ago
+    | - '-1 month' - 1 month ago
+    |
+    */
+
+    'quick_filters' => [
+        [
+            'label' => 'Today',
+            'icon' => 'calendar',
+            'from' => 'today',
+        ],
+        [
+            'label' => 'This Hour',
+            'icon' => 'clock',
+            'from' => '-1 hour',
+        ],
+        [
+            'label' => 'Last 24 Hours',
+            'icon' => 'clock',
+            'from' => '-24 hours',
+        ],
+        [
+            'label' => 'Errors Only',
+            'icon' => 'alert',
+            'levels' => ['error', 'critical', 'alert', 'emergency'],
+        ],
+        // More examples:
+        // [
+        //     'label' => 'Last 4 Hours',
+        //     'icon' => 'clock',
+        //     'from' => '-4 hours',
+        // ],
+        // [
+        //     'label' => 'Last Week',
+        //     'icon' => 'calendar',
+        //     'from' => '-7 days',
+        // ],
+        // [
+        //     'label' => 'Warnings',
+        //     'icon' => 'alert',
+        //     'levels' => ['warning'],
+        // ],
+        // [
+        //     'label' => 'Recent Errors',
+        //     'icon' => 'alert',
+        //     'levels' => ['error', 'critical'],
+        //     'from' => '-24 hours',
+        // ],
+    ],
+
 ];
