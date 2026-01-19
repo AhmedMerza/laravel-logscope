@@ -23,7 +23,7 @@ class LogEntryFactory extends Factory
     public function definition(): array
     {
         $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
-        $channels = ['stack', 'single', 'daily', 'slack', 'stderr', null];
+        $channels = ['stack', 'single', 'daily', 'slack', 'stderr'];
         $environments = ['local', 'staging', 'production'];
         $httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', null];
 

@@ -525,50 +525,50 @@
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Request Context</p>
                         <div class="space-y-2">
                             <!-- Trace ID -->
-                            <div x-show="selectedLog?.trace_id" class="flex items-center gap-2">
+                            <div x-show="selectedLog?.trace_id">
                                 <button @click="filterByTraceId(selectedLog?.trace_id)"
-                                    class="flex-1 p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-sm font-mono text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-left break-all transition-colors">
-                                    <span class="text-xs text-purple-500 dark:text-purple-500 block">Trace ID</span>
-                                    <span x-text="selectedLog?.trace_id" class="text-xs"></span>
+                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-indigo-400 dark:border-indigo-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left break-all transition-colors">
+                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">Trace ID</span>
+                                    <span x-text="selectedLog?.trace_id" class="text-xs font-mono text-slate-700 dark:text-slate-200"></span>
                                 </button>
                             </div>
                             <!-- User ID -->
-                            <div x-show="selectedLog?.user_id" class="flex items-center gap-2">
+                            <div x-show="selectedLog?.user_id">
                                 <button @click="filterByUserId(selectedLog?.user_id)"
-                                    class="flex-1 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-sm font-mono text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 text-left transition-colors">
-                                    <span class="text-xs text-green-500 dark:text-green-500 block">User ID</span>
-                                    <span x-text="selectedLog?.user_id"></span>
+                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-cyan-400 dark:border-cyan-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left transition-colors">
+                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">User ID</span>
+                                    <span x-text="selectedLog?.user_id" class="text-sm font-mono text-slate-700 dark:text-slate-200"></span>
                                 </button>
                             </div>
                             <!-- IP Address -->
-                            <div x-show="selectedLog?.ip_address" class="flex items-center gap-2">
+                            <div x-show="selectedLog?.ip_address">
                                 <button @click="filterByIpAddress(selectedLog?.ip_address)"
-                                    class="flex-1 p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-sm font-mono text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-left transition-colors">
-                                    <span class="text-xs text-orange-500 dark:text-orange-500 block">IP Address</span>
-                                    <span x-text="selectedLog?.ip_address"></span>
+                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-amber-400 dark:border-amber-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left transition-colors">
+                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">IP Address</span>
+                                    <span x-text="selectedLog?.ip_address" class="text-sm font-mono text-slate-700 dark:text-slate-200"></span>
                                 </button>
                             </div>
                             <!-- HTTP Method & URL -->
-                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-gray-50 dark:bg-slate-600">
+                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-600">
+                                <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">Request</span>
                                 <div class="flex items-center gap-2 text-sm">
-                                    <span x-show="selectedLog?.http_method" class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300" x-text="selectedLog?.http_method"></span>
-                                    <span x-show="selectedLog?.url" class="font-mono text-gray-600 dark:text-gray-300 break-all text-xs" x-text="selectedLog?.url"></span>
-                                </div>
-                                <div x-show="selectedLog?.http_status" class="mt-1">
-                                    <span class="text-xs"
+                                    <span x-show="selectedLog?.http_method"
+                                        class="px-2 py-0.5 rounded text-xs font-bold"
                                         :class="{
-                                            'text-green-600 dark:text-green-400': selectedLog?.http_status >= 200 && selectedLog?.http_status < 300,
-                                            'text-yellow-600 dark:text-yellow-400': selectedLog?.http_status >= 300 && selectedLog?.http_status < 400,
-                                            'text-red-600 dark:text-red-400': selectedLog?.http_status >= 400
-                                        }">
-                                        Status: <span x-text="selectedLog?.http_status"></span>
-                                    </span>
+                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300': selectedLog?.http_method === 'GET',
+                                            'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300': selectedLog?.http_method === 'POST',
+                                            'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300': selectedLog?.http_method === 'PUT' || selectedLog?.http_method === 'PATCH',
+                                            'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300': selectedLog?.http_method === 'DELETE',
+                                            'bg-slate-200 dark:bg-slate-500 text-slate-700 dark:text-slate-200': !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(selectedLog?.http_method)
+                                        }"
+                                        x-text="selectedLog?.http_method"></span>
+                                    <span x-show="selectedLog?.url" class="font-mono text-slate-700 dark:text-slate-200 break-all text-xs" x-text="selectedLog?.url"></span>
                                 </div>
                             </div>
                             <!-- User Agent -->
-                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-gray-50 dark:bg-slate-600">
-                                <span class="text-xs text-gray-500 dark:text-gray-500 block">User Agent</span>
-                                <span class="text-xs font-mono text-gray-600 dark:text-gray-400 break-all" x-text="selectedLog?.user_agent"></span>
+                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-600">
+                                <span class="text-xs text-slate-500 dark:text-slate-400 block">User Agent</span>
+                                <span class="text-xs font-mono text-slate-700 dark:text-slate-200 break-all" x-text="selectedLog?.user_agent"></span>
                             </div>
                         </div>
                     </div>
@@ -576,7 +576,7 @@
 
                 <!-- Panel Footer -->
                 <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-slate-600">
-                    <button @click="deleteLog(selectedLog?.id)"
+                    <button @click="confirmDelete()"
                         class="flex-1 h-9 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
                         Delete
                     </button>
@@ -585,6 +585,49 @@
                         Close
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <div x-show="showDeleteDialog" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        x-transition:enter="ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50" @click="cancelDelete()"></div>
+        <!-- Dialog -->
+        <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6"
+            x-transition:enter="ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Log Entry</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone.</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button @click="cancelDelete()"
+                    class="flex-1 h-10 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 transition-colors">
+                    Cancel
+                </button>
+                <button @click="deleteLog()"
+                    class="flex-1 h-10 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">
+                    Delete
+                </button>
             </div>
         </div>
     </div>
@@ -600,6 +643,7 @@ function logScope() {
         loading: true,
         error: null,
         selectedLog: null,
+        showDeleteDialog: false,
         searches: [{ field: 'any', value: '' }],
         searchMode: 'and',
         filters: {
@@ -667,16 +711,22 @@ function logScope() {
 
         filterByTraceId(traceId) {
             this.filters.trace_id = traceId;
+            this.sections.request = true;
+            localStorage.setItem('logscope-section-request', 'true');
             this.fetchLogs();
         },
 
         filterByUserId(userId) {
             this.filters.user_id = userId;
+            this.sections.request = true;
+            localStorage.setItem('logscope-section-request', 'true');
             this.fetchLogs();
         },
 
         filterByIpAddress(ip) {
             this.filters.ip_address = ip;
+            this.sections.request = true;
+            localStorage.setItem('logscope-section-request', 'true');
             this.fetchLogs();
         },
 
@@ -755,13 +805,22 @@ function logScope() {
             }
         },
 
-        async deleteLog(id) {
-            if (!confirm('Delete this log entry?')) return;
+        confirmDelete() {
+            this.showDeleteDialog = true;
+        },
+
+        cancelDelete() {
+            this.showDeleteDialog = false;
+        },
+
+        async deleteLog() {
+            if (!this.selectedLog) return;
             try {
-                await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${id}`, {
+                await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}`, {
                     method: 'DELETE',
                     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
                 });
+                this.showDeleteDialog = false;
                 this.selectedLog = null;
                 await Promise.all([this.fetchLogs(), this.fetchStats()]);
             } catch (error) {
