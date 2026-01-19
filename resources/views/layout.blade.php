@@ -22,6 +22,11 @@
                         sans: ['Inter', 'system-ui', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
+                    colors: {
+                        slate: {
+                            850: '#172033',
+                        }
+                    }
                 }
             }
         }
@@ -120,7 +125,7 @@
         }
     </style>
 </head>
-<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+<body class="h-full bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
     @yield('content')
 </body>
 </html>

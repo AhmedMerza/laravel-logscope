@@ -3,10 +3,10 @@
 @section('content')
 <div x-data="logScope()" x-init="init()" class="h-full flex" @keydown.escape.window="closePanel()">
     <!-- Sidebar -->
-    <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col"
+    <aside class="w-64 flex-shrink-0 bg-white dark:bg-slate-850 border-r border-gray-200 dark:border-slate-600 flex flex-col"
         :class="{ 'hidden': !sidebarOpen }" x-cloak>
         <!-- Logo -->
-        <div class="h-14 flex items-center gap-2 px-4 border-b border-gray-200 dark:border-gray-800">
+        <div class="h-14 flex items-center gap-2 px-4 border-b border-gray-200 dark:border-slate-600">
             <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -18,9 +18,9 @@
         <!-- Scrollable Filters -->
         <div class="flex-1 overflow-y-auto custom-scrollbar">
             <!-- Overview Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.overview = !sections.overview"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>Overview</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.overview }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -45,9 +45,9 @@
             </div>
 
             <!-- Severity Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.severity = !sections.severity"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>Severity</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.severity }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -60,7 +60,7 @@
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="filters.levels.includes('{{ $level }}')
                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
                             <span class="level-{{ $level }} level-dot flex-shrink-0"></span>
                             <span class="flex-1 text-left capitalize">{{ $level }}</span>
                             <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums" x-text="stats.by_level?.{{ $level }} || 0"></span>
@@ -72,9 +72,9 @@
 
             @if(count($channels) > 0)
             <!-- Channels Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.channels = !sections.channels"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>Channels</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -87,7 +87,7 @@
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="filters.channels.includes('{{ $channel }}')
                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
                             <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                             </svg>
@@ -101,9 +101,9 @@
 
             @if(count($environments) > 0)
             <!-- Environment Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.environments = !sections.environments"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>Environment</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.environments }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -116,7 +116,7 @@
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="filters.environments.includes('{{ $env }}')
                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
                             <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
                             </svg>
@@ -130,9 +130,9 @@
 
             @if(count($httpMethods) > 0)
             <!-- HTTP Method Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.httpMethods = !sections.httpMethods"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>HTTP Method</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.httpMethods }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -145,7 +145,7 @@
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="filters.httpMethods.includes('{{ $method }}')
                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
                             <span class="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-400">{{ substr($method, 0, 1) }}</span>
                             <span class="flex-1 text-left">{{ $method }}</span>
                         </button>
@@ -156,9 +156,9 @@
             @endif
 
             <!-- Request Context Section -->
-            <div class="border-b border-gray-200 dark:border-gray-800">
+            <div class="border-b border-gray-200 dark:border-slate-600">
                 <button @click="sections.request = !sections.request"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
                     <span>Request</span>
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.request }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -169,34 +169,34 @@
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Trace ID</label>
                         <input type="text" x-model="filters.trace_id" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by trace..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">User ID</label>
                         <input type="text" x-model="filters.user_id" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by user..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">IP Address</label>
                         <input type="text" x-model="filters.ip_address" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by IP..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">URL</label>
                         <input type="text" x-model="filters.url" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by URL..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Theme Toggle -->
-        <div class="p-4 border-t border-gray-200 dark:border-gray-800">
+        <div class="p-4 border-t border-gray-200 dark:border-slate-600">
             <button @click="darkMode = !darkMode"
-                class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
                 <svg x-show="!darkMode" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                 </svg>
@@ -211,12 +211,12 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">
         <!-- Header -->
-        <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <header class="bg-white dark:bg-slate-850 border-b border-gray-200 dark:border-slate-600">
             <!-- Main header row -->
             <div class="h-14 flex items-center gap-4 px-4">
                 <!-- Sidebar Toggle -->
                 <button @click="sidebarOpen = !sidebarOpen"
-                    class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+                    class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
@@ -226,7 +226,7 @@
                 <div class="flex-1 flex items-center gap-2">
                     <div class="flex-1 max-w-xl flex items-center gap-2">
                         <select x-model="searches[0].field"
-                            class="h-9 px-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="h-9 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="any">Any field</option>
                             <option value="message">Message</option>
                             <option value="context">Context</option>
@@ -238,13 +238,13 @@
                             </svg>
                             <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
                                 placeholder="Search logs..."
-                                class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
 
                     <!-- Add search button -->
                     <button @click="addSearch()"
-                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
                         title="Add search condition">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -252,15 +252,15 @@
                     </button>
 
                     <!-- AND/OR toggle (only show if multiple searches) -->
-                    <div x-show="searches.length > 1" class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                    <div x-show="searches.length > 1" class="flex items-center bg-gray-100 dark:bg-slate-600 rounded-lg p-0.5">
                         <button @click="searchMode = 'and'"
                             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'and' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            :class="searchMode === 'and' ? 'bg-white dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
                             AND
                         </button>
                         <button @click="searchMode = 'or'"
                             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'or' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            :class="searchMode === 'or' ? 'bg-white dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
                             OR
                         </button>
                     </div>
@@ -269,18 +269,18 @@
                 <!-- Date Range -->
                 <div class="flex items-center gap-2">
                     <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
-                        class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         title="From date">
                     <span class="text-gray-400">-</span>
                     <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
-                        class="h-9 px-3 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         title="To date">
                 </div>
 
                 <!-- Actions -->
                 <div class="flex items-center gap-1">
                     <button @click="clearFilters()"
-                        class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
                         title="Clear filters">
                         Clear
                     </button>
@@ -296,10 +296,10 @@
 
             <!-- Additional search rows -->
             <template x-for="(search, index) in searches.slice(1)" :key="index + 1">
-                <div class="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+                <div class="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-600/30">
                     <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-10" x-text="searchMode.toUpperCase()"></span>
                     <select x-model="searches[index + 1].field"
-                        class="h-8 px-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="h-8 px-2 bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="any">Any field</option>
                         <option value="message">Message</option>
                         <option value="context">Context</option>
@@ -307,7 +307,7 @@
                     </select>
                     <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
                         placeholder="Search..."
-                        class="flex-1 h-8 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="flex-1 h-8 px-3 bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button @click="removeSearch(index + 1)"
                         class="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -342,7 +342,7 @@
                     </span>
                 </template>
                 <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-slate-500 text-gray-700 dark:text-gray-200">
                         <span x-text="search.field === 'any' ? '' : search.field + ':'"></span>
                         <span x-text="search.value" class="max-w-[100px] truncate"></span>
                         <button @click="search.value = ''; fetchLogs()" class="hover:text-gray-900 dark:hover:text-white">&times;</button>
@@ -395,8 +395,8 @@
                 <!-- Log Table -->
                 <div x-show="!loading && logs.length > 0" x-cloak class="flex-1 overflow-auto custom-scrollbar">
                     <table class="w-full">
-                        <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10">
-                            <tr class="border-b border-gray-200 dark:border-gray-800">
+                        <thead class="sticky top-0 bg-gray-50 dark:bg-slate-850 z-10">
+                            <tr class="border-b border-gray-200 dark:border-slate-600">
                                 <th class="w-[3px] p-0"></th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">Time</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">Level</th>
@@ -406,7 +406,7 @@
                         </thead>
                         <tbody>
                             <template x-for="log in logs" :key="log.id">
-                                <tr class="log-row border-b border-gray-100 dark:border-gray-800/50 cursor-pointer"
+                                <tr class="log-row border-b border-gray-100 dark:border-slate-600/50 cursor-pointer"
                                     :class="{ 'selected': selectedLog?.id === log.id }"
                                     @click="selectLog(log)">
                                     <td class="p-0">
@@ -433,7 +433,7 @@
 
                 <!-- Pagination -->
                 <div x-show="!loading && logs.length > 0" x-cloak
-                    class="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+                    class="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-850 border-t border-gray-200 dark:border-slate-600">
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         Showing <span class="font-medium text-gray-900 dark:text-gray-100" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
                         to <span class="font-medium text-gray-900 dark:text-gray-100" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
@@ -441,14 +441,14 @@
                     </p>
                     <div class="flex items-center gap-1">
                         <button @click="prevPage()" :disabled="meta.current_page <= 1"
-                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             Previous
                         </button>
                         <span class="px-2 text-sm text-gray-500 dark:text-gray-400">
                             <span x-text="meta.current_page"></span> / <span x-text="meta.last_page"></span>
                         </span>
                         <button @click="nextPage()" :disabled="meta.current_page >= meta.last_page"
-                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             Next
                         </button>
                     </div>
@@ -457,7 +457,7 @@
 
             <!-- Detail Panel -->
             <div x-show="selectedLog" x-cloak
-                class="w-[480px] flex-shrink-0 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden"
+                class="w-[480px] flex-shrink-0 bg-white dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-x-4"
                 x-transition:enter-end="opacity-100 translate-x-0"
@@ -465,10 +465,10 @@
                 x-transition:leave-start="opacity-100 translate-x-0"
                 x-transition:leave-end="opacity-0 translate-x-4">
                 <!-- Panel Header -->
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-600">
                     <h3 class="font-semibold text-gray-900 dark:text-white">Log Details</h3>
                     <button @click="closePanel()"
-                        class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
@@ -479,21 +479,21 @@
                 <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
                     <!-- Meta -->
                     <div class="grid grid-cols-2 gap-3">
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Level</p>
                             <p class="mt-1">
                                 <span class="level-badge" :class="'level-' + selectedLog?.level" x-text="selectedLog?.level"></span>
                             </p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Channel</p>
                             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="selectedLog?.channel || '-'"></p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Environment</p>
                             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="selectedLog?.environment || '-'"></p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</p>
                             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="formatDateTime(selectedLog?.occurred_at)"></p>
                         </div>
@@ -502,21 +502,21 @@
                     <!-- Source -->
                     <div x-show="selectedLog?.source">
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Source</p>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 font-mono text-sm text-gray-700 dark:text-gray-300 break-all"
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 font-mono text-sm text-gray-700 dark:text-gray-300 break-all"
                             x-text="formatSource(selectedLog?.source, selectedLog?.source_line)"></div>
                     </div>
 
                     <!-- Message -->
                     <div>
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Message</p>
-                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto"
+                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto"
                             x-text="selectedLog?.message"></pre>
                     </div>
 
                     <!-- Context -->
                     <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Context</p>
-                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 overflow-x-auto font-mono"
+                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 overflow-x-auto font-mono"
                             x-text="JSON.stringify(selectedLog?.context, null, 2)"></pre>
                     </div>
 
@@ -549,7 +549,7 @@
                                 </button>
                             </div>
                             <!-- HTTP Method & URL -->
-                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-gray-50 dark:bg-slate-600">
                                 <div class="flex items-center gap-2 text-sm">
                                     <span x-show="selectedLog?.http_method" class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300" x-text="selectedLog?.http_method"></span>
                                     <span x-show="selectedLog?.url" class="font-mono text-gray-600 dark:text-gray-300 break-all text-xs" x-text="selectedLog?.url"></span>
@@ -566,7 +566,7 @@
                                 </div>
                             </div>
                             <!-- User Agent -->
-                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-gray-50 dark:bg-slate-600">
                                 <span class="text-xs text-gray-500 dark:text-gray-500 block">User Agent</span>
                                 <span class="text-xs font-mono text-gray-600 dark:text-gray-400 break-all" x-text="selectedLog?.user_agent"></span>
                             </div>
@@ -575,13 +575,13 @@
                 </div>
 
                 <!-- Panel Footer -->
-                <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+                <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-slate-600">
                     <button @click="deleteLog(selectedLog?.id)"
                         class="flex-1 h-9 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
                         Delete
                     </button>
                     <button @click="closePanel()"
-                        class="flex-1 h-9 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        class="flex-1 h-9 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 transition-colors">
                         Close
                     </button>
                 </div>
