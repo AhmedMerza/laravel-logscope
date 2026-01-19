@@ -50,6 +50,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Capture Mode
+    |--------------------------------------------------------------------------
+    |
+    | Choose how LogScope captures logs:
+    |
+    | 'channel' - Only capture logs sent to the 'logscope' channel.
+    |             User must add 'logscope' to their channel stack.
+    |
+    | 'all'     - Automatically capture ALL logs from ALL channels.
+    |             No channel configuration needed. Uses Log::listen().
+    |
+    */
+
+    'capture' => env('LOGSCOPE_CAPTURE', 'all'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Request Context Middleware
     |--------------------------------------------------------------------------
     |

@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace LogScope;
 
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
 use LogScope\Console\Commands\SeedCommand;
 use LogScope\Http\Middleware\CaptureRequestContext;
+use LogScope\Models\LogEntry;
+use Throwable;
 
 class LogScopeServiceProvider extends ServiceProvider
 {
@@ -36,6 +41,128 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerMigrations();
         $this->registerMiddleware();
+        $this->registerLogListener();
+    }
+
+    /**
+     * Register the global log listener for 'all' capture mode.
+     */
+    protected function registerLogListener(): void
+    {
+        if (config('logscope.capture', 'all') !== 'all') {
+            return;
+        }
+
+        Event::listen(MessageLogged::class, function (MessageLogged $event) {
+            // Prevent infinite loops - don't log our own operations
+            if ($this->isInternalLog($event)) {
+                return;
+            }
+
+            try {
+                // Get request context from Laravel Context (set by middleware)
+                $requestContext = Context::get('logscope', []);
+
+                LogEntry::createEntry([
+                    'level' => $event->level,
+                    'message' => $event->message,
+                    'context' => $this->sanitizeContext($event->context),
+                    'channel' => $event->context['__channel__'] ?? config('logging.default'),
+                    'environment' => app()->environment(),
+                    'source' => $this->extractSource($event->context),
+                    'source_line' => $this->extractSourceLine($event->context),
+                    'trace_id' => $requestContext['trace_id'] ?? null,
+                    'user_id' => $requestContext['user_id'] ?? null,
+                    'ip_address' => $requestContext['ip_address'] ?? null,
+                    'user_agent' => $requestContext['user_agent'] ?? null,
+                    'http_method' => $requestContext['http_method'] ?? null,
+                    'url' => $requestContext['url'] ?? null,
+                    'http_status' => $requestContext['http_status'] ?? null,
+                    'occurred_at' => now(),
+                ]);
+            } catch (Throwable $e) {
+                // Silently fail - don't break the application
+                if (config('app.debug')) {
+                    error_log('LogScope: Failed to write log entry: '.$e->getMessage());
+                }
+            }
+        });
+    }
+
+    /**
+     * Check if this is an internal log that should be skipped.
+     */
+    protected function isInternalLog(MessageLogged $event): bool
+    {
+        // Skip logs from our own namespace
+        if (str_contains($event->message, 'LogScope')) {
+            return true;
+        }
+
+        // Check context for LogScope markers
+        if (isset($event->context['_logscope_internal'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Sanitize context array for storage.
+     */
+    protected function sanitizeContext(array $context): array
+    {
+        $sanitized = [];
+
+        foreach ($context as $key => $value) {
+            // Skip internal keys
+            if (str_starts_with((string) $key, '__') || str_starts_with((string) $key, '_logscope')) {
+                continue;
+            }
+
+            if ($value instanceof Throwable) {
+                $sanitized[$key] = [
+                    '_type' => 'exception',
+                    'class' => get_class($value),
+                    'message' => $value->getMessage(),
+                    'code' => $value->getCode(),
+                    'file' => $value->getFile(),
+                    'line' => $value->getLine(),
+                ];
+            } elseif (is_object($value)) {
+                $sanitized[$key] = '[Object: '.get_class($value).']';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $value;
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Extract source file from context.
+     */
+    protected function extractSource(array $context): ?string
+    {
+        if (isset($context['exception']) && $context['exception'] instanceof Throwable) {
+            return $context['exception']->getFile();
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract source line from context.
+     */
+    protected function extractSourceLine(array $context): ?int
+    {
+        if (isset($context['exception']) && $context['exception'] instanceof Throwable) {
+            return $context['exception']->getLine();
+        }
+
+        return null;
     }
 
     /**
