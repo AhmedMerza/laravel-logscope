@@ -37,6 +37,9 @@ class LogParser
             throw new RuntimeException("Unable to open log file: {$path}");
         }
 
+        // Infer channel from filename (e.g., laravel.log -> laravel, daily-2024-01-15.log -> daily)
+        $channel = $this->inferChannelFromFilename($path);
+
         try {
             $currentEntry = null;
             $lineBuffer = '';
@@ -51,7 +54,7 @@ class LogParser
                 if (preg_match(self::LARAVEL_LOG_PATTERN, $line, $matches)) {
                     // Yield the previous entry if exists
                     if ($currentEntry !== null) {
-                        $parsed = $this->finalizeEntry($currentEntry);
+                        $parsed = $this->finalizeEntry($currentEntry, $channel);
                         if ($parsed && ($since === null || $parsed['occurred_at']->gte($since))) {
                             yield $parsed;
                         }
@@ -72,7 +75,7 @@ class LogParser
 
             // Don't forget the last entry
             if ($currentEntry !== null) {
-                $parsed = $this->finalizeEntry($currentEntry);
+                $parsed = $this->finalizeEntry($currentEntry, $channel);
                 if ($parsed && ($since === null || $parsed['occurred_at']->gte($since))) {
                     yield $parsed;
                 }
@@ -85,7 +88,7 @@ class LogParser
     /**
      * Finalize and parse a log entry.
      */
-    protected function finalizeEntry(array $entry): ?array
+    protected function finalizeEntry(array $entry, string $channel = 'import'): ?array
     {
         try {
             $occurred_at = Carbon::parse($entry['datetime']);
@@ -132,12 +135,28 @@ class LogParser
             'level' => $entry['level'],
             'message' => $message,
             'context' => $context,
-            'channel' => 'import',
+            'channel' => $channel,
             'environment' => $entry['environment'],
             'source' => $source,
             'source_line' => $sourceLine,
             'occurred_at' => $occurred_at,
         ];
+    }
+
+    /**
+     * Infer the channel name from the log filename.
+     */
+    protected function inferChannelFromFilename(string $path): string
+    {
+        $filename = basename($path, '.log');
+
+        // Handle daily logs: laravel-2024-01-15.log -> laravel
+        if (preg_match('/^(.+?)-\d{4}-\d{2}-\d{2}$/', $filename, $matches)) {
+            return $matches[1];
+        }
+
+        // Otherwise use the filename as channel: laravel.log -> laravel
+        return $filename;
     }
 
     /**
