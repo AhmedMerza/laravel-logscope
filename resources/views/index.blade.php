@@ -53,22 +53,6 @@
                             <span>{{ $filter['label'] }}</span>
                         </button>
                         @endforeach
-
-                        <!-- User Presets -->
-                        @if(isset($presets) && count($presets) > 0)
-                        <div class="border-t border-gray-200 dark:border-slate-500 mt-2 pt-2">
-                            <p class="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 uppercase">Saved Presets</p>
-                            @foreach($presets as $preset)
-                            <button @click="applyPreset({{ $preset->id }})"
-                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
-                                <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-                                </svg>
-                                <span>{{ $preset->name }}</span>
-                            </button>
-                            @endforeach
-                        </div>
-                        @endif
                     </div>
                 </div>
             </div>
@@ -902,24 +886,6 @@ function logScope() {
             }
 
             return { from: timeStr }; // Return as-is if not a relative time
-        },
-
-        async applyPreset(presetId) {
-            try {
-                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/presets/${presetId}`);
-                const preset = await response.json();
-                if (preset.filters) {
-                    this.clearFilters();
-                    if (preset.filters.levels) this.filters.levels = preset.filters.levels;
-                    if (preset.filters.channels) this.filters.channels = preset.filters.channels;
-                    if (preset.filters.from) this.filters.from = preset.filters.from;
-                    if (preset.filters.to) this.filters.to = preset.filters.to;
-                    if (preset.filters.search) this.searches[0].value = preset.filters.search;
-                    this.fetchLogs();
-                }
-            } catch (error) {
-                console.error('Failed to apply preset:', error);
-            }
         },
 
         prevPage() {

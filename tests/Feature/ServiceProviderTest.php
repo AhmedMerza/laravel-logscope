@@ -8,5 +8,5 @@ it('registers the service provider', function () {
 it('loads the configuration', function () {
     expect(config('logscope'))
         ->toBeArray()
-        ->toHaveKeys(['tables', 'retention', 'routes', 'migrations', 'limits', 'search', 'pagination']);
+        ->toHaveKeys(['table', 'retention', 'routes', 'migrations', 'limits', 'search', 'pagination']);
 });

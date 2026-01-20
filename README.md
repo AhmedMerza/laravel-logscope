@@ -14,7 +14,6 @@ A fast, database-backed log viewer for Laravel applications.
 - **Exclusion filters** - Hide noise, focus on what matters
 - **Retention policies** - Auto-prune old logs after configurable period
 - **Quick filters** - Configurable one-click filters for common queries
-- **Saved presets** - Save and reuse your filter combinations
 - **Performance optimized** - Batch writes after response, queue support for high-traffic apps
 - **Highly configurable** - Customize capture mode, write mode, table names, and more
 
@@ -45,7 +44,7 @@ The config file will be published to `config/logscope.php`. Options include:
 - **Write mode** - `sync`, `batch` (default), or `queue` for performance tuning
 - **Queue settings** - Queue name and connection for queue write mode
 - **Middleware** - Enable/disable request context capture
-- **Table names** - Customize the database table names
+- **Table name** - Customize the database table name
 - **Retention policy** - Enable/disable auto-pruning and set retention days
 - **Route configuration** - Customize prefix, middleware, and domain
 - **Content limits** - Configure preview lengths and truncation thresholds
@@ -230,9 +229,8 @@ LOGSCOPE_QUEUE_CONNECTION=
 # Request context middleware
 LOGSCOPE_MIDDLEWARE_ENABLED=true
 
-# Database tables
-LOGSCOPE_TABLE_ENTRIES=log_entries
-LOGSCOPE_TABLE_PRESETS=filter_presets
+# Database table
+LOGSCOPE_TABLE=log_entries
 
 # Retention policy
 LOGSCOPE_RETENTION_ENABLED=true

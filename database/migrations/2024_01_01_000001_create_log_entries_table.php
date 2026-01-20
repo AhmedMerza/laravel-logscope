@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create(config('logscope.tables.entries', 'log_entries'), function (Blueprint $table) {
+        Schema::create(config('logscope.table', 'log_entries'), function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->string('level', 20)->index();
             $table->text('message');
@@ -46,6 +46,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(config('logscope.tables.entries', 'log_entries'));
+        Schema::dropIfExists(config('logscope.table', 'log_entries'));
     }
 };

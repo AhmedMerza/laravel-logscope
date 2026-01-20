@@ -42,7 +42,7 @@ class LogEntry extends Model
 
     public function getTable(): string
     {
-        return config('logscope.tables.entries', 'log_entries');
+        return config('logscope.table', 'log_entries');
     }
 
     /**

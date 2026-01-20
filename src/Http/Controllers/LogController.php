@@ -8,7 +8,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
-use LogScope\Models\FilterPreset;
 use LogScope\Models\LogEntry;
 
 class LogController extends Controller
@@ -23,7 +22,6 @@ class LogController extends Controller
             'channels' => $this->getAvailableChannels(),
             'environments' => $this->getAvailableEnvironments(),
             'httpMethods' => $this->getAvailableHttpMethods(),
-            'presets' => FilterPreset::ordered()->get(),
             'quickFilters' => config('logscope.quick_filters', []),
         ]);
     }

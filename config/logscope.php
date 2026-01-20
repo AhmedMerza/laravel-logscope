@@ -4,18 +4,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | LogScope Tables
+    | LogScope Table
     |--------------------------------------------------------------------------
     |
-    | Configure the database table names used by LogScope. You can customize
-    | these if they conflict with existing tables in your application.
+    | Configure the database table name used by LogScope. You can customize
+    | this if it conflicts with existing tables in your application.
     |
     */
 
-    'tables' => [
-        'entries' => env('LOGSCOPE_TABLE_ENTRIES', 'log_entries'),
-        'presets' => env('LOGSCOPE_TABLE_PRESETS', 'filter_presets'),
-    ],
+    'table' => env('LOGSCOPE_TABLE', 'log_entries'),
 
     /*
     |--------------------------------------------------------------------------
