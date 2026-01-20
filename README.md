@@ -9,8 +9,8 @@ A fast, database-backed log viewer for Laravel applications.
 - **Automatic log capture** - Captures ALL logs from ALL channels automatically (zero config)
 - **Request context tracking** - Trace ID, user ID, IP address, URL, and user agent for every log
 - **Database-backed storage** - Fast queries with proper indexing
-- **Advanced filtering** - Filter by level, channel, environment, user, IP, and date range
-- **Full-text search** - Find what you need quickly (Scout integration optional)
+- **Advanced filtering** - Filter by level, channel, user, IP, and date range
+- **Full-text search** - Search across messages, context, and source
 - **Exclusion filters** - Hide noise, focus on what matters
 - **Retention policies** - Auto-prune old logs after configurable period
 - **Quick filters** - Configurable one-click filters for common queries
@@ -48,7 +48,7 @@ The config file will be published to `config/logscope.php`. Options include:
 - **Retention policy** - Enable/disable auto-pruning and set retention days
 - **Route configuration** - Customize prefix, middleware, and domain
 - **Content limits** - Configure preview lengths and truncation thresholds
-- **Search driver** - Choose between database or Scout for search
+- **Search driver** - Database search (Scout integration planned)
 - **Quick filters** - Define one-click filters for common queries
 - **Theme** - Customize colors for the web interface
 
@@ -241,7 +241,7 @@ LOGSCOPE_ROUTES_ENABLED=true
 LOGSCOPE_ROUTE_PREFIX=logscope
 LOGSCOPE_DOMAIN=
 
-# Search
+# Search (Scout integration planned)
 LOGSCOPE_SEARCH_DRIVER=database
 
 # Migrations

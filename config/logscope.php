@@ -149,8 +149,8 @@ return [
     | Search
     |--------------------------------------------------------------------------
     |
-    | Configure the search driver. Use 'database' for built-in search
-    | or 'scout' to use Laravel Scout with your preferred engine.
+    | Configure the search driver. Currently only 'database' is supported,
+    | which uses SQL LIKE queries. Scout integration is planned for future.
     |
     */
 
