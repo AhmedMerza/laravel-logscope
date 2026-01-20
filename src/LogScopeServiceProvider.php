@@ -88,7 +88,6 @@ class LogScopeServiceProvider extends ServiceProvider
                     'user_agent' => $requestContext['user_agent'] ?? null,
                     'http_method' => $requestContext['http_method'] ?? null,
                     'url' => $requestContext['url'] ?? null,
-                    'http_status' => $requestContext['http_status'] ?? null,
                     'occurred_at' => now(),
                 ];
 

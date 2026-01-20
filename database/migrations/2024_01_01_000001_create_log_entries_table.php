@@ -24,11 +24,10 @@ return new class extends Migration
             $table->unsignedInteger('source_line')->nullable();
             $table->uuid('trace_id')->nullable()->index();
             $table->unsignedBigInteger('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable(); // 45 chars for IPv6
+            $table->string('ip_address', 45)->nullable()->index(); // 45 chars for IPv6
             $table->string('user_agent', 500)->nullable();
-            $table->string('http_method', 10)->nullable();
+            $table->string('http_method', 10)->nullable()->index();
             $table->string('url', 2000)->nullable();
-            $table->unsignedSmallInteger('http_status')->nullable();
             $table->timestamp('occurred_at')->index();
             $table->boolean('is_truncated')->default(false);
             $table->timestamp('created_at')->useCurrent();

@@ -114,10 +114,6 @@ class LogController extends Controller
             $query->httpMethod((array) $request->input('http_method'));
         }
 
-        if ($request->filled('http_status')) {
-            $query->httpStatus((array) $request->input('http_status'));
-        }
-
         if ($request->filled('url')) {
             $query->url($request->input('url'));
         }

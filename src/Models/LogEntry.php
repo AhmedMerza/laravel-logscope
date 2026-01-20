@@ -171,18 +171,6 @@ class LogEntry extends Model
     }
 
     /**
-     * Scope: Filter by HTTP status code.
-     */
-    public function scopeHttpStatus(Builder $query, int|array $status): Builder
-    {
-        if (is_array($status)) {
-            return $query->whereIn('http_status', $status);
-        }
-
-        return $query->where('http_status', $status);
-    }
-
-    /**
      * Scope: Filter by URL (partial match).
      */
     public function scopeUrl(Builder $query, string $url): Builder

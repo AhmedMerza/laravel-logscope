@@ -30,14 +30,6 @@ class CaptureRequestContext
             'url' => $request->fullUrl(),
         ]);
 
-        $response = $next($request);
-
-        // Update context with response status
-        Context::add('logscope', array_merge(
-            Context::get('logscope', []),
-            ['http_status' => $response->getStatusCode()]
-        ));
-
-        return $response;
+        return $next($request);
     }
 }
