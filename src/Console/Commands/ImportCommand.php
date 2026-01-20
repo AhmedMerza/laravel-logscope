@@ -195,13 +195,6 @@ class ImportCommand extends Command
             $isTruncated = true;
         }
 
-        // Generate fingerprint
-        $fingerprint = LogEntry::generateFingerprint(
-            $entry['message'],
-            $entry['level'],
-            $entry['source'] ?? null
-        );
-
         return [
             'id' => (string) \Illuminate\Support\Str::ulid(),
             'level' => $entry['level'],
@@ -213,7 +206,6 @@ class ImportCommand extends Command
             'environment' => $entry['environment'] ?? app()->environment(),
             'source' => $entry['source'],
             'source_line' => $entry['source_line'],
-            'fingerprint' => $fingerprint,
             'occurred_at' => $entry['occurred_at'],
             'is_truncated' => $isTruncated,
             'created_at' => now(),
