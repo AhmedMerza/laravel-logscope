@@ -268,8 +268,9 @@ class LogScopeServiceProvider extends ServiceProvider
                 __DIR__.'/../config/logscope.php' => config_path('logscope.php'),
             ], 'logscope-config');
 
-            // Migrations
-            $this->publishesMigrations([
+            // Migrations (use publishes() not publishesMigrations() to keep same filename
+            // so Laravel's migration tracking prevents duplicates)
+            $this->publishes([
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'logscope-migrations');
 
