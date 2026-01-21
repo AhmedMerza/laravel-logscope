@@ -313,7 +313,7 @@ LOGSCOPE_MIGRATIONS_ENABLED=true
 
 ## Contributing
 
-Contributions are welcome! Please read the contributing guidelines first.
+Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
