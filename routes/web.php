@@ -2,10 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 use LogScope\Http\Controllers\LogController;
+use LogScope\Http\Middleware\Authorize;
 
 Route::group([
     'prefix' => config('logscope.routes.prefix', 'logscope'),
-    'middleware' => config('logscope.routes.middleware', ['web']),
+    'middleware' => array_merge(
+        config('logscope.routes.middleware', ['web']),
+        [Authorize::class]
+    ),
     'domain' => config('logscope.routes.domain'),
     'as' => 'logscope.',
 ], function () {

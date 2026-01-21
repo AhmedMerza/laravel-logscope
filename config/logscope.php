@@ -31,10 +31,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Routes
+    | Routes & Authorization
     |--------------------------------------------------------------------------
     |
     | Configure the routes for LogScope's web interface.
+    |
+    | Authorization:
+    | LogScope uses a flexible authorization system with three options:
+    |
+    | 1. Custom Callback (highest priority):
+    |    In your AppServiceProvider::boot():
+    |
+    |    LogScope::auth(function ($request) {
+    |        return $request->user()?->isAdmin();
+    |    });
+    |
+    | 2. Gate (if no callback set):
+    |    In your AuthServiceProvider::boot():
+    |
+    |    Gate::define('viewLogScope', function ($user) {
+    |        return $user->hasRole('admin');
+    |    });
+    |
+    | 3. Default (if no callback or gate):
+    |    Only accessible in 'local' environment.
+    |
+    | Middleware:
+    | Add your own middleware (auth, roles, etc.) to the array below.
+    | The LogScope authorization middleware is always applied automatically.
+    |
+    | Full Control:
+    | Set 'enabled' to false and register routes manually in your app.
     |
     */
 

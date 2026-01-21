@@ -198,6 +198,69 @@ php artisan logscope:prune --days=14
 
 After installation, access LogScope at `/logscope` (or your configured prefix).
 
+### Authorization
+
+LogScope uses a flexible authorization system with three options (in priority order):
+
+**1. Custom Callback** (highest priority)
+
+Define a callback in your `AppServiceProvider::boot()`:
+
+```php
+use LogScope\LogScope;
+
+public function boot(): void
+{
+    LogScope::auth(function ($request) {
+        return $request->user()?->isAdmin();
+    });
+}
+```
+
+**2. Gate Definition**
+
+Define a `viewLogScope` gate in your `AuthServiceProvider`:
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('viewLogScope', function ($user) {
+        return $user->hasRole('admin');
+    });
+}
+```
+
+**3. Default Behavior**
+
+If no callback or gate is defined, LogScope is only accessible in the `local` environment.
+
+**Additional Middleware**
+
+You can also add middleware via config (e.g., `auth`, custom roles):
+
+```php
+// config/logscope.php
+'routes' => [
+    'middleware' => ['web', 'auth'],
+    // ...
+],
+```
+
+**Full Control**
+
+For complete customization, disable the default routes and register your own:
+
+```php
+// config/logscope.php
+'routes' => [
+    'enabled' => false,
+],
+```
+
+Then register the routes manually in your `routes/web.php` with any middleware or logic you need.
+
 ## Customization
 
 ### Publishing Assets
