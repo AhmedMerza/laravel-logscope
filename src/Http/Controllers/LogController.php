@@ -7,6 +7,7 @@ namespace LogScope\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use LogScope\Models\LogEntry;
 
@@ -202,66 +203,79 @@ class LogController extends Controller
      */
     public function stats(): JsonResponse
     {
-        $stats = [
-            'total' => LogEntry::count(),
-            'by_level' => LogEntry::selectRaw('level, count(*) as count')
-                ->groupBy('level')
-                ->pluck('count', 'level'),
-            'today' => LogEntry::where('occurred_at', '>=', now()->startOfDay())->count(),
-            'this_hour' => LogEntry::where('occurred_at', '>=', now()->startOfHour())->count(),
-        ];
+        $cacheKey = 'logscope:stats';
+        $cacheTtl = 60; // 60 seconds
+
+        $stats = Cache::remember($cacheKey, $cacheTtl, function () {
+            return [
+                'total' => LogEntry::count(),
+                'by_level' => LogEntry::selectRaw('level, count(*) as count')
+                    ->groupBy('level')
+                    ->pluck('count', 'level'),
+                'today' => LogEntry::where('occurred_at', '>=', now()->startOfDay())->count(),
+                'this_hour' => LogEntry::where('occurred_at', '>=', now()->startOfHour())->count(),
+            ];
+        });
 
         return response()->json(['data' => $stats]);
     }
 
     /**
-     * Get available log levels.
+     * Get available log levels (cached).
      */
     protected function getAvailableLevels(): array
     {
-        return LogEntry::distinct()
-            ->pluck('level')
-            ->sort()
-            ->values()
-            ->toArray();
+        return Cache::remember('logscope:filters:levels', 60, function () {
+            return LogEntry::distinct()
+                ->pluck('level')
+                ->sort()
+                ->values()
+                ->toArray();
+        });
     }
 
     /**
-     * Get available channels.
+     * Get available channels (cached).
      */
     protected function getAvailableChannels(): array
     {
-        return LogEntry::distinct()
-            ->whereNotNull('channel')
-            ->pluck('channel')
-            ->sort()
-            ->values()
-            ->toArray();
+        return Cache::remember('logscope:filters:channels', 60, function () {
+            return LogEntry::distinct()
+                ->whereNotNull('channel')
+                ->pluck('channel')
+                ->sort()
+                ->values()
+                ->toArray();
+        });
     }
 
     /**
-     * Get available environments.
+     * Get available environments (cached).
      */
     protected function getAvailableEnvironments(): array
     {
-        return LogEntry::distinct()
-            ->whereNotNull('environment')
-            ->pluck('environment')
-            ->sort()
-            ->values()
-            ->toArray();
+        return Cache::remember('logscope:filters:environments', 60, function () {
+            return LogEntry::distinct()
+                ->whereNotNull('environment')
+                ->pluck('environment')
+                ->sort()
+                ->values()
+                ->toArray();
+        });
     }
 
     /**
-     * Get available HTTP methods.
+     * Get available HTTP methods (cached).
      */
     protected function getAvailableHttpMethods(): array
     {
-        return LogEntry::distinct()
-            ->whereNotNull('http_method')
-            ->pluck('http_method')
-            ->sort()
-            ->values()
-            ->toArray();
+        return Cache::remember('logscope:filters:http_methods', 60, function () {
+            return LogEntry::distinct()
+                ->whereNotNull('http_method')
+                ->pluck('http_method')
+                ->sort()
+                ->values()
+                ->toArray();
+        });
     }
 }

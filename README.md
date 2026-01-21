@@ -261,6 +261,63 @@ For complete customization, disable the default routes and register your own:
 
 Then register the routes manually in your `routes/web.php` with any middleware or logic you need.
 
+## Production Deployment
+
+### Recommended Settings
+
+For production environments, we recommend:
+
+```env
+# Use batch (default) or queue mode - never sync in production
+LOGSCOPE_WRITE_MODE=batch
+
+# Keep logs for 7-14 days (adjust based on your needs)
+LOGSCOPE_RETENTION_DAYS=14
+
+# Set appropriate log level (reduces noise)
+LOG_LEVEL=info
+```
+
+### Schedule Pruning
+
+Add to your scheduler to automatically clean old logs:
+
+```php
+// Laravel 11+ (routes/console.php)
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('logscope:prune')->daily();
+
+// Laravel 10 (app/Console/Kernel.php)
+protected function schedule(Schedule $schedule): void
+{
+    $schedule->command('logscope:prune')->daily();
+}
+```
+
+### High-Traffic Applications
+
+For applications with high traffic (thousands of requests/day):
+
+1. **Use queue mode** with a dedicated queue:
+   ```env
+   LOGSCOPE_WRITE_MODE=queue
+   LOGSCOPE_QUEUE=logs
+   ```
+
+2. **Run a separate queue worker** for logs:
+   ```bash
+   php artisan queue:work --queue=logs
+   ```
+
+3. **Consider shorter retention** (7 days) to keep the table size manageable.
+
+### Performance Notes
+
+- **Stats are cached** for 60 seconds to reduce database load
+- **Batch mode** (default) writes logs after the response is sent, so it won't slow down your requests
+- **Indexes** are optimized for common filter combinations (level + date, channel + date, etc.)
+
 ## Customization
 
 ### Publishing Assets
