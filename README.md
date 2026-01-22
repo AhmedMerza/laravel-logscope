@@ -119,13 +119,14 @@ LOGSCOPE_QUEUE_CONNECTION=   # Optional queue connection
 
 LogScope can filter out noisy logs that you don't want to capture:
 
-**Ignore PHP Deprecations** - Third-party packages often trigger PHP deprecation warnings. These are captured by Laravel's error handler and can clutter your logs.
+**Ignore PHP Deprecations** (enabled by default) - Third-party packages often trigger PHP deprecation warnings. These are captured by Laravel's error handler and can clutter your logs.
 
-**Ignore Null Channel Logs** - Logs without a channel are usually PHP errors/warnings rather than explicit `Log::` calls.
+**Ignore Null Channel Logs** (enabled by default) - Logs without a channel are usually PHP errors/warnings rather than explicit `Log::` calls.
 
 ```env
-LOGSCOPE_IGNORE_DEPRECATIONS=true   # Ignore "is deprecated" messages
-LOGSCOPE_IGNORE_NULL_CHANNEL=true   # Ignore logs without a channel
+# Both are enabled by default. Set to false to capture these logs:
+LOGSCOPE_IGNORE_DEPRECATIONS=false   # Capture "is deprecated" messages
+LOGSCOPE_IGNORE_NULL_CHANNEL=false   # Capture logs without a channel
 ```
 
 ### Request Context
@@ -376,7 +377,7 @@ LOGSCOPE_WRITE_MODE=batch
 LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
 
-# Ignore filters (reduce noise)
+# Ignore filters (both enabled by default, set to false to capture)
 LOGSCOPE_IGNORE_DEPRECATIONS=false
 LOGSCOPE_IGNORE_NULL_CHANNEL=false
 
