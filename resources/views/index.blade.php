@@ -109,11 +109,11 @@
                                 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeChannels.includes('{{ $channel }}'),
                                 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.channels.includes('{{ $channel }}') && !filters.excludeChannels.includes('{{ $channel }}')
                             }">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 :class="filters.excludeChannels.includes('{{ $channel }}') ? 'text-red-400' : 'text-gray-400'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                             </svg>
-                            <span class="flex-1 text-left">{{ $channel }}</span>
+                            <span class="flex-1 text-left truncate" title="{{ $channel }}">{{ $channel }}</span>
                         </button>
                         @endforeach
                     </div>
@@ -471,11 +471,11 @@
                                         <span class="level-badge" :class="'level-' + log.level" x-text="log.level"></span>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <p class="text-sm text-gray-900 dark:text-gray-100 truncate max-w-xl" x-text="log.message_preview || log.message"></p>
+                                        <p class="text-sm text-gray-900 dark:text-gray-100 truncate" :style="{ maxWidth: getMessagePreviewWidth() + 'px' }" x-text="log.message_preview || log.message"></p>
                                         <p x-show="log.source" class="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate font-mono" x-text="formatSource(log.source, log.source_line)"></p>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-500 dark:text-gray-400" x-text="log.channel"></span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400 truncate block max-w-[120px]" :title="log.channel" x-text="log.channel"></span>
                                     </td>
                                 </tr>
                             </template>
@@ -509,22 +509,37 @@
 
             <!-- Detail Panel -->
             <div x-show="selectedLog" x-cloak
-                class="w-[400px] lg:w-[480px] xl:w-[560px] flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
+                class="flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden relative"
+                :style="{ width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' }"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-x-4"
                 x-transition:enter-end="opacity-100 translate-x-0"
                 x-transition:leave="transition ease-in duration-150"
                 x-transition:leave-start="opacity-100 translate-x-0"
                 x-transition:leave-end="opacity-0 translate-x-4">
+                <!-- Resize Handle -->
+                <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-10"
+                    :class="isResizing ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-400/50'"
+                    @mousedown.prevent="startResize($event)"></div>
                 <!-- Panel Header -->
                 <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-600">
                     <h3 class="font-semibold text-gray-900 dark:text-white">Log Details</h3>
-                    <button @click="closePanel()"
-                        class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
+                    <div class="flex items-center gap-1">
+                        <button x-show="detailPanelWidth" @click="resetPanelWidth()"
+                            class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
+                            title="Reset panel width">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                            </svg>
+                        </button>
+                        <button @click="closePanel()"
+                            class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
+                            title="Close panel">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Panel Content -->
@@ -537,9 +552,9 @@
                                 <span class="level-badge" :class="'level-' + selectedLog?.level" x-text="selectedLog?.level"></span>
                             </p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
+                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 overflow-hidden">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Channel</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="selectedLog?.channel || '-'"></p>
+                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white truncate" :title="selectedLog?.channel" x-text="selectedLog?.channel || '-'"></p>
                         </div>
                         <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</p>
@@ -748,6 +763,9 @@ function logScope() {
         selectedLog: null,
         showDeleteDialog: false,
         showKeyboardHelp: false,
+        detailPanelWidth: parseInt(localStorage.getItem('logscope_panel_width')) || 0,
+        isResizing: false,
+        minPanelWidth: 360,
         quickFilters: @json($quickFilters),
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
@@ -775,6 +793,15 @@ function logScope() {
         page: 1,
 
         async init() {
+            // Validate saved panel width against current max
+            if (this.detailPanelWidth) {
+                const maxWidth = this.getMaxPanelWidth();
+                if (this.detailPanelWidth > maxWidth) {
+                    this.detailPanelWidth = maxWidth;
+                    localStorage.setItem('logscope_panel_width', maxWidth);
+                }
+            }
+
             // Watch section states and persist to localStorage
             this.$watch('sections.quickFilters', val => localStorage.setItem('logscope-section-quickFilters', JSON.stringify(val)));
             this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
@@ -1099,6 +1126,58 @@ function logScope() {
 
         closePanel() {
             this.selectedLog = null;
+        },
+
+        getDefaultPanelWidth() {
+            const width = window.innerWidth;
+            if (width >= 1920) return 640; // Ultra-wide / 2xl
+            if (width >= 1536) return 560; // xl
+            if (width >= 1280) return 480; // lg
+            return 400;
+        },
+
+        getMessagePreviewWidth() {
+            const sidebarWidth = this.sidebarOpen ? 256 : 0;
+            const panelWidth = this.selectedLog ? (this.detailPanelWidth || this.getDefaultPanelWidth()) : 0;
+            const tableOverhead = 350; // Approximate space for other columns (time, level, channel, padding)
+            const availableWidth = window.innerWidth - sidebarWidth - panelWidth - tableOverhead;
+            // Clamp between 200px min and available space
+            return Math.max(200, availableWidth);
+        },
+
+        getMaxPanelWidth() {
+            // Max 50% of screen width, but at least 400px for usability
+            const sidebarWidth = this.sidebarOpen ? 256 : 0; // w-64 = 256px
+            const availableWidth = window.innerWidth - sidebarWidth;
+            return Math.max(400, Math.min(900, Math.floor(availableWidth * 0.5)));
+        },
+
+        startResize(event) {
+            this.isResizing = true;
+            const startX = event.clientX;
+            const startWidth = this.detailPanelWidth || this.getDefaultPanelWidth();
+            const maxWidth = this.getMaxPanelWidth();
+
+            const onMouseMove = (e) => {
+                const delta = startX - e.clientX;
+                const newWidth = Math.min(maxWidth, Math.max(this.minPanelWidth, startWidth + delta));
+                this.detailPanelWidth = newWidth;
+            };
+
+            const onMouseUp = () => {
+                this.isResizing = false;
+                localStorage.setItem('logscope_panel_width', this.detailPanelWidth);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        },
+
+        resetPanelWidth() {
+            this.detailPanelWidth = 0;
+            localStorage.removeItem('logscope_panel_width');
         },
 
         formatTime(dateStr) {
