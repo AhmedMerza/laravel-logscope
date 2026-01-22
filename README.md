@@ -2,18 +2,22 @@
 
 A fast, database-backed log viewer for Laravel applications.
 
-> **Status:** Early development - not yet ready for production use.
+> **Status:** Beta - actively developed, used in production by early adopters.
 
 ## Features
 
 - **Automatic log capture** - Captures ALL logs from ALL channels automatically (zero config)
 - **Request context tracking** - Trace ID, user ID, IP address, URL, and user agent for every log
 - **Database-backed storage** - Fast queries with proper indexing
-- **Advanced filtering** - Filter by level, channel, user, IP, and date range
-- **Full-text search** - Search across messages, context, and source
-- **Exclusion filters** - Hide noise, focus on what matters
+- **Advanced filtering** - Filter by level, channel, HTTP method, user, IP, and date range
+- **Include/Exclude filters** - Three-state toggles to include, exclude, or ignore each filter
+- **Full-text search** - Search across messages, context, and source with NOT support
 - **Retention policies** - Auto-prune old logs after configurable period
 - **Quick filters** - Configurable one-click filters for common queries
+- **Keyboard shortcuts** - Navigate with j/k, search with /, help with ?, close with Esc
+- **Shareable links** - URL reflects current filters for easy sharing
+- **Resizable detail panel** - Drag to resize, width persisted across sessions
+- **Dark mode** - Full dark mode support with persistence
 - **Performance optimized** - Batch writes after response, queue support for high-traffic apps
 - **Highly configurable** - Customize capture mode, write mode, table names, and more
 
@@ -197,6 +201,18 @@ php artisan logscope:prune --days=14
 ### Access the Web Interface
 
 After installation, access LogScope at `/logscope` (or your configured prefix).
+
+### Keyboard Shortcuts
+
+LogScope includes keyboard shortcuts for faster navigation:
+
+| Key | Action |
+|-----|--------|
+| `j` | Next log entry |
+| `k` | Previous log entry |
+| `/` | Focus search input |
+| `?` | Show keyboard shortcuts help |
+| `Esc` | Close detail panel / dialogs |
 
 ### Authorization
 
