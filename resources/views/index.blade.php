@@ -400,8 +400,11 @@
                                     <td class="p-0">
                                         <div class="level-indicator h-full" :class="'level-' + log.level"></div>
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums font-mono whitespace-nowrap" x-text="formatTime(log.occurred_at)"></span>
+                                    <td class="px-4 py-3 relative group">
+                                        <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums whitespace-nowrap cursor-help"
+                                            x-text="formatRelativeTime(log.occurred_at)"></span>
+                                        <div class="absolute left-0 bottom-full mb-1 px-2 py-1 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20"
+                                            x-text="formatFullDateTime(log.occurred_at)"></div>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="level-badge" :class="'level-' + log.level" x-text="log.level"></span>
@@ -445,7 +448,7 @@
 
             <!-- Detail Panel -->
             <div x-show="selectedLog" x-cloak
-                class="w-[480px] flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
+                class="w-[400px] lg:w-[480px] xl:w-[560px] flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-x-4"
                 x-transition:enter-end="opacity-100 translate-x-0"
@@ -479,7 +482,8 @@
                         </div>
                         <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
                             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap" x-text="formatTime(selectedLog?.occurred_at)"></p>
+                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="formatRelativeTime(selectedLog?.occurred_at)"></p>
+                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400" x-text="formatTime(selectedLog?.occurred_at)"></p>
                         </div>
                     </div>
 
@@ -869,6 +873,40 @@ function logScope() {
             if (!dateStr) return '';
             const d = new Date(dateStr);
             return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        },
+
+        formatRelativeTime(dateStr) {
+            if (!dateStr) return '';
+            const now = new Date();
+            const d = new Date(dateStr);
+            const diffMs = now - d;
+            const diffSec = Math.floor(diffMs / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHour = Math.floor(diffMin / 60);
+            const diffDay = Math.floor(diffHour / 24);
+
+            if (diffSec < 60) return 'just now';
+            if (diffMin < 60) return `${diffMin}m ago`;
+            if (diffHour < 24) return `${diffHour}h ago`;
+            if (diffDay === 1) return 'yesterday';
+            if (diffDay < 7) return `${diffDay}d ago`;
+            if (diffDay < 30) return `${Math.floor(diffDay / 7)}w ago`;
+            return this.formatTime(dateStr);
+        },
+
+        formatFullDateTime(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
         },
 
         formatDateTime(dateStr) {
