@@ -45,6 +45,7 @@ php artisan migrate
 The config file will be published to `config/logscope.php`. Options include:
 
 - **Capture mode** - `all` (automatic) or `channel` (explicit)
+- **Ignore filters** - Suppress deprecations and/or null-channel logs
 - **Write mode** - `sync`, `batch` (default), or `queue` for performance tuning
 - **Queue settings** - Queue name and connection for queue write mode
 - **Middleware** - Enable/disable request context capture
@@ -112,6 +113,19 @@ LogScope offers three write modes optimized for different use cases:
 LOGSCOPE_WRITE_MODE=batch    # 'sync', 'batch', or 'queue'
 LOGSCOPE_QUEUE=default       # Queue name (when using 'queue' mode)
 LOGSCOPE_QUEUE_CONNECTION=   # Optional queue connection
+```
+
+### Reducing Log Noise
+
+LogScope can filter out noisy logs that you don't want to capture:
+
+**Ignore PHP Deprecations** - Third-party packages often trigger PHP deprecation warnings. These are captured by Laravel's error handler and can clutter your logs.
+
+**Ignore Null Channel Logs** - Logs without a channel are usually PHP errors/warnings rather than explicit `Log::` calls.
+
+```env
+LOGSCOPE_IGNORE_DEPRECATIONS=true   # Ignore "is deprecated" messages
+LOGSCOPE_IGNORE_NULL_CHANNEL=true   # Ignore logs without a channel
 ```
 
 ### Request Context
@@ -361,6 +375,10 @@ LOGSCOPE_WRITE_MODE=batch
 # Queue settings (when using 'queue' write mode)
 LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
+
+# Ignore filters (reduce noise)
+LOGSCOPE_IGNORE_DEPRECATIONS=false
+LOGSCOPE_IGNORE_NULL_CHANNEL=false
 
 # Request context middleware
 LOGSCOPE_MIDDLEWARE_ENABLED=true

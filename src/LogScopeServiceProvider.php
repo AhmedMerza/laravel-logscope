@@ -114,6 +114,12 @@ class LogScopeServiceProvider extends ServiceProvider
                 return;
             }
 
+            // Check if this log should be ignored based on config
+            $channel = ChannelContextProcessor::getLastChannel();
+            if ($this->shouldIgnoreLog($event, $channel)) {
+                return;
+            }
+
             try {
                 // Get request context from Laravel Context (set by middleware)
                 $requestContext = Context::get('logscope', []);
@@ -122,7 +128,7 @@ class LogScopeServiceProvider extends ServiceProvider
                     'level' => $event->level,
                     'message' => $event->message,
                     'context' => $this->sanitizeContext($event->context),
-                    'channel' => ChannelContextProcessor::getLastChannel() ?? config('logging.default'),
+                    'channel' => $channel ?? config('logging.default'),
                     'environment' => app()->environment(),
                     'source' => $this->extractSource($event->context),
                     'source_line' => $this->extractSourceLine($event->context),
@@ -212,6 +218,28 @@ class LogScopeServiceProvider extends ServiceProvider
         // Check context for LogScope markers
         if (isset($event->context['_logscope_internal'])) {
             return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if this log should be ignored based on config settings.
+     */
+    protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
+    {
+        // Check if we should ignore deprecation messages
+        if (config('logscope.ignore.deprecations', false)) {
+            if (str_contains($event->message, 'is deprecated')) {
+                return true;
+            }
+        }
+
+        // Check if we should ignore logs without a channel
+        if (config('logscope.ignore.null_channel', false)) {
+            if ($channel === null) {
+                return true;
+            }
         }
 
         return false;

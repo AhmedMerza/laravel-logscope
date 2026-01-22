@@ -91,6 +91,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Ignore Filters
+    |--------------------------------------------------------------------------
+    |
+    | Configure which logs should be ignored and not captured by LogScope.
+    |
+    | 'deprecations' - Ignore PHP deprecation warnings (messages containing
+    |                  "is deprecated"). These typically come from third-party
+    |                  packages and can be noisy.
+    |
+    | 'null_channel' - Ignore logs without a channel. These are usually PHP
+    |                  errors/warnings captured by Laravel's error handler
+    |                  rather than explicit Log:: calls.
+    |
+    */
+
+    'ignore' => [
+        'deprecations' => env('LOGSCOPE_IGNORE_DEPRECATIONS', false),
+        'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Write Mode (Performance)
     |--------------------------------------------------------------------------
     |
