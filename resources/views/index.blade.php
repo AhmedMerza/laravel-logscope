@@ -739,7 +739,97 @@ function logScope() {
             this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
             this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
+            // Load filters from URL on init
+            this.loadFiltersFromUrl();
+
             await Promise.all([this.fetchLogs(), this.fetchStats()]);
+        },
+
+        loadFiltersFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+
+            // Load levels
+            const levels = params.getAll('levels[]');
+            if (levels.length > 0) this.filters.levels = levels;
+
+            const excludeLevels = params.getAll('exclude_levels[]');
+            if (excludeLevels.length > 0) this.filters.excludeLevels = excludeLevels;
+
+            // Load channels
+            const channels = params.getAll('channels[]');
+            if (channels.length > 0) this.filters.channels = channels;
+
+            const excludeChannels = params.getAll('exclude_channels[]');
+            if (excludeChannels.length > 0) this.filters.excludeChannels = excludeChannels;
+
+            // Load HTTP methods
+            const httpMethods = params.getAll('http_method[]');
+            if (httpMethods.length > 0) this.filters.httpMethods = httpMethods;
+
+            // Load date range
+            if (params.get('from')) this.filters.from = params.get('from');
+            if (params.get('to')) this.filters.to = params.get('to');
+
+            // Load request context filters
+            if (params.get('trace_id')) this.filters.trace_id = params.get('trace_id');
+            if (params.get('user_id')) this.filters.user_id = params.get('user_id');
+            if (params.get('ip_address')) this.filters.ip_address = params.get('ip_address');
+            if (params.get('url')) this.filters.url = params.get('url');
+
+            // Load search
+            if (params.get('search')) {
+                this.searches[0].value = params.get('search');
+            }
+            if (params.get('search_field')) {
+                this.searches[0].field = params.get('search_field');
+            }
+
+            // Load page
+            if (params.get('page')) {
+                this.page = parseInt(params.get('page')) || 1;
+            }
+        },
+
+        syncFiltersToUrl() {
+            const params = new URLSearchParams();
+
+            // Add levels
+            this.filters.levels.forEach(l => params.append('levels[]', l));
+            this.filters.excludeLevels.forEach(l => params.append('exclude_levels[]', l));
+
+            // Add channels
+            this.filters.channels.forEach(c => params.append('channels[]', c));
+            this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
+
+            // Add HTTP methods
+            this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
+
+            // Add date range
+            if (this.filters.from) params.set('from', this.filters.from);
+            if (this.filters.to) params.set('to', this.filters.to);
+
+            // Add request context
+            if (this.filters.trace_id) params.set('trace_id', this.filters.trace_id);
+            if (this.filters.user_id) params.set('user_id', this.filters.user_id);
+            if (this.filters.ip_address) params.set('ip_address', this.filters.ip_address);
+            if (this.filters.url) params.set('url', this.filters.url);
+
+            // Add search
+            if (this.searches[0]?.value) {
+                params.set('search', this.searches[0].value);
+                if (this.searches[0].field !== 'any') {
+                    params.set('search_field', this.searches[0].field);
+                }
+            }
+
+            // Add page if not first
+            if (this.page > 1) params.set('page', this.page);
+
+            // Update URL without reload
+            const newUrl = params.toString()
+                ? `${window.location.pathname}?${params.toString()}`
+                : window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
         },
 
         addSearch() {
@@ -885,6 +975,7 @@ function logScope() {
 
                 this.logs = data.data;
                 this.meta = data.meta;
+                this.syncFiltersToUrl();
             } catch (error) {
                 console.error('Failed to fetch logs:', error);
                 this.error = 'Failed to fetch logs. Please try again.';
