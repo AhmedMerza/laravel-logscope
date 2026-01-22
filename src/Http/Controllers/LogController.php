@@ -47,6 +47,10 @@ class LogController extends Controller
             $query->channel((array) $request->input('channels'));
         }
 
+        if ($request->filled('exclude_channels')) {
+            $query->excludeChannel((array) $request->input('exclude_channels'));
+        }
+
         if ($request->filled('environments')) {
             $query->environment((array) $request->input('environments'));
         }

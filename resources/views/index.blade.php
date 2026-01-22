@@ -73,12 +73,16 @@
                         @foreach(['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'] as $level)
                         <button @click="toggleLevel('{{ $level }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                            :class="filters.levels.includes('{{ $level }}')
-                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
+                            :class="{
+                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.levels.includes('{{ $level }}'),
+                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeLevels.includes('{{ $level }}'),
+                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.levels.includes('{{ $level }}') && !filters.excludeLevels.includes('{{ $level }}')
+                            }">
                             <span class="level-{{ $level }} level-dot flex-shrink-0"></span>
                             <span class="flex-1 text-left capitalize">{{ $level }}</span>
-                            <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums" x-text="stats.by_level?.{{ $level }} || 0"></span>
+                            <span class="text-xs tabular-nums"
+                                :class="filters.excludeLevels.includes('{{ $level }}') ? 'text-red-400 dark:text-red-500' : 'text-gray-400 dark:text-gray-500'"
+                                x-text="stats.by_level?.{{ $level }} || 0"></span>
                         </button>
                         @endforeach
                     </div>
@@ -100,10 +104,13 @@
                         @foreach($channels as $channel)
                         <button @click="toggleChannel('{{ $channel }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                            :class="filters.channels.includes('{{ $channel }}')
-                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
-                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            :class="{
+                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.channels.includes('{{ $channel }}'),
+                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeChannels.includes('{{ $channel }}'),
+                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.channels.includes('{{ $channel }}') && !filters.excludeChannels.includes('{{ $channel }}')
+                            }">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                :class="filters.excludeChannels.includes('{{ $channel }}') ? 'text-red-400' : 'text-gray-400'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                             </svg>
                             <span class="flex-1 text-left">{{ $channel }}</span>
@@ -317,16 +324,28 @@
             class="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/30">
             <span class="text-xs font-medium text-blue-600 dark:text-blue-400">Active filters:</span>
             <div class="flex flex-wrap gap-1">
-                <template x-for="level in filters.levels" :key="level">
+                <template x-for="level in filters.levels" :key="'inc-' + level">
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200">
                         <span x-text="level" class="capitalize"></span>
-                        <button @click="toggleLevel(level)" class="hover:text-blue-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearLevelFilter(level)" class="hover:text-blue-900 dark:hover:text-white">&times;</button>
                     </span>
                 </template>
-                <template x-for="channel in filters.channels" :key="channel">
+                <template x-for="level in filters.excludeLevels" :key="'exc-' + level">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                        <span class="line-through capitalize" x-text="level"></span>
+                        <button @click="clearLevelFilter(level)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
+                    </span>
+                </template>
+                <template x-for="channel in filters.channels" :key="'inc-' + channel">
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200">
                         <span x-text="channel"></span>
-                        <button @click="toggleChannel(channel)" class="hover:text-green-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearChannelFilter(channel)" class="hover:text-green-900 dark:hover:text-white">&times;</button>
+                    </span>
+                </template>
+                <template x-for="channel in filters.excludeChannels" :key="'exc-' + channel">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                        <span class="line-through" x-text="channel"></span>
+                        <button @click="clearChannelFilter(channel)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
@@ -692,7 +711,9 @@ function logScope() {
         searchMode: 'and',
         filters: {
             levels: [],
+            excludeLevels: [],
             channels: [],
+            excludeChannels: [],
             httpMethods: [],
             from: '',
             to: '',
@@ -732,7 +753,9 @@ function logScope() {
 
         hasActiveFilters() {
             return this.filters.levels.length > 0 ||
+                this.filters.excludeLevels.length > 0 ||
                 this.filters.channels.length > 0 ||
+                this.filters.excludeChannels.length > 0 ||
                 this.filters.httpMethods.length > 0 ||
                 this.searches.some(s => s.value) ||
                 this.filters.from ||
@@ -771,14 +794,54 @@ function logScope() {
         },
 
         toggleLevel(level) {
-            const i = this.filters.levels.indexOf(level);
-            i === -1 ? this.filters.levels.push(level) : this.filters.levels.splice(i, 1);
+            const inInclude = this.filters.levels.indexOf(level);
+            const inExclude = this.filters.excludeLevels.indexOf(level);
+
+            if (inInclude === -1 && inExclude === -1) {
+                // Neutral → Include
+                this.filters.levels.push(level);
+            } else if (inInclude !== -1) {
+                // Include → Exclude
+                this.filters.levels.splice(inInclude, 1);
+                this.filters.excludeLevels.push(level);
+            } else {
+                // Exclude → Neutral
+                this.filters.excludeLevels.splice(inExclude, 1);
+            }
+            this.fetchLogs();
+        },
+
+        clearLevelFilter(level) {
+            const inInclude = this.filters.levels.indexOf(level);
+            const inExclude = this.filters.excludeLevels.indexOf(level);
+            if (inInclude !== -1) this.filters.levels.splice(inInclude, 1);
+            if (inExclude !== -1) this.filters.excludeLevels.splice(inExclude, 1);
             this.fetchLogs();
         },
 
         toggleChannel(channel) {
-            const i = this.filters.channels.indexOf(channel);
-            i === -1 ? this.filters.channels.push(channel) : this.filters.channels.splice(i, 1);
+            const inInclude = this.filters.channels.indexOf(channel);
+            const inExclude = this.filters.excludeChannels.indexOf(channel);
+
+            if (inInclude === -1 && inExclude === -1) {
+                // Neutral → Include
+                this.filters.channels.push(channel);
+            } else if (inInclude !== -1) {
+                // Include → Exclude
+                this.filters.channels.splice(inInclude, 1);
+                this.filters.excludeChannels.push(channel);
+            } else {
+                // Exclude → Neutral
+                this.filters.excludeChannels.splice(inExclude, 1);
+            }
+            this.fetchLogs();
+        },
+
+        clearChannelFilter(channel) {
+            const inInclude = this.filters.channels.indexOf(channel);
+            const inExclude = this.filters.excludeChannels.indexOf(channel);
+            if (inInclude !== -1) this.filters.channels.splice(inInclude, 1);
+            if (inExclude !== -1) this.filters.excludeChannels.splice(inExclude, 1);
             this.fetchLogs();
         },
 
@@ -795,7 +858,9 @@ function logScope() {
                 if (this.filters.ip_address) params.append('ip_address', this.filters.ip_address);
                 if (this.filters.url) params.append('url', this.filters.url);
                 this.filters.levels.forEach(l => params.append('levels[]', l));
+                this.filters.excludeLevels.forEach(l => params.append('exclude_levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
+                this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
                 this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
 
                 // Add advanced search params
@@ -926,7 +991,9 @@ function logScope() {
             this.searchMode = 'and';
             this.filters = {
                 levels: [],
+                excludeLevels: [],
                 channels: [],
+                excludeChannels: [],
                 httpMethods: [],
                 from: '',
                 to: '',

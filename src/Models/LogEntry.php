@@ -96,6 +96,18 @@ class LogEntry extends Model
     }
 
     /**
+     * Scope: Exclude specific channels.
+     */
+    public function scopeExcludeChannel(Builder $query, string|array $channel): Builder
+    {
+        if (is_array($channel)) {
+            return $query->whereNotIn('channel', $channel);
+        }
+
+        return $query->where('channel', '!=', $channel);
+    }
+
+    /**
      * Scope: Filter by environment.
      */
     public function scopeEnvironment(Builder $query, string|array $environment): Builder
