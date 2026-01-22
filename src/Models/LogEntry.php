@@ -100,11 +100,14 @@ class LogEntry extends Model
      */
     public function scopeExcludeChannel(Builder $query, string|array $channel): Builder
     {
-        if (is_array($channel)) {
-            return $query->whereNotIn('channel', $channel);
-        }
-
-        return $query->where('channel', '!=', $channel);
+        return $query->where(function ($q) use ($channel) {
+            if (is_array($channel)) {
+                $q->whereNotIn('channel', $channel);
+            } else {
+                $q->where('channel', '!=', $channel);
+            }
+            $q->orWhereNull('channel');
+        });
     }
 
     /**
@@ -180,6 +183,21 @@ class LogEntry extends Model
         }
 
         return $query->where('http_method', $method);
+    }
+
+    /**
+     * Scope: Exclude specific HTTP methods.
+     */
+    public function scopeExcludeHttpMethod(Builder $query, string|array $method): Builder
+    {
+        return $query->where(function ($q) use ($method) {
+            if (is_array($method)) {
+                $q->whereNotIn('http_method', $method);
+            } else {
+                $q->where('http_method', '!=', $method);
+            }
+            $q->orWhereNull('http_method');
+        });
     }
 
     /**

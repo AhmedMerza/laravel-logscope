@@ -72,15 +72,37 @@ class LogController extends Controller
                         $field = $search['field'] ?? 'any';
                         $value = '%'.$search['value'].'%';
                         $boolean = ($index === 0 || $searchMode === 'and') ? 'and' : 'or';
+                        $exclude = ! empty($search['exclude']) && $search['exclude'] !== '0';
 
                         if ($field === 'any') {
-                            $q->where(function ($subQ) use ($value) {
-                                $subQ->where('message', 'like', $value)
-                                    ->orWhere('context', 'like', $value)
-                                    ->orWhere('source', 'like', $value);
-                            }, null, null, $boolean);
+                            if ($exclude) {
+                                // NOT: all fields must NOT match (handle NULLs)
+                                $q->where(function ($subQ) use ($value) {
+                                    $subQ->where(function ($mq) use ($value) {
+                                        $mq->where('message', 'not like', $value)->orWhereNull('message');
+                                    })->where(function ($cq) use ($value) {
+                                        $cq->where('context', 'not like', $value)->orWhereNull('context');
+                                    })->where(function ($sq) use ($value) {
+                                        $sq->where('source', 'not like', $value)->orWhereNull('source');
+                                    });
+                                }, null, null, $boolean);
+                            } else {
+                                // INCLUDE: any field can match
+                                $q->where(function ($subQ) use ($value) {
+                                    $subQ->where('message', 'like', $value)
+                                        ->orWhere('context', 'like', $value)
+                                        ->orWhere('source', 'like', $value);
+                                }, null, null, $boolean);
+                            }
                         } else {
-                            $q->where($field, 'like', $value, $boolean);
+                            if ($exclude) {
+                                // Handle NULL for specific field exclude
+                                $q->where(function ($subQ) use ($field, $value) {
+                                    $subQ->where($field, 'not like', $value)->orWhereNull($field);
+                                }, null, null, $boolean);
+                            } else {
+                                $q->where($field, 'like', $value, $boolean);
+                            }
                         }
                     }
                 });
@@ -117,6 +139,10 @@ class LogController extends Controller
 
         if ($request->filled('http_method')) {
             $query->httpMethod((array) $request->input('http_method'));
+        }
+
+        if ($request->filled('exclude_http_method')) {
+            $query->excludeHttpMethod((array) $request->input('exclude_http_method'));
         }
 
         if ($request->filled('url')) {

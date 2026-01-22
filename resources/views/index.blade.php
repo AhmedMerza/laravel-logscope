@@ -136,10 +136,13 @@
                         @foreach($httpMethods as $method)
                         <button @click="toggleHttpMethod('{{ $method }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                            :class="filters.httpMethods.includes('{{ $method }}')
-                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500'">
-                            <span class="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-400">{{ substr($method, 0, 1) }}</span>
+                            :class="{
+                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.httpMethods.includes('{{ $method }}'),
+                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeHttpMethods.includes('{{ $method }}'),
+                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.httpMethods.includes('{{ $method }}') && !filters.excludeHttpMethods.includes('{{ $method }}')
+                            }">
+                            <span class="w-4 h-4 flex items-center justify-center text-xs font-bold"
+                                :class="filters.excludeHttpMethods.includes('{{ $method }}') ? 'text-red-400' : 'text-gray-400'">{{ substr($method, 0, 1) }}</span>
                             <span class="flex-1 text-left">{{ $method }}</span>
                         </button>
                         @endforeach
@@ -225,14 +228,26 @@
                             <option value="context">Context</option>
                             <option value="source">Source</option>
                         </select>
+                        <button @click="searches[0].exclude = !searches[0].exclude; fetchLogs()"
+                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border"
+                            :class="searches[0].exclude
+                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700'
+                                : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                            title="Toggle NOT (exclude matching)">
+                            NOT
+                        </button>
                         <div class="flex-1 relative">
-                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                :class="searches[0].exclude ? 'text-red-400' : 'text-gray-400'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
                             <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
                                 x-ref="searchInput"
-                                placeholder="Search logs..."
-                                class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                :placeholder="searches[0].exclude ? 'Exclude logs containing...' : 'Search logs...'"
+                                class="w-full h-9 pl-9 pr-4 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2"
+                                :class="searches[0].exclude
+                                    ? 'bg-red-50 dark:bg-red-900/20 focus:ring-red-500'
+                                    : 'bg-gray-100 dark:bg-slate-600 focus:ring-blue-500'">
                         </div>
                     </div>
 
@@ -306,9 +321,20 @@
                         <option value="context">Context</option>
                         <option value="source">Source</option>
                     </select>
+                    <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; fetchLogs()"
+                        class="h-8 px-2 rounded-md text-xs font-bold transition-colors border"
+                        :class="searches[index + 1].exclude
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                        title="Toggle NOT (exclude matching)">
+                        NOT
+                    </button>
                     <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
-                        placeholder="Search..."
-                        class="flex-1 h-8 px-3 bg-slate-100 dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        :placeholder="searches[index + 1].exclude ? 'Exclude...' : 'Search...'"
+                        class="flex-1 h-8 px-3 border rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2"
+                        :class="searches[index + 1].exclude
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 focus:ring-red-500'
+                            : 'bg-slate-100 dark:bg-slate-600 border-gray-200 dark:border-slate-500 focus:ring-blue-500'">
                     <button @click="removeSearch(index + 1)"
                         class="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -348,8 +374,24 @@
                         <button @click="clearChannelFilter(channel)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
                     </span>
                 </template>
+                <template x-for="method in filters.httpMethods" :key="'inc-http-' + method">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200">
+                        <span x-text="method"></span>
+                        <button @click="clearHttpMethodFilter(method)" class="hover:text-purple-900 dark:hover:text-white">&times;</button>
+                    </span>
+                </template>
+                <template x-for="method in filters.excludeHttpMethods" :key="'exc-http-' + method">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                        <span class="line-through" x-text="method"></span>
+                        <button @click="clearHttpMethodFilter(method)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
+                    </span>
+                </template>
                 <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-slate-500 text-gray-700 dark:text-gray-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                        :class="search.exclude
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            : 'bg-gray-100 dark:bg-slate-500 text-gray-700 dark:text-gray-200'">
+                        <span x-show="search.exclude" class="font-bold">NOT</span>
                         <span x-text="search.field === 'any' ? '' : search.field + ':'"></span>
                         <span x-text="search.value" class="max-w-[100px] truncate"></span>
                         <button @click="search.value = ''; fetchLogs()" class="hover:text-gray-900 dark:hover:text-white">&times;</button>
@@ -707,7 +749,7 @@ function logScope() {
         showDeleteDialog: false,
         showKeyboardHelp: false,
         quickFilters: @json($quickFilters),
-        searches: [{ field: 'any', value: '' }],
+        searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
         filters: {
             levels: [],
@@ -715,6 +757,7 @@ function logScope() {
             channels: [],
             excludeChannels: [],
             httpMethods: [],
+            excludeHttpMethods: [],
             from: '',
             to: '',
             trace_id: '',
@@ -766,6 +809,9 @@ function logScope() {
             const httpMethods = params.getAll('http_method[]');
             if (httpMethods.length > 0) this.filters.httpMethods = httpMethods;
 
+            const excludeHttpMethods = params.getAll('exclude_http_method[]');
+            if (excludeHttpMethods.length > 0) this.filters.excludeHttpMethods = excludeHttpMethods;
+
             // Load date range
             if (params.get('from')) this.filters.from = params.get('from');
             if (params.get('to')) this.filters.to = params.get('to');
@@ -782,6 +828,9 @@ function logScope() {
             }
             if (params.get('search_field')) {
                 this.searches[0].field = params.get('search_field');
+            }
+            if (params.get('search_exclude') === '1') {
+                this.searches[0].exclude = true;
             }
 
             // Load page
@@ -803,6 +852,7 @@ function logScope() {
 
             // Add HTTP methods
             this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
+            this.filters.excludeHttpMethods.forEach(m => params.append('exclude_http_method[]', m));
 
             // Add date range
             if (this.filters.from) params.set('from', this.filters.from);
@@ -820,6 +870,9 @@ function logScope() {
                 if (this.searches[0].field !== 'any') {
                     params.set('search_field', this.searches[0].field);
                 }
+                if (this.searches[0].exclude) {
+                    params.set('search_exclude', '1');
+                }
             }
 
             // Add page if not first
@@ -833,7 +886,7 @@ function logScope() {
         },
 
         addSearch() {
-            this.searches.push({ field: 'any', value: '' });
+            this.searches.push({ field: 'any', value: '', exclude: false });
         },
 
         removeSearch(index) {
@@ -847,6 +900,7 @@ function logScope() {
                 this.filters.channels.length > 0 ||
                 this.filters.excludeChannels.length > 0 ||
                 this.filters.httpMethods.length > 0 ||
+                this.filters.excludeHttpMethods.length > 0 ||
                 this.searches.some(s => s.value) ||
                 this.filters.from ||
                 this.filters.to ||
@@ -857,8 +911,28 @@ function logScope() {
         },
 
         toggleHttpMethod(method) {
-            const i = this.filters.httpMethods.indexOf(method);
-            i === -1 ? this.filters.httpMethods.push(method) : this.filters.httpMethods.splice(i, 1);
+            const inInclude = this.filters.httpMethods.indexOf(method);
+            const inExclude = this.filters.excludeHttpMethods.indexOf(method);
+
+            if (inInclude === -1 && inExclude === -1) {
+                // Neutral → Include
+                this.filters.httpMethods.push(method);
+            } else if (inInclude !== -1) {
+                // Include → Exclude
+                this.filters.httpMethods.splice(inInclude, 1);
+                this.filters.excludeHttpMethods.push(method);
+            } else {
+                // Exclude → Neutral
+                this.filters.excludeHttpMethods.splice(inExclude, 1);
+            }
+            this.fetchLogs();
+        },
+
+        clearHttpMethodFilter(method) {
+            const inInclude = this.filters.httpMethods.indexOf(method);
+            const inExclude = this.filters.excludeHttpMethods.indexOf(method);
+            if (inInclude !== -1) this.filters.httpMethods.splice(inInclude, 1);
+            if (inExclude !== -1) this.filters.excludeHttpMethods.splice(inExclude, 1);
             this.fetchLogs();
         },
 
@@ -952,6 +1026,7 @@ function logScope() {
                 this.filters.channels.forEach(c => params.append('channels[]', c));
                 this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
                 this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
+                this.filters.excludeHttpMethods.forEach(m => params.append('exclude_http_method[]', m));
 
                 // Add advanced search params
                 const activeSearches = this.searches.filter(s => s.value);
@@ -959,6 +1034,7 @@ function logScope() {
                     activeSearches.forEach((s, i) => {
                         params.append(`searches[${i}][field]`, s.field);
                         params.append(`searches[${i}][value]`, s.value);
+                        params.append(`searches[${i}][exclude]`, s.exclude ? '1' : '0');
                     });
                     params.append('search_mode', this.searchMode);
                 }
@@ -1078,7 +1154,7 @@ function logScope() {
         },
 
         clearFilters() {
-            this.searches = [{ field: 'any', value: '' }];
+            this.searches = [{ field: 'any', value: '', exclude: false }];
             this.searchMode = 'and';
             this.filters = {
                 levels: [],
@@ -1086,6 +1162,7 @@ function logScope() {
                 channels: [],
                 excludeChannels: [],
                 httpMethods: [],
+                excludeHttpMethods: [],
                 from: '',
                 to: '',
                 trace_id: '',
