@@ -1,7 +1,9 @@
 @extends('logscope::layout')
 
 @section('content')
-<div x-data="logScope()" x-init="init()" class="h-full flex" @keydown.escape.window="closePanel()">
+<div x-data="logScope()" x-init="init()" class="h-full flex"
+    @keydown.escape.window="closePanel()"
+    @keydown.window="handleKeydown($event)">
     <!-- Sidebar -->
     <aside class="w-64 flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-r border-gray-200 dark:border-slate-600 flex flex-col"
         :class="{ 'hidden': !sidebarOpen }" x-cloak>
@@ -221,6 +223,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
                             <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
+                                x-ref="searchInput"
                                 placeholder="Search logs..."
                                 class="w-full h-9 pl-9 pr-4 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
@@ -263,6 +266,13 @@
 
                 <!-- Actions -->
                 <div class="flex items-center gap-1">
+                    <button @click="showKeyboardHelp = true"
+                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
+                        title="Keyboard shortcuts (?)">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </button>
                     <button @click="clearFilters()"
                         class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
                         title="Clear filters">
@@ -605,6 +615,60 @@
             </div>
         </div>
     </div>
+
+    <!-- Keyboard Shortcuts Help Dialog -->
+    <div x-show="showKeyboardHelp" x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center"
+        @keydown.escape.window="showKeyboardHelp = false"
+        x-transition:enter="ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50" @click="showKeyboardHelp = false"></div>
+        <!-- Dialog -->
+        <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6"
+            x-transition:enter="ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Keyboard Shortcuts</h3>
+                <button @click="showKeyboardHelp = false"
+                    class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-600">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Navigate down</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">j</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Navigate up</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">k</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus search</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">/</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Close panel</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">Esc</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Show this help</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">?</kbd>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -618,6 +682,7 @@ function logScope() {
         error: null,
         selectedLog: null,
         showDeleteDialog: false,
+        showKeyboardHelp: false,
         quickFilters: @json($quickFilters),
         searches: [{ field: 'any', value: '' }],
         searchMode: 'and',
@@ -900,6 +965,75 @@ function logScope() {
                 this.page = this.meta.current_page + 1;
                 this.fetchLogs();
             }
+        },
+
+        handleKeydown(event) {
+            // Ignore if typing in an input, textarea, or select
+            const tag = event.target.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+                return;
+            }
+
+            // Ignore if modifier keys are pressed (except shift for ?)
+            if (event.ctrlKey || event.metaKey || event.altKey) {
+                return;
+            }
+
+            switch (event.key) {
+                case '/':
+                    event.preventDefault();
+                    this.$refs.searchInput?.focus();
+                    break;
+                case 'j':
+                    event.preventDefault();
+                    this.selectNextLog();
+                    break;
+                case 'k':
+                    event.preventDefault();
+                    this.selectPrevLog();
+                    break;
+                case '?':
+                    event.preventDefault();
+                    this.showKeyboardHelp = !this.showKeyboardHelp;
+                    break;
+            }
+        },
+
+        selectNextLog() {
+            if (this.logs.length === 0) return;
+
+            if (!this.selectedLog) {
+                this.selectedLog = this.logs[0];
+            } else {
+                const currentIndex = this.logs.findIndex(log => log.id === this.selectedLog.id);
+                if (currentIndex < this.logs.length - 1) {
+                    this.selectedLog = this.logs[currentIndex + 1];
+                }
+            }
+            this.scrollToSelectedLog();
+        },
+
+        selectPrevLog() {
+            if (this.logs.length === 0) return;
+
+            if (!this.selectedLog) {
+                this.selectedLog = this.logs[0];
+            } else {
+                const currentIndex = this.logs.findIndex(log => log.id === this.selectedLog.id);
+                if (currentIndex > 0) {
+                    this.selectedLog = this.logs[currentIndex - 1];
+                }
+            }
+            this.scrollToSelectedLog();
+        },
+
+        scrollToSelectedLog() {
+            this.$nextTick(() => {
+                const selectedRow = document.querySelector('.log-row.selected');
+                if (selectedRow) {
+                    selectedRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
         }
     }
 }
