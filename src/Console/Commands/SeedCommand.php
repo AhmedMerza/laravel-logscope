@@ -136,18 +136,18 @@ class SeedCommand extends Command
     {
         $replacements = [
             '{user_id}' => rand(1, 100),
-            '{username}' => 'user_' . rand(100, 999),
-            '{email}' => 'user' . rand(1, 100) . '@example.com',
+            '{username}' => 'user_'.rand(100, 999),
+            '{email}' => 'user'.rand(1, 100).'@example.com',
             '{order_id}' => rand(10000, 99999),
             '{amount}' => number_format(rand(10, 500) + rand(0, 99) / 100, 2),
             '{time}' => rand(10, 5000),
-            '{ip}' => rand(1, 255) . '.' . rand(0, 255) . '.' . rand(0, 255) . '.' . rand(1, 255),
-            '{path}' => '/app/' . ['Controllers', 'Services', 'Models', 'Jobs'][rand(0, 3)] . '/File.php',
+            '{ip}' => rand(1, 255).'.'.rand(0, 255).'.'.rand(0, 255).'.'.rand(1, 255),
+            '{path}' => '/app/'.['Controllers', 'Services', 'Models', 'Jobs'][rand(0, 3)].'/File.php',
             '{percent}' => rand(70, 95),
             '{endpoint}' => ['/api/users', '/api/orders', '/api/products', '/dashboard'][rand(0, 3)],
             '{status}' => [200, 201, 400, 401, 404, 500][rand(0, 5)],
             '{product_id}' => rand(1, 500),
-            '{filename}' => 'file_' . rand(1000, 9999) . '.pdf',
+            '{filename}' => 'file_'.rand(1000, 9999).'.pdf',
             '{queue}' => ['default', 'high', 'low', 'emails'][rand(0, 3)],
             '{job}' => ['SendEmail', 'ProcessPayment', 'GenerateReport', 'SyncData'][rand(0, 3)],
         ];

@@ -87,18 +87,18 @@ class LogEntryFactory extends Factory
             ['{time}', '{key}', '{route}', '{user}', '{order_id}', '{email}', '{amount}', '{filename}', '{ip}', '{method}', '{percent}', '{error}', '{path}'],
             [
                 $this->faker->numberBetween(10, 5000),
-                'cache:' . $this->faker->word(),
+                'cache:'.$this->faker->word(),
                 $this->faker->randomElement(['/api/users', '/api/orders', '/dashboard', '/login']),
                 $this->faker->userName(),
                 $this->faker->numberBetween(1000, 9999),
                 $this->faker->email(),
                 $this->faker->numberBetween(10, 500),
-                $this->faker->word() . '.pdf',
+                $this->faker->word().'.pdf',
                 $this->faker->ipv4(),
                 $this->faker->randomElement(['getUsers', 'processPayment', 'sendEmail']),
                 $this->faker->numberBetween(70, 95),
                 $this->faker->sentence(3),
-                '/var/www/' . $this->faker->word() . '.php',
+                '/var/www/'.$this->faker->word().'.php',
             ],
             $message
         );
@@ -114,7 +114,7 @@ class LogEntryFactory extends Factory
             'channel' => $this->faker->randomElement($channels),
             'environment' => $this->faker->randomElement($environments),
             'source' => $this->faker->boolean(80)
-                ? '/app/' . $this->faker->randomElement(['Http/Controllers', 'Services', 'Jobs', 'Models']) . '/' . $this->faker->word() . '.php'
+                ? '/app/'.$this->faker->randomElement(['Http/Controllers', 'Services', 'Jobs', 'Models']).'/'.$this->faker->word().'.php'
                 : null,
             'source_line' => $this->faker->boolean(80) ? $this->faker->numberBetween(10, 500) : null,
             'trace_id' => $hasRequestContext ? Str::uuid()->toString() : null,
@@ -124,7 +124,7 @@ class LogEntryFactory extends Factory
             'http_method' => $hasRequestContext ? $this->faker->randomElement($httpMethods) : null,
             'url' => $hasRequestContext ? $this->faker->randomElement([
                 '/api/users',
-                '/api/orders/' . $this->faker->numberBetween(1, 100),
+                '/api/orders/'.$this->faker->numberBetween(1, 100),
                 '/dashboard',
                 '/login',
                 '/api/products',

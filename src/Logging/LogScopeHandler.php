@@ -17,6 +17,13 @@ class LogScopeHandler extends AbstractProcessingHandler
 
     protected string $channel;
 
+    /**
+     * Flag to indicate the handler has captured a log.
+     * Used to prevent duplicate captures when both the handler
+     * and the MessageLogged listener are active.
+     */
+    protected static bool $handledCurrentLog = false;
+
     public function __construct(
         string $channel = 'logscope',
         int|string|Level $level = Level::Debug,
@@ -36,6 +43,9 @@ class LogScopeHandler extends AbstractProcessingHandler
             return;
         }
 
+        // Mark that we're handling this log (prevents duplicate capture by listener)
+        static::$handledCurrentLog = true;
+
         try {
             $this->ensureInitialized();
 
@@ -46,7 +56,7 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'level' => strtolower($record->level->name),
                 'message' => $record->message,
                 'context' => $this->sanitizeContext($record->context),
-                'channel' => $record->channel,
+                'channel' => $this->channel,
                 'environment' => app()->environment(),
                 'source' => $this->extractSource($record),
                 'source_line' => $this->extractSourceLine($record),
@@ -65,6 +75,20 @@ class LogScopeHandler extends AbstractProcessingHandler
                 error_log('LogScope: Failed to write log entry: '.$e->getMessage());
             }
         }
+    }
+
+    /**
+     * Check if the handler captured the current log and reset the flag.
+     *
+     * This is used by the MessageLogged listener to avoid duplicates
+     * when both the handler and listener are active.
+     */
+    public static function didHandleCurrentLog(): bool
+    {
+        $handled = static::$handledCurrentLog;
+        static::$handledCurrentLog = false;
+
+        return $handled;
     }
 
     /**

@@ -15,6 +15,9 @@ use LogScope\Console\Commands\PruneCommand;
 use LogScope\Console\Commands\SeedCommand;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\Jobs\WriteLogEntry;
+use LogScope\Logging\AddChannelToContext;
+use LogScope\Logging\ChannelContextProcessor;
+use LogScope\Logging\LogScopeHandler;
 use LogScope\Models\LogEntry;
 use Throwable;
 
@@ -39,6 +42,41 @@ class LogScopeServiceProvider extends ServiceProvider
             __DIR__.'/../config/logscope.php',
             'logscope'
         );
+
+        // Register channel processor early, before any channels are resolved
+        $this->app->booting(function () {
+            $this->registerChannelProcessor();
+        });
+    }
+
+    /**
+     * Register the channel processor tap class for all logging channels.
+     *
+     * This injects a Monolog processor that adds the channel name to the
+     * log context, making it available in the MessageLogged event.
+     */
+    protected function registerChannelProcessor(): void
+    {
+        // Only needed for 'all' capture mode
+        if (config('logscope.capture', 'all') !== 'all') {
+            return;
+        }
+
+        $channels = config('logging.channels', []);
+
+        foreach ($channels as $name => $config) {
+            // Skip if it's a null channel or doesn't support tap
+            if (($config['driver'] ?? null) === 'null') {
+                continue;
+            }
+
+            // Add our tap class to inject channel name into context
+            // Laravel expects tap format: 'ClassName:arg1,arg2' (string with colon separator)
+            $existingTap = $config['tap'] ?? [];
+            $existingTap[] = AddChannelToContext::class.':'.$name;
+
+            config(["logging.channels.{$name}.tap" => $existingTap]);
+        }
     }
 
     /**
@@ -70,6 +108,12 @@ class LogScopeServiceProvider extends ServiceProvider
                 return;
             }
 
+            // Skip if LogScopeHandler already captured this log (prevents duplicates
+            // when 'logscope' channel is included in a stack alongside 'all' capture mode)
+            if (LogScopeHandler::didHandleCurrentLog()) {
+                return;
+            }
+
             try {
                 // Get request context from Laravel Context (set by middleware)
                 $requestContext = Context::get('logscope', []);
@@ -78,7 +122,7 @@ class LogScopeServiceProvider extends ServiceProvider
                     'level' => $event->level,
                     'message' => $event->message,
                     'context' => $this->sanitizeContext($event->context),
-                    'channel' => $event->context['__channel__'] ?? config('logging.default'),
+                    'channel' => ChannelContextProcessor::getLastChannel() ?? config('logging.default'),
                     'environment' => app()->environment(),
                     'source' => $this->extractSource($event->context),
                     'source_line' => $this->extractSourceLine($event->context),
