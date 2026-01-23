@@ -219,24 +219,25 @@
                 </button>
 
                 <!-- Primary Search -->
-                <div class="flex-1 flex items-center gap-2">
-                    <div class="flex-1 max-w-xl flex items-center gap-2">
+                <div class="flex-1 flex items-center gap-2 min-w-0">
+                    <!-- Search input group -->
+                    <div class="flex-1 flex items-center gap-2 min-w-0">
                         <select x-model="searches[0].field"
-                            class="h-9 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="h-9 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0">
                             <option value="any">Any field</option>
                             <option value="message">Message</option>
                             <option value="context">Context</option>
                             <option value="source">Source</option>
                         </select>
                         <button @click="searches[0].exclude = !searches[0].exclude; fetchLogs()"
-                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border"
+                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border flex-shrink-0"
                             :class="searches[0].exclude
                                 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700'
                                 : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
                             title="Toggle NOT (exclude matching)">
                             NOT
                         </button>
-                        <div class="flex-1 relative">
+                        <div class="flex-1 relative min-w-[200px]">
                             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 :class="searches[0].exclude ? 'text-red-400' : 'text-gray-400'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -249,19 +250,18 @@
                                     ? 'bg-red-50 dark:bg-red-900/20 focus:ring-red-500'
                                     : 'bg-gray-100 dark:bg-slate-600 focus:ring-blue-500'">
                         </div>
+                        <!-- Add search button -->
+                        <button @click="addSearch()"
+                            class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500 flex-shrink-0"
+                            title="Add search condition (Ctrl+Shift+F)">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </button>
                     </div>
 
-                    <!-- Add search button -->
-                    <button @click="addSearch()"
-                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
-                        title="Add search condition">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                    </button>
-
                     <!-- AND/OR toggle (only show if multiple searches) -->
-                    <div x-show="searches.length > 1" class="flex items-center bg-gray-100 dark:bg-slate-600 rounded-lg p-0.5">
+                    <div x-show="searches.length > 1" x-cloak class="flex items-center bg-gray-100 dark:bg-slate-600 rounded-lg p-0.5 flex-shrink-0">
                         <button @click="searchMode = 'and'"
                             class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
                             :class="searchMode === 'and' ? 'bg-slate-100 dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
@@ -275,19 +275,66 @@
                     </div>
                 </div>
 
-                <!-- Date Range -->
-                <div class="flex items-center gap-2">
-                    <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
-                        class="h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        title="From date">
-                    <span class="text-gray-400">-</span>
-                    <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
-                        class="h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        title="To date">
-                </div>
-
                 <!-- Actions -->
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1 flex-shrink-0">
+                    <!-- Date Range Dropdown -->
+                    <div class="relative" x-data="{ dateOpen: false }" @click.away="dateOpen = false">
+                        <button @click="dateOpen = !dateOpen"
+                            class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
+                            :class="(filters.from || filters.to)
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'"
+                            title="Date range filter">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                        <div x-show="dateOpen" x-cloak
+                            x-transition:enter="transition ease-out duration-100"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 p-4 z-50">
+                            <div class="space-y-3">
+                                <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date Range</div>
+                                <div class="space-y-2">
+                                    <label class="block">
+                                        <span class="text-xs text-gray-600 dark:text-gray-300">From</span>
+                                        <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
+                                            class="mt-1 w-full h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </label>
+                                    <label class="block">
+                                        <span class="text-xs text-gray-600 dark:text-gray-300">To</span>
+                                        <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
+                                            class="mt-1 w-full h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </label>
+                                </div>
+                                <button @click="filters.from = ''; filters.to = ''; fetchLogs(); dateOpen = false"
+                                    class="w-full h-8 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                                    x-show="filters.from || filters.to">
+                                    Clear dates
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show Resolved Toggle -->
+                    <template x-if="features.resolvable">
+                        <button @click="showResolved = !showResolved; fetchLogs()"
+                            class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
+                            :class="showResolved
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'"
+                            :title="showResolved ? 'Showing resolved logs - click to hide' : 'Resolved logs hidden - click to show'">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </button>
+                    </template>
+
+                    <!-- Keyboard shortcuts -->
                     <button @click="showKeyboardHelp = true"
                         class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
                         title="Keyboard shortcuts (?)">
@@ -295,11 +342,15 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </button>
+
+                    <!-- Clear -->
                     <button @click="clearFilters()"
                         class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
-                        title="Clear filters">
+                        title="Clear all filters">
                         Clear
                     </button>
+
+                    <!-- Refresh -->
                     <button @click="fetchLogs(); fetchStats()"
                         class="h-9 px-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2">
                         <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -456,10 +507,18 @@
                         <tbody>
                             <template x-for="log in logs" :key="log.id">
                                 <tr class="log-row border-b border-gray-100 dark:border-slate-600/50 cursor-pointer"
-                                    :class="{ 'selected': selectedLog?.id === log.id }"
+                                    :class="{
+                                        'selected': selectedLog?.id === log.id,
+                                        'opacity-60': log.resolved_at
+                                    }"
                                     @click="selectLog(log)">
-                                    <td class="p-0">
+                                    <td class="p-0 relative">
                                         <div class="level-indicator h-full" :class="'level-' + log.level"></div>
+                                        <div x-show="log.resolved_at" class="absolute top-1 left-1 w-3 h-3 text-green-500" title="Resolved">
+                                            <svg fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                            </svg>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-3 relative group">
                                         <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums whitespace-nowrap cursor-help"
@@ -636,10 +695,65 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Resolved Status -->
+                    <div x-show="features.resolvable && selectedLog?.resolved_at">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Resolved</p>
+                        <div class="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                            <div class="flex items-center gap-2 text-green-700 dark:text-green-300">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span class="text-sm font-medium">Resolved</span>
+                            </div>
+                            <p class="mt-1 text-xs text-green-600 dark:text-green-400">
+                                <span x-text="formatRelativeTime(selectedLog?.resolved_at)"></span>
+                                <span x-show="selectedLog?.resolved_by"> by <span x-text="selectedLog?.resolved_by"></span></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Note -->
+                    <div x-show="features.notes" x-data="{ editing: false, noteText: '' }" x-effect="if (selectedLog) { editing = false; noteText = ''; }">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Note</p>
+                        <div x-show="!editing" @click="editing = true; noteText = selectedLog?.note || ''; $nextTick(() => $refs.noteInput.focus())"
+                            class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 min-h-[60px] cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
+                            <p x-show="selectedLog?.note" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap" x-text="selectedLog?.note"></p>
+                            <p x-show="!selectedLog?.note" class="text-sm text-gray-400 dark:text-gray-500 italic">Click to add a note...</p>
+                        </div>
+                        <div x-show="editing" class="space-y-2">
+                            <textarea x-model="noteText" x-ref="noteInput"
+                                class="w-full p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows="3"
+                                placeholder="Add a note about this log entry..."></textarea>
+                            <div class="flex gap-2">
+                                <button @click="updateNote(noteText); editing = false"
+                                    class="px-3 py-1.5 rounded text-xs font-medium text-white bg-blue-600 hover:bg-blue-700">
+                                    Save
+                                </button>
+                                <button @click="editing = false"
+                                    class="px-3 py-1.5 rounded text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-500 hover:bg-gray-200 dark:hover:bg-slate-400">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Panel Footer -->
                 <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-slate-600">
+                    <template x-if="features.resolvable">
+                        <button x-show="!selectedLog?.resolved_at" @click="resolveLog()"
+                            class="flex-1 h-9 rounded-lg text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                            Resolve
+                        </button>
+                    </template>
+                    <template x-if="features.resolvable">
+                        <button x-show="selectedLog?.resolved_at" @click="unresolveLog()"
+                            class="flex-1 h-9 rounded-lg text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+                            Unresolve
+                        </button>
+                    </template>
                     <button @click="confirmDelete()"
                         class="flex-1 h-9 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
                         Delete
@@ -767,6 +881,8 @@ function logScope() {
         isResizing: false,
         minPanelWidth: 360,
         quickFilters: @json($quickFilters),
+        features: @json($features),
+        showResolved: false,
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
         filters: {
@@ -1042,8 +1158,12 @@ function logScope() {
             try {
                 const params = new URLSearchParams();
                 params.append('page', this.page);
+                params.append('show_resolved', this.showResolved ? '1' : '0');
                 if (this.filters.from) params.append('from', this.filters.from);
                 if (this.filters.to) params.append('to', this.filters.to);
+                if (this.filters.from || this.filters.to) {
+                    params.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+                }
                 if (this.filters.trace_id) params.append('trace_id', this.filters.trace_id);
                 if (this.filters.user_id) params.append('user_id', this.filters.user_id);
                 if (this.filters.ip_address) params.append('ip_address', this.filters.ip_address);
@@ -1117,6 +1237,70 @@ function logScope() {
                 await Promise.all([this.fetchLogs(), this.fetchStats()]);
             } catch (error) {
                 console.error('Failed to delete log:', error);
+            }
+        },
+
+        async resolveLog(note = null) {
+            if (!this.selectedLog) return;
+            try {
+                const body = note ? JSON.stringify({ note }) : '{}';
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/resolve`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    this.selectedLog = data.data;
+                    await this.fetchLogs();
+                }
+            } catch (error) {
+                console.error('Failed to resolve log:', error);
+            }
+        },
+
+        async unresolveLog() {
+            if (!this.selectedLog) return;
+            try {
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/unresolve`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    this.selectedLog = data.data;
+                    await this.fetchLogs();
+                }
+            } catch (error) {
+                console.error('Failed to unresolve log:', error);
+            }
+        },
+
+        async updateNote(note) {
+            if (!this.selectedLog) return;
+            try {
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/note`, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ note })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    this.selectedLog = data.data;
+                }
+            } catch (error) {
+                console.error('Failed to update note:', error);
             }
         },
 

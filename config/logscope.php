@@ -113,6 +113,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Features
+    |--------------------------------------------------------------------------
+    |
+    | Enable or disable optional features.
+    |
+    | 'resolvable' - Allow marking logs as resolved instead of deleting them.
+    |                Resolved logs are hidden by default but can be viewed.
+    |
+    | 'notes'      - Allow adding notes/comments to log entries.
+    |                Useful for documenting investigation findings.
+    |
+    */
+
+    'features' => [
+        'resolvable' => env('LOGSCOPE_FEATURE_RESOLVABLE', true),
+        'notes' => env('LOGSCOPE_FEATURE_NOTES', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Write Mode (Performance)
     |--------------------------------------------------------------------------
     |

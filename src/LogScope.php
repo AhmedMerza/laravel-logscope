@@ -18,6 +18,13 @@ class LogScope
     public static ?Closure $authUsing = null;
 
     /**
+     * The callback that should be used to get the "resolved by" identifier.
+     *
+     * @var (Closure(Request): ?string)|null
+     */
+    public static ?Closure $resolvedByUsing = null;
+
+    /**
      * Register the callback used to authorize access to LogScope.
      *
      * This allows you to define custom authorization logic:
@@ -72,5 +79,49 @@ class LogScope
     public static function resetAuth(): void
     {
         static::$authUsing = null;
+    }
+
+    /**
+     * Register the callback used to determine "resolved by" identifier.
+     *
+     * This allows you to customize how the resolver is identified:
+     *
+     * ```php
+     * // In AppServiceProvider::boot()
+     * LogScope::resolvedBy(function ($request) {
+     *     return $request->user()?->full_name;
+     * });
+     * ```
+     *
+     * @param  Closure(Request): ?string  $callback
+     */
+    public static function resolvedBy(Closure $callback): void
+    {
+        static::$resolvedByUsing = $callback;
+    }
+
+    /**
+     * Get the "resolved by" identifier for the given request.
+     *
+     * Resolution priority:
+     * 1. Custom callback set via LogScope::resolvedBy()
+     * 2. Default: user name or email (if authenticated)
+     */
+    public static function getResolvedBy(Request $request): ?string
+    {
+        if (static::$resolvedByUsing !== null) {
+            return (static::$resolvedByUsing)($request);
+        }
+
+        return $request->user()?->name
+            ?? $request->user()?->email;
+    }
+
+    /**
+     * Reset the resolvedBy callback (useful for testing).
+     */
+    public static function resetResolvedBy(): void
+    {
+        static::$resolvedByUsing = null;
     }
 }

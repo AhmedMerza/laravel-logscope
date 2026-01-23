@@ -36,6 +36,7 @@ class LogEntry extends Model
             'context' => 'array',
             'occurred_at' => 'datetime',
             'created_at' => 'datetime',
+            'resolved_at' => 'datetime',
             'is_truncated' => 'boolean',
         ];
     }
@@ -221,7 +222,72 @@ class LogEntry extends Model
      */
     public function scopeRecent(Builder $query): Builder
     {
-        return $query->orderByDesc('occurred_at');
+        return $query->orderByDesc('occurred_at')->orderByDesc('id');
+    }
+
+    /**
+     * Scope: Only resolved entries.
+     */
+    public function scopeResolved(Builder $query): Builder
+    {
+        return $query->whereNotNull('resolved_at');
+    }
+
+    /**
+     * Scope: Only unresolved entries.
+     */
+    public function scopeUnresolved(Builder $query): Builder
+    {
+        return $query->whereNull('resolved_at');
+    }
+
+    /**
+     * Scope: Filter by resolved status.
+     */
+    public function scopeResolvedStatus(Builder $query, ?bool $resolved): Builder
+    {
+        if ($resolved === null) {
+            return $query;
+        }
+
+        return $resolved ? $query->resolved() : $query->unresolved();
+    }
+
+    /**
+     * Check if the entry is resolved.
+     */
+    public function isResolved(): bool
+    {
+        return $this->resolved_at !== null;
+    }
+
+    /**
+     * Mark the entry as resolved.
+     */
+    public function resolve(?string $resolvedBy = null, ?string $note = null): bool
+    {
+        $data = ['resolved_at' => now()];
+
+        if ($resolvedBy !== null) {
+            $data['resolved_by'] = $resolvedBy;
+        }
+
+        if ($note !== null) {
+            $data['note'] = $note;
+        }
+
+        return $this->update($data);
+    }
+
+    /**
+     * Mark the entry as unresolved.
+     */
+    public function unresolve(): bool
+    {
+        return $this->update([
+            'resolved_at' => null,
+            'resolved_by' => null,
+        ]);
     }
 
     /**

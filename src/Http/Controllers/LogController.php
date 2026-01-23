@@ -24,6 +24,10 @@ class LogController extends Controller
             'environments' => $this->getAvailableEnvironments(),
             'httpMethods' => $this->getAvailableHttpMethods(),
             'quickFilters' => config('logscope.quick_filters', []),
+            'features' => [
+                'resolvable' => config('logscope.features.resolvable', true),
+                'notes' => config('logscope.features.notes', true),
+            ],
         ]);
     }
 
@@ -33,6 +37,18 @@ class LogController extends Controller
     public function logs(Request $request): JsonResponse
     {
         $query = LogEntry::query()->recent();
+
+        // Apply resolved filter (default: hide resolved unless explicitly requested)
+        if ($request->has('show_resolved')) {
+            $showResolved = filter_var($request->input('show_resolved'), FILTER_VALIDATE_BOOLEAN);
+            if (! $showResolved) {
+                $query->unresolved();
+            }
+            // If show_resolved is true, show all (resolved and unresolved)
+        } else {
+            // By default, hide resolved logs
+            $query->unresolved();
+        }
 
         // Apply filters
         if ($request->filled('levels')) {
@@ -114,8 +130,13 @@ class LogController extends Controller
 
         if ($request->filled('from') || $request->filled('to')) {
             try {
-                $from = $request->filled('from') ? \Illuminate\Support\Carbon::parse($request->input('from')) : null;
-                $to = $request->filled('to') ? \Illuminate\Support\Carbon::parse($request->input('to')) : null;
+                $timezone = $request->input('timezone', config('app.timezone', 'UTC'));
+                $from = $request->filled('from')
+                    ? \Illuminate\Support\Carbon::parse($request->input('from'), $timezone)->utc()
+                    : null;
+                $to = $request->filled('to')
+                    ? \Illuminate\Support\Carbon::parse($request->input('to'), $timezone)->utc()
+                    : null;
                 $query->dateRange($from, $to);
             } catch (\Throwable $e) {
                 return response()->json([
@@ -186,6 +207,85 @@ class LogController extends Controller
         $log->delete();
 
         return response()->json(['message' => 'Log entry deleted']);
+    }
+
+    /**
+     * Resolve a log entry.
+     */
+    public function resolve(Request $request, string $id): JsonResponse
+    {
+        if (! config('logscope.features.resolvable', true)) {
+            return response()->json(['error' => 'Resolve feature is disabled'], 403);
+        }
+
+        $log = LogEntry::findOrFail($id);
+
+        $resolvedBy = \LogScope\LogScope::getResolvedBy($request);
+
+        $note = $request->input('note');
+
+        $log->resolve($resolvedBy, $note);
+
+        return response()->json(['data' => $log->fresh(), 'message' => 'Log entry resolved']);
+    }
+
+    /**
+     * Unresolve a log entry.
+     */
+    public function unresolve(string $id): JsonResponse
+    {
+        if (! config('logscope.features.resolvable', true)) {
+            return response()->json(['error' => 'Resolve feature is disabled'], 403);
+        }
+
+        $log = LogEntry::findOrFail($id);
+        $log->unresolve();
+
+        return response()->json(['data' => $log->fresh(), 'message' => 'Log entry unresolved']);
+    }
+
+    /**
+     * Resolve multiple log entries.
+     */
+    public function resolveMany(Request $request): JsonResponse
+    {
+        if (! config('logscope.features.resolvable', true)) {
+            return response()->json(['error' => 'Resolve feature is disabled'], 403);
+        }
+
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'string',
+        ]);
+
+        $resolvedBy = \LogScope\LogScope::getResolvedBy($request);
+
+        $resolved = LogEntry::whereIn('id', $request->input('ids'))
+            ->update([
+                'resolved_at' => now(),
+                'resolved_by' => $resolvedBy,
+            ]);
+
+        return response()->json(['message' => "{$resolved} log entries resolved"]);
+    }
+
+    /**
+     * Update note for a log entry.
+     */
+    public function updateNote(Request $request, string $id): JsonResponse
+    {
+        if (! config('logscope.features.notes', true)) {
+            return response()->json(['error' => 'Notes feature is disabled'], 403);
+        }
+
+        $request->validate([
+            'note' => 'nullable|string|max:10000',
+        ]);
+
+        $log = LogEntry::findOrFail($id);
+        $log->update(['note' => $request->input('note')]);
+
+        return response()->json(['data' => $log->fresh(), 'message' => 'Note updated']);
     }
 
     /**

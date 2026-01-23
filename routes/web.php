@@ -23,4 +23,12 @@ Route::group([
     Route::post('/api/logs/delete-many', [LogController::class, 'destroyMany'])->name('logs.destroy-many');
     Route::post('/api/logs/clear', [LogController::class, 'clear'])->name('logs.clear');
     Route::get('/api/stats', [LogController::class, 'stats'])->name('stats');
+
+    // Resolve API
+    Route::post('/api/logs/{id}/resolve', [LogController::class, 'resolve'])->name('logs.resolve');
+    Route::post('/api/logs/{id}/unresolve', [LogController::class, 'unresolve'])->name('logs.unresolve');
+    Route::post('/api/logs/resolve-many', [LogController::class, 'resolveMany'])->name('logs.resolve-many');
+
+    // Notes API
+    Route::patch('/api/logs/{id}/note', [LogController::class, 'updateNote'])->name('logs.update-note');
 });
