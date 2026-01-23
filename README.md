@@ -29,6 +29,31 @@ A fast, database-backed log viewer for Laravel applications.
 - Laravel 10, 11, or 12
 - SQLite, MySQL, or PostgreSQL
 
+## When to Use LogScope
+
+LogScope stores logs in your database. This is a deliberate choice that works great for most Laravel applications.
+
+**LogScope is a great fit if you:**
+- Want log visibility without setting up external services
+- Have a typical Laravel app (up to ~100K requests/day)
+- Need to search and filter logs with rich context
+- Prefer simplicity over infrastructure complexity
+
+**You might prefer other solutions if you:**
+- Process millions of requests daily and need specialized log infrastructure
+- Need to retain logs for months or years
+- Already use centralized logging (Datadog, CloudWatch, ELK)
+
+**Addressing common concerns:**
+
+| Concern | How LogScope handles it |
+|---------|------------------------|
+| Database bloat | Retention policies auto-delete old logs (default: 30 days) |
+| Performance impact | Batch mode writes logs *after* the response is sent |
+| Query speed | Proper indexes on common filter combinations |
+
+For most Laravel apps, the choice comes down to: 5 minutes of setup with LogScope, or hours configuring external log infrastructure. LogScope is designed for developers who want practical log visibility without the complexity.
+
 ## Installation
 
 ```bash
