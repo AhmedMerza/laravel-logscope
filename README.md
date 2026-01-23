@@ -12,6 +12,8 @@ A fast, database-backed log viewer for Laravel applications.
 - **Advanced filtering** - Filter by level, channel, HTTP method, user, IP, and date range
 - **Include/Exclude filters** - Three-state toggles to include, exclude, or ignore each filter
 - **Full-text search** - Search across messages, context, and source with NOT support
+- **Resolvable logs** - Mark logs as resolved instead of deleting, track who resolved them
+- **Log notes** - Add notes to log entries for context and investigation findings
 - **Retention policies** - Auto-prune old logs after configurable period
 - **Quick filters** - Configurable one-click filters for common queries
 - **Keyboard shortcuts** - Navigate with j/k, search with /, help with ?, close with Esc
@@ -127,6 +129,54 @@ LogScope can filter out noisy logs that you don't want to capture:
 # Both are enabled by default. Set to false to capture these logs:
 LOGSCOPE_IGNORE_DEPRECATIONS=false   # Capture "is deprecated" messages
 LOGSCOPE_IGNORE_NULL_CHANNEL=false   # Capture logs without a channel
+```
+
+### Resolvable Logs
+
+Instead of deleting logs, you can mark them as resolved. Resolved logs are hidden by default but can be viewed when needed.
+
+```php
+// Toggle visibility in the UI with the checkmark icon
+// Or via API:
+POST /logscope/api/logs/{id}/resolve
+POST /logscope/api/logs/{id}/unresolve
+```
+
+**Customizing "Resolved By"**
+
+By default, LogScope uses the authenticated user's name or email. You can customize this in your `AppServiceProvider`:
+
+```php
+use LogScope\LogScope;
+
+public function boot(): void
+{
+    LogScope::resolvedBy(function ($request) {
+        return $request->user()?->full_name;
+        // Or combine fields:
+        // return $request->user() ? "{$user->name} ({$user->role})" : null;
+    });
+}
+```
+
+**Disable Resolvable Feature**
+
+```env
+LOGSCOPE_FEATURE_RESOLVABLE=false
+```
+
+### Log Notes
+
+Add notes to log entries to document investigation findings or context:
+
+- Click the note area in the detail panel to add/edit
+- Notes are saved automatically
+- Useful for team collaboration on debugging
+
+**Disable Notes Feature**
+
+```env
+LOGSCOPE_FEATURE_NOTES=false
 ```
 
 ### Request Context
@@ -380,6 +430,10 @@ LOGSCOPE_QUEUE_CONNECTION=
 # Ignore filters (both enabled by default, set to false to capture)
 LOGSCOPE_IGNORE_DEPRECATIONS=false
 LOGSCOPE_IGNORE_NULL_CHANNEL=false
+
+# Features (both enabled by default)
+LOGSCOPE_FEATURE_RESOLVABLE=true
+LOGSCOPE_FEATURE_NOTES=true
 
 # Request context middleware
 LOGSCOPE_MIDDLEWARE_ENABLED=true
