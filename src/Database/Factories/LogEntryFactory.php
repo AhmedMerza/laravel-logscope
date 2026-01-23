@@ -135,16 +135,117 @@ class LogEntryFactory extends Factory
     }
 
     /**
-     * Generate random context data.
+     * Generate random context data with varied JSON structures.
      */
     protected function generateContext(): array
     {
         $contexts = [
-            ['user_id' => $this->faker->numberBetween(1, 100), 'action' => $this->faker->word()],
-            ['order_id' => $this->faker->numberBetween(1000, 9999), 'total' => $this->faker->randomFloat(2, 10, 500)],
-            ['query_time' => $this->faker->numberBetween(10, 1000), 'query' => 'SELECT * FROM users WHERE id = ?'],
-            ['exception' => 'RuntimeException', 'file' => '/app/Services/PaymentService.php', 'line' => $this->faker->numberBetween(1, 200)],
-            ['request_id' => Str::uuid()->toString(), 'duration' => $this->faker->numberBetween(50, 2000)],
+            // Simple key-value
+            [
+                'user_id' => $this->faker->numberBetween(1, 100),
+                'action' => $this->faker->word(),
+                'success' => $this->faker->boolean(),
+            ],
+            // Nested object
+            [
+                'order' => [
+                    'id' => $this->faker->numberBetween(1000, 9999),
+                    'total' => $this->faker->randomFloat(2, 10, 500),
+                    'currency' => 'USD',
+                    'items_count' => $this->faker->numberBetween(1, 10),
+                ],
+                'customer' => [
+                    'id' => $this->faker->numberBetween(1, 100),
+                    'email' => $this->faker->email(),
+                    'is_guest' => $this->faker->boolean(),
+                ],
+            ],
+            // With array
+            [
+                'query_time' => $this->faker->numberBetween(10, 1000),
+                'query' => 'SELECT * FROM users WHERE id = ?',
+                'bindings' => [$this->faker->numberBetween(1, 100)],
+                'cached' => false,
+            ],
+            // Exception with stack trace
+            [
+                'exception' => [
+                    'class' => $this->faker->randomElement(['RuntimeException', 'InvalidArgumentException', 'ValidationException', 'ModelNotFoundException']),
+                    'message' => $this->faker->sentence(),
+                    'code' => $this->faker->randomElement([0, 400, 404, 500, null]),
+                    'file' => '/app/Services/'.$this->faker->word().'Service.php',
+                    'line' => $this->faker->numberBetween(1, 200),
+                ],
+                'trace' => [
+                    ['file' => '/app/Http/Controllers/'.$this->faker->word().'Controller.php', 'line' => $this->faker->numberBetween(10, 100), 'function' => $this->faker->word()],
+                    ['file' => '/app/Services/'.$this->faker->word().'Service.php', 'line' => $this->faker->numberBetween(10, 100), 'function' => $this->faker->word()],
+                    ['file' => '/vendor/laravel/framework/src/Illuminate/Routing/Controller.php', 'line' => 54, 'function' => 'callAction'],
+                ],
+            ],
+            // API response
+            [
+                'request' => [
+                    'method' => $this->faker->randomElement(['GET', 'POST', 'PUT']),
+                    'url' => 'https://api.example.com/'.$this->faker->word(),
+                    'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                ],
+                'response' => [
+                    'status' => $this->faker->randomElement([200, 201, 400, 401, 500]),
+                    'body' => ['success' => $this->faker->boolean(), 'message' => $this->faker->sentence()],
+                ],
+                'duration_ms' => $this->faker->numberBetween(50, 2000),
+            ],
+            // Payment context
+            [
+                'payment' => [
+                    'id' => 'pay_'.$this->faker->regexify('[A-Za-z0-9]{14}'),
+                    'amount' => $this->faker->randomFloat(2, 10, 1000),
+                    'currency' => $this->faker->randomElement(['USD', 'EUR', 'GBP']),
+                    'status' => $this->faker->randomElement(['pending', 'completed', 'failed']),
+                    'method' => $this->faker->randomElement(['card', 'paypal', 'bank_transfer']),
+                ],
+                'metadata' => [
+                    'order_id' => $this->faker->numberBetween(1000, 9999),
+                    'customer_email' => $this->faker->email(),
+                    'ip_address' => $this->faker->ipv4(),
+                ],
+                'is_test' => true,
+            ],
+            // Validation errors
+            [
+                'validation_errors' => [
+                    'email' => ['The email field is required.', 'The email must be a valid email address.'],
+                    'password' => ['The password must be at least 8 characters.'],
+                ],
+                'input' => [
+                    'email' => null,
+                    'name' => $this->faker->name(),
+                    'terms_accepted' => false,
+                ],
+            ],
+            // Simple with nulls and booleans
+            [
+                'request_id' => Str::uuid()->toString(),
+                'duration' => $this->faker->numberBetween(50, 2000),
+                'cached' => $this->faker->boolean(),
+                'error' => null,
+                'retries' => 0,
+            ],
+            // Job context
+            [
+                'job' => [
+                    'class' => 'App\\Jobs\\'.$this->faker->word().'Job',
+                    'queue' => $this->faker->randomElement(['default', 'high', 'low', 'emails']),
+                    'attempts' => $this->faker->numberBetween(1, 3),
+                    'max_tries' => 3,
+                ],
+                'payload' => [
+                    'user_id' => $this->faker->numberBetween(1, 100),
+                    'data' => ['key' => $this->faker->word(), 'value' => $this->faker->sentence()],
+                ],
+                'completed' => $this->faker->boolean(),
+                'execution_time' => $this->faker->randomFloat(2, 0.1, 30),
+            ],
         ];
 
         return $this->faker->randomElement($contexts);

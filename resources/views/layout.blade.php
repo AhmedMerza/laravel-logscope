@@ -124,6 +124,44 @@
         .dark .log-row.selected {
             background-color: rgba(59, 130, 246, 0.15);
         }
+
+        /* JSON syntax highlighting */
+        .json-highlight {
+            color: #374151;
+        }
+        .dark .json-highlight {
+            color: #d1d5db;
+        }
+        .json-key {
+            color: #2563eb;
+        }
+        .dark .json-key {
+            color: #60a5fa;
+        }
+        .json-string {
+            color: #059669;
+        }
+        .dark .json-string {
+            color: #34d399;
+        }
+        .json-number {
+            color: #d97706;
+        }
+        .dark .json-number {
+            color: #fbbf24;
+        }
+        .json-boolean {
+            color: #7c3aed;
+        }
+        .dark .json-boolean {
+            color: #a78bfa;
+        }
+        .json-null {
+            color: #6b7280;
+        }
+        .dark .json-null {
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body class="h-full bg-slate-200 dark:bg-slate-800 text-gray-900 dark:text-gray-100">

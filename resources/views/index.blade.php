@@ -639,8 +639,8 @@
                     <!-- Context -->
                     <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Context</p>
-                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 overflow-x-auto font-mono"
-                            x-text="JSON.stringify(selectedLog?.context, null, 2)"></pre>
+                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm overflow-x-auto font-mono json-highlight"
+                            x-html="highlightJson(selectedLog?.context)"></pre>
                     </div>
 
                     <!-- Request Context -->
@@ -1334,6 +1334,28 @@ function logScope() {
             const sidebarWidth = this.sidebarOpen ? 256 : 0; // w-64 = 256px
             const availableWidth = window.innerWidth - sidebarWidth;
             return Math.max(400, Math.min(900, Math.floor(availableWidth * 0.5)));
+        },
+
+        highlightJson(obj) {
+            if (!obj) return '';
+            const json = JSON.stringify(obj, null, 2);
+            // Escape HTML first
+            const escaped = json
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            // Apply syntax highlighting
+            return escaped
+                // Strings (but not keys)
+                .replace(/: "((?:[^"\\]|\\.)*)"/g, ': <span class="json-string">"$1"</span>')
+                // Keys
+                .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+                // Numbers
+                .replace(/: (-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+                // Booleans
+                .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
+                // Null
+                .replace(/: (null)/g, ': <span class="json-null">$1</span>');
         },
 
         startResize(event) {
