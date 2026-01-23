@@ -12,6 +12,7 @@ A fast, database-backed log viewer for Laravel applications.
 - **Advanced filtering** - Filter by level, channel, HTTP method, user, IP, and date range
 - **Include/Exclude filters** - Three-state toggles to include, exclude, or ignore each filter
 - **Full-text search** - Search across messages, context, and source with NOT support
+- **JSON viewer** - Syntax-highlighted, collapsible JSON context with smart defaults
 - **Resolvable logs** - Mark logs as resolved instead of deleting, track who resolved them
 - **Log notes** - Add notes to log entries for context and investigation findings
 - **Retention policies** - Auto-prune old logs after configurable period
@@ -202,6 +203,26 @@ Add notes to log entries to document investigation findings or context:
 
 ```env
 LOGSCOPE_FEATURE_NOTES=false
+```
+
+### JSON Viewer
+
+The context viewer displays JSON with syntax highlighting and collapsible sections:
+
+- **Color-coded** - Keys (blue), strings (green), numbers (orange), booleans (purple), null (gray)
+- **Collapsible** - Click ▶/▼ to expand/collapse objects and arrays
+- **Smart defaults** - Stack traces (`trace`, `stack_trace`, etc.) are collapsed by default
+
+Configure in `config/logscope.php`:
+
+```php
+'json_viewer' => [
+    // Collapse arrays/objects with more than N items (0 to disable)
+    'collapse_threshold' => 5,
+
+    // Keys that should always be collapsed (regardless of size)
+    'auto_collapse_keys' => ['trace', 'stack_trace', 'stacktrace', 'backtrace'],
+],
 ```
 
 ### Request Context

@@ -215,6 +215,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | JSON Viewer
+    |--------------------------------------------------------------------------
+    |
+    | Configure how JSON context is displayed in the detail panel.
+    |
+    | 'collapse_threshold' - Arrays/objects with more items than this will be
+    |                        collapsed by default. Set to 0 to disable.
+    |
+    | 'auto_collapse_keys' - Keys that should always be collapsed by default,
+    |                        regardless of size (e.g., stack traces).
+    |
+    */
+
+    'json_viewer' => [
+        'collapse_threshold' => 5,
+        'auto_collapse_keys' => ['trace', 'stack_trace', 'stacktrace', 'backtrace'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Search
     |--------------------------------------------------------------------------
     |

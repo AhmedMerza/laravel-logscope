@@ -132,6 +132,36 @@
         .dark .json-highlight {
             color: #d1d5db;
         }
+        .json-toggle {
+            cursor: pointer;
+            user-select: none;
+            color: #6b7280;
+            font-size: 0.75em;
+            margin-right: 2px;
+        }
+        .json-toggle:hover {
+            color: #3b82f6;
+        }
+        .dark .json-toggle {
+            color: #9ca3af;
+        }
+        .dark .json-toggle:hover {
+            color: #60a5fa;
+        }
+        .json-collapsed {
+            color: #9ca3af;
+            font-style: italic;
+            cursor: pointer;
+        }
+        .json-collapsed:hover {
+            color: #3b82f6;
+        }
+        .dark .json-collapsed {
+            color: #6b7280;
+        }
+        .dark .json-collapsed:hover {
+            color: #60a5fa;
+        }
         .json-key {
             color: #2563eb;
         }

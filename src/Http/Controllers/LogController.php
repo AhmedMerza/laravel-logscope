@@ -28,6 +28,10 @@ class LogController extends Controller
                 'resolvable' => config('logscope.features.resolvable', true),
                 'notes' => config('logscope.features.notes', true),
             ],
+            'jsonViewer' => [
+                'collapseThreshold' => config('logscope.json_viewer.collapse_threshold', 5),
+                'autoCollapseKeys' => config('logscope.json_viewer.auto_collapse_keys', ['trace', 'stack_trace', 'stacktrace', 'backtrace']),
+            ],
         ]);
     }
 

@@ -640,7 +640,9 @@
                     <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Context</p>
                         <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm overflow-x-auto font-mono json-highlight"
-                            x-html="highlightJson(selectedLog?.context)"></pre>
+                            x-ref="jsonContext"
+                            @click="handleJsonToggle($event)"
+                            x-html="renderJsonContext()"></pre>
                     </div>
 
                     <!-- Request Context -->
@@ -882,6 +884,10 @@ function logScope() {
         minPanelWidth: 360,
         quickFilters: @json($quickFilters),
         features: @json($features),
+        jsonViewer: @json($jsonViewer),
+        jsonCollapseState: {},
+        jsonRenderKey: 0,
+        _lastJsonLogId: null,
         showResolved: false,
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
@@ -1336,26 +1342,144 @@ function logScope() {
             return Math.max(400, Math.min(900, Math.floor(availableWidth * 0.5)));
         },
 
-        highlightJson(obj) {
+        renderJsonContext() {
+            // Access jsonRenderKey to make this reactive to toggles
+            const _ = this.jsonRenderKey;
+
+            if (!this.selectedLog?.context) return '';
+
+            // Reset collapse state when viewing a different log
+            if (this._lastJsonLogId !== this.selectedLog?.id) {
+                this._lastJsonLogId = this.selectedLog?.id;
+                this.jsonCollapseState = {};
+            }
+
+            return this.renderJsonValue(this.selectedLog.context, 'root', 0);
+        },
+
+        highlightJson(obj, path = 'root') {
             if (!obj) return '';
-            const json = JSON.stringify(obj, null, 2);
-            // Escape HTML first
-            const escaped = json
+            return this.renderJsonValue(obj, path, 0);
+        },
+
+        renderJsonValue(value, path, indent) {
+            const type = this.getJsonType(value);
+            switch (type) {
+                case 'null': return '<span class="json-null">null</span>';
+                case 'boolean': return `<span class="json-boolean">${value}</span>`;
+                case 'number': return `<span class="json-number">${value}</span>`;
+                case 'string': return `<span class="json-string">"${this.escapeHtml(value)}"</span>`;
+                case 'array': return this.renderJsonArray(value, path, indent);
+                case 'object': return this.renderJsonObject(value, path, indent);
+                default: return this.escapeHtml(String(value));
+            }
+        },
+
+        renderJsonObject(obj, path, indent) {
+            const keys = Object.keys(obj);
+            if (keys.length === 0) return '{}';
+
+            const shouldCollapse = this.shouldAutoCollapse(path, keys.length, 'object');
+            const collapseId = path;
+            if (this.jsonCollapseState[collapseId] === undefined) {
+                this.jsonCollapseState[collapseId] = shouldCollapse;
+            }
+            const isCollapsed = this.jsonCollapseState[collapseId];
+
+            const spaces = '  '.repeat(indent);
+            const innerSpaces = '  '.repeat(indent + 1);
+
+            if (isCollapsed) {
+                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> {<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${keys.length} ${keys.length === 1 ? 'property' : 'properties'}</span>}`;
+            }
+
+            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> {\n`;
+            keys.forEach((key, i) => {
+                const childPath = `${path}.${key}`;
+                html += `${innerSpaces}<span class="json-key">"${this.escapeHtml(key)}"</span>: `;
+                html += this.renderJsonValue(obj[key], childPath, indent + 1);
+                if (i < keys.length - 1) html += ',';
+                html += '\n';
+            });
+            html += `${spaces}}`;
+            return html;
+        },
+
+        renderJsonArray(arr, path, indent) {
+            if (arr.length === 0) return '[]';
+
+            const keyName = path.split('.').pop();
+            const shouldCollapse = this.shouldAutoCollapse(path, arr.length, 'array', keyName);
+            const collapseId = path;
+            if (this.jsonCollapseState[collapseId] === undefined) {
+                this.jsonCollapseState[collapseId] = shouldCollapse;
+            }
+            const isCollapsed = this.jsonCollapseState[collapseId];
+
+            const spaces = '  '.repeat(indent);
+            const innerSpaces = '  '.repeat(indent + 1);
+
+            if (isCollapsed) {
+                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> [<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span>]`;
+            }
+
+            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> [\n`;
+            arr.forEach((item, i) => {
+                const childPath = `${path}[${i}]`;
+                html += `${innerSpaces}${this.renderJsonValue(item, childPath, indent + 1)}`;
+                if (i < arr.length - 1) html += ',';
+                html += '\n';
+            });
+            html += `${spaces}]`;
+            return html;
+        },
+
+        shouldAutoCollapse(path, itemCount, type, keyName = '') {
+            const threshold = this.jsonViewer.collapseThreshold;
+            const autoCollapseKeys = this.jsonViewer.autoCollapseKeys || [];
+
+            // Check if this key should always be collapsed
+            if (keyName && autoCollapseKeys.includes(keyName.toLowerCase())) {
+                return true;
+            }
+
+            // Check threshold (0 means disabled)
+            if (threshold > 0 && itemCount > threshold) {
+                return true;
+            }
+
+            return false;
+        },
+
+        getJsonType(value) {
+            if (value === null) return 'null';
+            if (Array.isArray(value)) return 'array';
+            return typeof value;
+        },
+
+        escapeHtml(str) {
+            return String(str)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            // Apply syntax highlighting
-            return escaped
-                // Strings (but not keys)
-                .replace(/: "((?:[^"\\]|\\.)*)"/g, ': <span class="json-string">"$1"</span>')
-                // Keys
-                .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
-                // Numbers
-                .replace(/: (-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
-                // Booleans
-                .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
-                // Null
-                .replace(/: (null)/g, ': <span class="json-null">$1</span>');
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        },
+
+        handleJsonToggle(event) {
+            // Find the clicked element or closest parent with data-path
+            const target = event.target.closest('[data-path]');
+            if (!target) return;
+
+            const path = target.dataset.path;
+            const action = target.dataset.action;
+
+            if (!path || !action) return;
+
+            // Toggle the collapse state (expand = false, collapse = true)
+            this.jsonCollapseState[path] = (action === 'collapse');
+
+            // Increment render key to trigger Alpine re-render
+            this.jsonRenderKey++;
         },
 
         startResize(event) {
