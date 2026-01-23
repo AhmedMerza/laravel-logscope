@@ -1,512 +1,352 @@
 # LogScope
 
-A fast, database-backed log viewer for Laravel applications.
+[![Latest Version](https://img.shields.io/packagist/v/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
+[![License](https://img.shields.io/packagist/l/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
+[![PHP Version](https://img.shields.io/packagist/php-v/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 
-> **Status:** Beta - actively developed, used in production by early adopters.
+A beautiful, fast, database-backed log viewer for Laravel applications.
 
-## Features
+<!-- TODO: Add screenshot here -->
+<!-- ![LogScope Screenshot](art/screenshot.png) -->
 
-- **Automatic log capture** - Captures ALL logs from ALL channels automatically (zero config)
-- **Request context tracking** - Trace ID, user ID, IP address, URL, and user agent for every log
-- **Database-backed storage** - Fast queries with proper indexing
-- **Advanced filtering** - Filter by level, channel, HTTP method, user, IP, and date range
-- **Include/Exclude filters** - Three-state toggles to include, exclude, or ignore each filter
-- **Full-text search** - Search across messages, context, and source with NOT support
-- **JSON viewer** - Syntax-highlighted, collapsible JSON context with smart defaults
-- **Resolvable logs** - Mark logs as resolved instead of deleting, track who resolved them
-- **Log notes** - Add notes to log entries for context and investigation findings
-- **Retention policies** - Auto-prune old logs after configurable period
-- **Quick filters** - Configurable one-click filters for common queries
-- **Keyboard shortcuts** - Navigate with j/k, search with /, help with ?, close with Esc
-- **Shareable links** - URL reflects current filters for easy sharing
-- **Resizable detail panel** - Drag to resize, width persisted across sessions
-- **Dark mode** - Full dark mode support with persistence
-- **Performance optimized** - Batch writes after response, queue support for high-traffic apps
-- **Highly configurable** - Customize capture mode, write mode, table names, and more
+## Quick Start
 
-## Requirements
+```bash
+composer require ahmedmerza/logscope
+php artisan logscope:install
+php artisan migrate
+```
+
+Visit `/logscope` in your browser. That's it!
+
+---
+
+## Table of Contents
+
+- [Features](#-features)
+- [Requirements](#-requirements)
+- [When to Use LogScope](#-when-to-use-logscope)
+- [Installation](#-installation)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Usage](#-usage)
+- [Production Deployment](#-production-deployment)
+- [Customization](#-customization)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| **Zero-Config Capture** | Automatically captures ALL logs from ALL channels |
+| **Request Context** | Trace ID, user ID, IP, URL, and user agent for every log |
+| **Advanced Search** | Full-text search with field targeting and NOT support |
+| **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
+| **JSON Viewer** | Syntax-highlighted, collapsible JSON with smart defaults |
+| **Resolvable Logs** | Mark logs as resolved instead of deleting |
+| **Log Notes** | Add investigation notes to any log entry |
+| **Quick Filters** | One-click filters for common queries |
+| **Keyboard Shortcuts** | Navigate with `j`/`k`, search with `/`, help with `?` |
+| **Dark Mode** | Full dark mode support with persistence |
+| **Shareable URLs** | Current filters reflected in URL for sharing |
+| **Performance** | Batch writes, queue support, proper indexing |
+
+---
+
+## 📋 Requirements
 
 - PHP 8.2+
 - Laravel 10, 11, or 12
 - SQLite, MySQL, or PostgreSQL
 
-## When to Use LogScope
+---
 
-LogScope stores logs in your database. This is a deliberate choice that works great for most Laravel applications.
+## 🤔 When to Use LogScope
 
-**LogScope is a great fit if you:**
-- Want log visibility without setting up external services
+LogScope stores logs in your database - a deliberate choice that works great for most Laravel apps.
+
+**Great fit if you:**
+- Want log visibility without external services
 - Have a typical Laravel app (up to ~100K requests/day)
-- Need to search and filter logs with rich context
+- Need rich search and filtering
 - Prefer simplicity over infrastructure complexity
 
-**You might prefer other solutions if you:**
-- Process millions of requests daily and need specialized log infrastructure
-- Need to retain logs for months or years
+**Consider alternatives if you:**
+- Process millions of requests daily
+- Need months/years of log retention
 - Already use centralized logging (Datadog, CloudWatch, ELK)
 
-**Addressing common concerns:**
+**How LogScope handles common concerns:**
 
-| Concern | How LogScope handles it |
-|---------|------------------------|
+| Concern | Solution |
+|---------|----------|
 | Database bloat | Retention policies auto-delete old logs (default: 30 days) |
-| Performance impact | Batch mode writes logs *after* the response is sent |
+| Performance | Batch mode writes logs *after* response is sent |
 | Query speed | Proper indexes on common filter combinations |
 
-For most Laravel apps, the choice comes down to: 5 minutes of setup with LogScope, or hours configuring external log infrastructure. LogScope is designed for developers who want practical log visibility without the complexity.
+---
 
-## Installation
+## 📦 Installation
 
 ```bash
 composer require ahmedmerza/logscope
 ```
 
-Run the install command to publish config and migrations:
+Run the install command:
 
 ```bash
 php artisan logscope:install
 php artisan migrate
 ```
 
-## Configuration
+Access the dashboard at `/logscope`.
 
-The config file will be published to `config/logscope.php`. Options include:
+---
 
-- **Capture mode** - `all` (automatic) or `channel` (explicit)
-- **Ignore filters** - Suppress deprecations and/or null-channel logs
-- **Write mode** - `sync`, `batch` (default), or `queue` for performance tuning
-- **Queue settings** - Queue name and connection for queue write mode
-- **Middleware** - Enable/disable request context capture
-- **Table name** - Customize the database table name
-- **Retention policy** - Enable/disable auto-pruning and set retention days
-- **Route configuration** - Customize prefix, middleware, and domain
-- **Content limits** - Configure preview lengths and truncation thresholds
-- **Search driver** - Database search (Scout integration planned)
-- **Quick filters** - Define one-click filters for common queries
-- **Theme** - Customize colors for the web interface
+## ⚙️ Configuration
 
-## Usage
+After installation, configure LogScope in `config/logscope.php` or via environment variables.
 
-### Automatic Log Capture (Default)
+### Capture Mode
 
-By default, LogScope automatically captures **all logs from all channels** with zero configuration. Just install and you're done!
+```env
+# 'all' (default) - Capture all logs automatically
+# 'channel' - Only capture logs sent to the logscope channel
+LOGSCOPE_CAPTURE=all
+```
+
+### Write Mode (Performance)
+
+```env
+# 'batch' (default) - Buffer logs, write after response
+# 'sync' - Write immediately (simple, but slower)
+# 'queue' - Queue each log entry (best for high-traffic)
+LOGSCOPE_WRITE_MODE=batch
+
+# Queue settings (when using 'queue' mode)
+LOGSCOPE_QUEUE=default
+LOGSCOPE_QUEUE_CONNECTION=
+```
+
+### Retention
+
+```env
+LOGSCOPE_RETENTION_ENABLED=true
+LOGSCOPE_RETENTION_DAYS=30
+```
+
+### Features
+
+```env
+LOGSCOPE_FEATURE_RESOLVABLE=true   # Mark logs as resolved
+LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
+```
+
+### Noise Reduction
+
+```env
+# Filter out noisy logs (both enabled by default)
+LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip "is deprecated" messages
+LOGSCOPE_IGNORE_NULL_CHANNEL=true  # Skip logs without a channel
+```
+
+### JSON Viewer
+
+Configure collapsible JSON behavior in `config/logscope.php`:
 
 ```php
-// All of these are captured automatically
+'json_viewer' => [
+    'collapse_threshold' => 5,  // Auto-collapse arrays/objects larger than this
+    'auto_collapse_keys' => ['trace', 'stack_trace', 'stacktrace', 'backtrace'],
+],
+```
+
+### Routes
+
+```env
+LOGSCOPE_ROUTES_ENABLED=true
+LOGSCOPE_ROUTE_PREFIX=logscope
+LOGSCOPE_DOMAIN=
+```
+
+Add middleware in config:
+
+```php
+'routes' => [
+    'middleware' => ['web', 'auth'],
+],
+```
+
+---
+
+## 🚀 Usage
+
+### Automatic Capture
+
+All logs are captured automatically - no code changes needed:
+
+```php
 Log::info('User logged in', ['user_id' => 1]);
 Log::channel('slack')->error('Payment failed');
 Log::stack(['daily', 'slack'])->warning('Low inventory');
 ```
 
-### Capture Modes
-
-LogScope supports two capture modes:
-
-**`all` (default)** - Automatically captures logs from ALL channels using Laravel's `Log::listen()`. No configuration needed.
-
-**`channel`** - Only captures logs explicitly sent to the LogScope channel. Add the channel to your `config/logging.php`:
-
-```php
-'channels' => [
-    'stack' => [
-        'driver' => 'stack',
-        'channels' => ['single', 'logscope'],
-    ],
-
-    'logscope' => [
-        'driver' => 'custom',
-        'via' => \LogScope\Logging\LogScopeChannel::class,
-        'level' => env('LOG_LEVEL', 'debug'),
-    ],
-],
-```
-
-Set the capture mode in your `.env`:
-
-```env
-LOGSCOPE_CAPTURE=all    # or 'channel'
-```
-
-### Write Modes (Performance)
-
-LogScope offers three write modes optimized for different use cases:
-
-**`batch` (default)** - Buffers logs during the request and writes them AFTER the response is sent. Best balance of performance and simplicity.
-
-**`sync`** - Writes immediately to the database. Simplest but can slow down requests.
-
-**`queue`** - Dispatches a queued job for each log entry. Best performance for high-traffic apps but requires a queue worker.
-
-```env
-LOGSCOPE_WRITE_MODE=batch    # 'sync', 'batch', or 'queue'
-LOGSCOPE_QUEUE=default       # Queue name (when using 'queue' mode)
-LOGSCOPE_QUEUE_CONNECTION=   # Optional queue connection
-```
-
-### Reducing Log Noise
-
-LogScope can filter out noisy logs that you don't want to capture:
-
-**Ignore PHP Deprecations** (enabled by default) - Third-party packages often trigger PHP deprecation warnings. These are captured by Laravel's error handler and can clutter your logs.
-
-**Ignore Null Channel Logs** (enabled by default) - Logs without a channel are usually PHP errors/warnings rather than explicit `Log::` calls.
-
-```env
-# Both are enabled by default. Set to false to capture these logs:
-LOGSCOPE_IGNORE_DEPRECATIONS=false   # Capture "is deprecated" messages
-LOGSCOPE_IGNORE_NULL_CHANNEL=false   # Capture logs without a channel
-```
-
-### Resolvable Logs
-
-Instead of deleting logs, you can mark them as resolved. Resolved logs are hidden by default but can be viewed when needed.
-
-```php
-// Toggle visibility in the UI with the checkmark icon
-// Or via API:
-POST /logscope/api/logs/{id}/resolve
-POST /logscope/api/logs/{id}/unresolve
-```
-
-**Customizing "Resolved By"**
-
-By default, LogScope uses the authenticated user's name or email. You can customize this in your `AppServiceProvider`:
-
-```php
-use LogScope\LogScope;
-
-public function boot(): void
-{
-    LogScope::resolvedBy(function ($request) {
-        return $request->user()?->full_name;
-        // Or combine fields:
-        // return $request->user() ? "{$user->name} ({$user->role})" : null;
-    });
-}
-```
-
-**Disable Resolvable Feature**
-
-```env
-LOGSCOPE_FEATURE_RESOLVABLE=false
-```
-
-### Log Notes
-
-Add notes to log entries to document investigation findings or context:
-
-- Click the note area in the detail panel to add/edit
-- Notes are saved automatically
-- Useful for team collaboration on debugging
-
-**Disable Notes Feature**
-
-```env
-LOGSCOPE_FEATURE_NOTES=false
-```
-
-### JSON Viewer
-
-The context viewer displays JSON with syntax highlighting and collapsible sections:
-
-- **Color-coded** - Keys (blue), strings (green), numbers (orange), booleans (purple), null (gray)
-- **Collapsible** - Click ▶/▼ to expand/collapse objects and arrays
-- **Smart defaults** - Stack traces (`trace`, `stack_trace`, etc.) are collapsed by default
-
-Configure in `config/logscope.php`:
-
-```php
-'json_viewer' => [
-    // Collapse arrays/objects with more than N items (0 to disable)
-    'collapse_threshold' => 5,
-
-    // Keys that should always be collapsed (regardless of size)
-    'auto_collapse_keys' => ['trace', 'stack_trace', 'stacktrace', 'backtrace'],
-],
-```
-
-### Request Context
-
-LogScope automatically captures request context for every log entry:
-
-- **Trace ID** - Unique identifier to group all logs from a single request
-- **User ID** - Authenticated user (if any)
-- **IP Address** - Client IP
-- **User Agent** - Browser/client information
-- **HTTP Method** - GET, POST, PUT, etc.
-- **URL** - The request URL
-
-This makes it easy to trace issues across your application.
-
-### Quick Filters
-
-LogScope includes configurable quick filters for common queries. Customize them in `config/logscope.php`:
-
-```php
-'quick_filters' => [
-    [
-        'label' => 'Today',
-        'icon' => 'calendar',  // calendar, clock, alert, or filter
-        'from' => 'today',
-    ],
-    [
-        'label' => 'This Hour',
-        'icon' => 'clock',
-        'from' => '-1 hour',
-    ],
-    [
-        'label' => 'Last 24 Hours',
-        'icon' => 'clock',
-        'from' => '-24 hours',
-    ],
-    [
-        'label' => 'Errors Only',
-        'icon' => 'alert',
-        'levels' => ['error', 'critical', 'alert', 'emergency'],
-    ],
-    // Combine time and levels
-    [
-        'label' => 'Recent Errors',
-        'icon' => 'alert',
-        'levels' => ['error', 'critical'],
-        'from' => '-24 hours',
-    ],
-],
-```
-
-**Time format options:**
-- `'today'` - Start of today
-- `'-1 hour'` - 1 hour ago
-- `'-4 hours'` - 4 hours ago
-- `'-24 hours'` - 24 hours ago
-- `'-7 days'` - 7 days ago
-- `'-1 week'` - 1 week ago
-- `'-1 month'` - 1 month ago
-
-### Import Existing Logs
-
-```bash
-# Import from default Laravel log location
-php artisan logscope:import
-
-# Import a specific file
-php artisan logscope:import storage/logs/laravel.log
-
-# Import only recent logs
-php artisan logscope:import --days=7
-```
-
-### Prune Old Logs
-
-```bash
-# Delete logs older than configured retention period
-php artisan logscope:prune
-
-# Preview what would be deleted
-php artisan logscope:prune --dry-run
-
-# Override retention days
-php artisan logscope:prune --days=14
-```
-
-### Access the Web Interface
-
-After installation, access LogScope at `/logscope` (or your configured prefix).
-
 ### Keyboard Shortcuts
-
-LogScope includes keyboard shortcuts for faster navigation:
 
 | Key | Action |
 |-----|--------|
-| `j` | Next log entry |
-| `k` | Previous log entry |
-| `/` | Focus search input |
-| `?` | Show keyboard shortcuts help |
-| `Esc` | Close detail panel / dialogs |
+| `j` | Next log |
+| `k` | Previous log |
+| `/` | Focus search |
+| `?` | Show help |
+| `Esc` | Close panel |
+
+### Resolvable Logs
+
+Mark logs as resolved instead of deleting. Customize who resolved it:
+
+```php
+// In AppServiceProvider::boot()
+use LogScope\LogScope;
+
+LogScope::resolvedBy(function ($request) {
+    return $request->user()?->name;
+});
+```
+
+### Quick Filters
+
+Configure one-click filters in `config/logscope.php`:
+
+```php
+'quick_filters' => [
+    ['label' => 'Today', 'icon' => 'calendar', 'from' => 'today'],
+    ['label' => 'Errors', 'icon' => 'alert', 'levels' => ['error', 'critical']],
+    ['label' => 'Last Hour', 'icon' => 'clock', 'from' => '-1 hour'],
+],
+```
 
 ### Authorization
 
-LogScope uses a flexible authorization system with three options (in priority order):
+LogScope uses a flexible auth system (checked in order):
 
-**1. Custom Callback** (highest priority)
-
-Define a callback in your `AppServiceProvider::boot()`:
-
+**1. Custom Callback:**
 ```php
-use LogScope\LogScope;
-
-public function boot(): void
-{
-    LogScope::auth(function ($request) {
-        return $request->user()?->isAdmin();
-    });
-}
+LogScope::auth(fn ($request) => $request->user()?->isAdmin());
 ```
 
-**2. Gate Definition**
-
-Define a `viewLogScope` gate in your `AuthServiceProvider`:
-
+**2. Gate:**
 ```php
-use Illuminate\Support\Facades\Gate;
-
-public function boot(): void
-{
-    Gate::define('viewLogScope', function ($user) {
-        return $user->hasRole('admin');
-    });
-}
+Gate::define('viewLogScope', fn ($user) => $user->hasRole('admin'));
 ```
 
-**3. Default Behavior**
+**3. Default:** Only accessible in `local` environment.
 
-If no callback or gate is defined, LogScope is only accessible in the `local` environment.
+### Artisan Commands
 
-**Additional Middleware**
+```bash
+# Import existing log files
+php artisan logscope:import
+php artisan logscope:import storage/logs/laravel.log --days=7
 
-You can also add middleware via config (e.g., `auth`, custom roles):
-
-```php
-// config/logscope.php
-'routes' => [
-    'middleware' => ['web', 'auth'],
-    // ...
-],
+# Prune old logs
+php artisan logscope:prune
+php artisan logscope:prune --dry-run
+php artisan logscope:prune --days=14
 ```
 
-**Full Control**
+---
 
-For complete customization, disable the default routes and register your own:
-
-```php
-// config/logscope.php
-'routes' => [
-    'enabled' => false,
-],
-```
-
-Then register the routes manually in your `routes/web.php` with any middleware or logic you need.
-
-## Production Deployment
+## 🏭 Production Deployment
 
 ### Recommended Settings
 
-For production environments, we recommend:
-
 ```env
-# Use batch (default) or queue mode - never sync in production
 LOGSCOPE_WRITE_MODE=batch
-
-# Keep logs for 7-14 days (adjust based on your needs)
 LOGSCOPE_RETENTION_DAYS=14
-
-# Set appropriate log level (reduces noise)
 LOG_LEVEL=info
 ```
 
 ### Schedule Pruning
 
-Add to your scheduler to automatically clean old logs:
-
 ```php
 // Laravel 11+ (routes/console.php)
-use Illuminate\Support\Facades\Schedule;
-
 Schedule::command('logscope:prune')->daily();
 
 // Laravel 10 (app/Console/Kernel.php)
-protected function schedule(Schedule $schedule): void
-{
-    $schedule->command('logscope:prune')->daily();
-}
+$schedule->command('logscope:prune')->daily();
 ```
 
-### High-Traffic Applications
+### High-Traffic Apps
 
-For applications with high traffic (thousands of requests/day):
+For thousands of requests/day:
 
-1. **Use queue mode** with a dedicated queue:
+1. Use queue mode with a dedicated queue:
    ```env
    LOGSCOPE_WRITE_MODE=queue
    LOGSCOPE_QUEUE=logs
    ```
 
-2. **Run a separate queue worker** for logs:
+2. Run a separate queue worker:
    ```bash
    php artisan queue:work --queue=logs
    ```
 
-3. **Consider shorter retention** (7 days) to keep the table size manageable.
+3. Consider shorter retention (7 days).
 
-### Performance Notes
+---
 
-- **Stats are cached** for 60 seconds to reduce database load
-- **Batch mode** (default) writes logs after the response is sent, so it won't slow down your requests
-- **Indexes** are optimized for common filter combinations (level + date, channel + date, etc.)
-
-## Customization
+## 🎨 Customization
 
 ### Publishing Assets
 
 ```bash
-# Publish config only
 php artisan vendor:publish --tag=logscope-config
-
-# Publish migrations (for customization)
 php artisan vendor:publish --tag=logscope-migrations
-
-# Publish views (for customization)
 php artisan vendor:publish --tag=logscope-views
 ```
 
-### Environment Variables
+### All Environment Variables
 
 ```env
-# Capture mode: 'all' (default) or 'channel'
+# Capture & Performance
 LOGSCOPE_CAPTURE=all
-
-# Write mode: 'sync', 'batch' (default), or 'queue'
 LOGSCOPE_WRITE_MODE=batch
-
-# Queue settings (when using 'queue' write mode)
 LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
 
-# Ignore filters (both enabled by default, set to false to capture)
-LOGSCOPE_IGNORE_DEPRECATIONS=false
-LOGSCOPE_IGNORE_NULL_CHANNEL=false
-
-# Features (both enabled by default)
+# Features
 LOGSCOPE_FEATURE_RESOLVABLE=true
 LOGSCOPE_FEATURE_NOTES=true
+LOGSCOPE_IGNORE_DEPRECATIONS=true
+LOGSCOPE_IGNORE_NULL_CHANNEL=true
 
-# Request context middleware
-LOGSCOPE_MIDDLEWARE_ENABLED=true
-
-# Database table
+# Database & Retention
 LOGSCOPE_TABLE=log_entries
-
-# Retention policy
 LOGSCOPE_RETENTION_ENABLED=true
 LOGSCOPE_RETENTION_DAYS=30
+LOGSCOPE_MIGRATIONS_ENABLED=true
 
 # Routes
 LOGSCOPE_ROUTES_ENABLED=true
 LOGSCOPE_ROUTE_PREFIX=logscope
 LOGSCOPE_DOMAIN=
+LOGSCOPE_MIDDLEWARE_ENABLED=true
 
-# Search (Scout integration planned)
+# Search
 LOGSCOPE_SEARCH_DRIVER=database
-
-# Migrations
-LOGSCOPE_MIGRATIONS_ENABLED=true
 ```
 
-## Contributing
+---
+
+## 🤝 Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
 
-## License
+---
+
+## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for details.
