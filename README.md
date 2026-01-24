@@ -246,6 +246,24 @@ Gate::define('viewLogScope', fn ($user) => $user->hasRole('admin'));
 
 **3. Default:** Only accessible in `local` environment.
 
+### Custom Context
+
+Add custom data to every log entry (e.g., API token ID, tenant ID):
+
+```php
+// In AppServiceProvider::boot()
+use LogScope\LogScope;
+
+LogScope::captureContext(function ($request) {
+    return [
+        'token_id' => $request->user()?->currentAccessToken()?->id,
+        'tenant_id' => $request->user()?->tenant_id,
+    ];
+});
+```
+
+This data is merged into the log's `context` field and appears in the JSON viewer.
+
 ### Artisan Commands
 
 ```bash

@@ -124,16 +124,24 @@ class LogScopeServiceProvider extends ServiceProvider
                 // Get request context from Laravel Context (set by middleware)
                 $requestContext = Context::get('logscope', []);
 
+                // Get user_id at log-write time (after auth middleware has run)
+                $userId = null;
+                $customContext = [];
+                if (app()->bound('request')) {
+                    $userId = request()->user()?->id;
+                    $customContext = LogScope::getCapturedContext(request());
+                }
+
                 $data = [
                     'level' => $event->level,
                     'message' => $event->message,
-                    'context' => $this->sanitizeContext($event->context),
+                    'context' => $this->sanitizeContext(array_merge($event->context, $customContext)),
                     'channel' => $channel ?? config('logging.default'),
                     'environment' => app()->environment(),
                     'source' => $this->extractSource($event->context),
                     'source_line' => $this->extractSourceLine($event->context),
                     'trace_id' => $requestContext['trace_id'] ?? null,
-                    'user_id' => $requestContext['user_id'] ?? null,
+                    'user_id' => $userId,
                     'ip_address' => $requestContext['ip_address'] ?? null,
                     'user_agent' => $requestContext['user_agent'] ?? null,
                     'http_method' => $requestContext['http_method'] ?? null,

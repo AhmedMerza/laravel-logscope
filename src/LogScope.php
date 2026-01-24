@@ -25,6 +25,13 @@ class LogScope
     public static ?Closure $resolvedByUsing = null;
 
     /**
+     * The callback that should be used to capture additional context.
+     *
+     * @var (Closure(Request): array<string, mixed>)|null
+     */
+    public static ?Closure $captureContextUsing = null;
+
+    /**
      * Register the callback used to authorize access to LogScope.
      *
      * This allows you to define custom authorization logic:
@@ -123,5 +130,49 @@ class LogScope
     public static function resetResolvedBy(): void
     {
         static::$resolvedByUsing = null;
+    }
+
+    /**
+     * Register the callback used to capture additional context.
+     *
+     * This allows you to add custom data to every log entry:
+     *
+     * ```php
+     * // In AppServiceProvider::boot()
+     * LogScope::captureContext(function ($request) {
+     *     return [
+     *         'token_id' => $request->user()?->currentAccessToken()?->id,
+     *         'tenant_id' => $request->user()?->tenant_id,
+     *     ];
+     * });
+     * ```
+     *
+     * @param  Closure(Request): array<string, mixed>  $callback
+     */
+    public static function captureContext(Closure $callback): void
+    {
+        static::$captureContextUsing = $callback;
+    }
+
+    /**
+     * Get the additional captured context for the given request.
+     *
+     * @return array<string, mixed>
+     */
+    public static function getCapturedContext(Request $request): array
+    {
+        if (static::$captureContextUsing !== null) {
+            return (static::$captureContextUsing)($request) ?? [];
+        }
+
+        return [];
+    }
+
+    /**
+     * Reset the captureContext callback (useful for testing).
+     */
+    public static function resetCaptureContext(): void
+    {
+        static::$captureContextUsing = null;
     }
 }

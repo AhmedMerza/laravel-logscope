@@ -21,9 +21,10 @@ class CaptureRequestContext
         $traceId = (string) Str::uuid();
 
         // Add context that will be automatically included in all logs
+        // Note: user_id is NOT captured here because auth middleware hasn't run yet
+        // It's captured at log-write time instead (see LogScopeServiceProvider)
         Context::add('logscope', [
             'trace_id' => $traceId,
-            'user_id' => $request->user()?->id,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'http_method' => $request->method(),

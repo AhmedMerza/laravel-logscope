@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Logging;
 
 use Illuminate\Support\Facades\Context;
+use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
@@ -52,16 +53,24 @@ class LogScopeHandler extends AbstractProcessingHandler
             // Get request context from Laravel Context (set by middleware)
             $requestContext = Context::get('logscope', []);
 
+            // Get user_id at log-write time (after auth middleware has run)
+            $userId = null;
+            $customContext = [];
+            if (app()->bound('request')) {
+                $userId = request()->user()?->id;
+                $customContext = LogScope::getCapturedContext(request());
+            }
+
             LogEntry::createEntry([
                 'level' => strtolower($record->level->name),
                 'message' => $record->message,
-                'context' => $this->sanitizeContext($record->context),
+                'context' => $this->sanitizeContext(array_merge($record->context, $customContext)),
                 'channel' => $this->channel,
                 'environment' => app()->environment(),
                 'source' => $this->extractSource($record),
                 'source_line' => $this->extractSourceLine($record),
                 'trace_id' => $requestContext['trace_id'] ?? null,
-                'user_id' => $requestContext['user_id'] ?? null,
+                'user_id' => $userId,
                 'ip_address' => $requestContext['ip_address'] ?? null,
                 'user_agent' => $requestContext['user_agent'] ?? null,
                 'http_method' => $requestContext['http_method'] ?? null,
