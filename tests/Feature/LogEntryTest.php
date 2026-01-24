@@ -16,7 +16,6 @@ it('creates a log entry with auto-generated fields', function () {
         'message' => 'Test error message',
         'context' => ['user_id' => 123],
         'channel' => 'test',
-        'environment' => 'testing',
     ]);
 
     expect($entry)
@@ -24,7 +23,8 @@ it('creates a log entry with auto-generated fields', function () {
         ->level->toBe('error')
         ->message->toBe('Test error message')
         ->message_preview->toBe('Test error message')
-        ->occurred_at->not->toBeNull();
+        ->occurred_at->not->toBeNull()
+        ->status->value->toBe('open');
 });
 
 it('generates preview for long messages', function () {
@@ -108,12 +108,32 @@ it('filters by channel', function () {
     expect(LogEntry::channel('slack')->count())->toBe(2);
 });
 
-it('filters by environment', function () {
-    LogEntry::createEntry(['level' => 'info', 'message' => 'Test', 'environment' => 'production']);
-    LogEntry::createEntry(['level' => 'info', 'message' => 'Test', 'environment' => 'staging']);
-    LogEntry::createEntry(['level' => 'info', 'message' => 'Test', 'environment' => 'production']);
+it('filters by status', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'status' => 'open']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'status' => 'investigating']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'status' => 'resolved']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 4', 'status' => 'ignored']);
 
-    expect(LogEntry::environment('production')->count())->toBe(2);
+    expect(LogEntry::status('open')->count())->toBe(1);
+    expect(LogEntry::status(['open', 'investigating'])->count())->toBe(2);
+    expect(LogEntry::query()->needsAttention()->count())->toBe(2);
+    expect(LogEntry::query()->closed()->count())->toBe(2);
+});
+
+it('sets status on a log entry', function () {
+    $entry = LogEntry::createEntry([
+        'level' => 'error',
+        'message' => 'Test error',
+    ]);
+
+    expect($entry->status->value)->toBe('open');
+
+    $entry->setStatus('investigating', 'Test User', 'Looking into it');
+
+    expect($entry->fresh())
+        ->status->value->toBe('investigating')
+        ->status_changed_by->toBe('Test User')
+        ->note->toBe('Looking into it');
 });
 
 it('filters by date range', function () {

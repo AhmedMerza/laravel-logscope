@@ -66,7 +66,6 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'message' => $record->message,
                 'context' => $this->sanitizeContext(array_merge($record->context, $customContext)),
                 'channel' => $this->channel,
-                'environment' => app()->environment(),
                 'source' => $this->extractSource($record),
                 'source_line' => $this->extractSourceLine($record),
                 'trace_id' => $requestContext['trace_id'] ?? null,

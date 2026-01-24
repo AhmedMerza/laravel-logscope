@@ -19,7 +19,6 @@ return new class extends Migration
             $table->json('context')->nullable();
             $table->string('context_preview', 500)->nullable();
             $table->string('channel', 100)->nullable()->index();
-            $table->string('environment', 50)->nullable()->index();
             $table->string('source', 500)->nullable();
             $table->unsignedInteger('source_line')->nullable();
             $table->uuid('trace_id')->nullable()->index();
@@ -34,7 +33,6 @@ return new class extends Migration
 
             $table->index(['level', 'occurred_at']);
             $table->index(['channel', 'occurred_at']);
-            $table->index(['environment', 'level']);
             $table->index(['trace_id', 'occurred_at']);
             $table->index(['user_id', 'occurred_at']);
         });

@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
+use LogScope\Enums\LogStatus;
+use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 
 class LogController extends Controller
@@ -21,17 +23,18 @@ class LogController extends Controller
         return view('logscope::index', [
             'levels' => $this->getAvailableLevels(),
             'channels' => $this->getAvailableChannels(),
-            'environments' => $this->getAvailableEnvironments(),
             'httpMethods' => $this->getAvailableHttpMethods(),
+            'statuses' => $this->getStatusOptions(),
             'quickFilters' => config('logscope.quick_filters', []),
             'features' => [
-                'resolvable' => config('logscope.features.resolvable', true),
+                'status' => config('logscope.features.status', true),
                 'notes' => config('logscope.features.notes', true),
             ],
             'jsonViewer' => [
                 'collapseThreshold' => config('logscope.json_viewer.collapse_threshold', 5),
                 'autoCollapseKeys' => config('logscope.json_viewer.auto_collapse_keys', ['trace', 'stack_trace', 'stacktrace', 'backtrace']),
             ],
+            'shortcuts' => $this->getShortcuts(),
         ]);
     }
 
@@ -42,16 +45,12 @@ class LogController extends Controller
     {
         $query = LogEntry::query()->recent();
 
-        // Apply resolved filter (default: hide resolved unless explicitly requested)
-        if ($request->has('show_resolved')) {
-            $showResolved = filter_var($request->input('show_resolved'), FILTER_VALIDATE_BOOLEAN);
-            if (! $showResolved) {
-                $query->unresolved();
-            }
-            // If show_resolved is true, show all (resolved and unresolved)
+        // Apply status filter (default: show only open logs)
+        if ($request->filled('statuses')) {
+            $query->status((array) $request->input('statuses'));
         } else {
-            // By default, hide resolved logs
-            $query->unresolved();
+            // By default, show only open logs
+            $query->open();
         }
 
         // Apply filters
@@ -69,10 +68,6 @@ class LogController extends Controller
 
         if ($request->filled('exclude_channels')) {
             $query->excludeChannel((array) $request->input('exclude_channels'));
-        }
-
-        if ($request->filled('environments')) {
-            $query->environment((array) $request->input('environments'));
         }
 
         // Handle advanced search with multiple conditions
@@ -214,63 +209,73 @@ class LogController extends Controller
     }
 
     /**
-     * Resolve a log entry.
+     * Update the status of a log entry.
      */
-    public function resolve(Request $request, string $id): JsonResponse
+    public function setStatus(Request $request, string $id): JsonResponse
     {
-        if (! config('logscope.features.resolvable', true)) {
-            return response()->json(['error' => 'Resolve feature is disabled'], 403);
+        if (! config('logscope.features.status', true)) {
+            return response()->json(['error' => 'Status feature is disabled'], 403);
         }
+
+        $request->validate([
+            'status' => 'required|string',
+            'note' => 'nullable|string|max:10000',
+        ]);
 
         $log = LogEntry::findOrFail($id);
 
-        $resolvedBy = \LogScope\LogScope::getResolvedBy($request);
+        // Validate status is a valid option
+        $validStatuses = $this->getValidStatuses();
+        $status = $request->input('status');
 
+        if (! in_array($status, $validStatuses)) {
+            return response()->json(['error' => 'Invalid status'], 422);
+        }
+
+        $changedBy = LogScope::getStatusChangedBy($request);
         $note = $request->input('note');
 
-        $log->resolve($resolvedBy, $note);
+        $log->setStatus($status, $changedBy, $note);
 
-        return response()->json(['data' => $log->fresh(), 'message' => 'Log entry resolved']);
+        return response()->json([
+            'data' => $log->fresh(),
+            'message' => 'Status updated to '.$status,
+        ]);
     }
 
     /**
-     * Unresolve a log entry.
+     * Update status for multiple log entries.
      */
-    public function unresolve(string $id): JsonResponse
+    public function setStatusMany(Request $request): JsonResponse
     {
-        if (! config('logscope.features.resolvable', true)) {
-            return response()->json(['error' => 'Resolve feature is disabled'], 403);
-        }
-
-        $log = LogEntry::findOrFail($id);
-        $log->unresolve();
-
-        return response()->json(['data' => $log->fresh(), 'message' => 'Log entry unresolved']);
-    }
-
-    /**
-     * Resolve multiple log entries.
-     */
-    public function resolveMany(Request $request): JsonResponse
-    {
-        if (! config('logscope.features.resolvable', true)) {
-            return response()->json(['error' => 'Resolve feature is disabled'], 403);
+        if (! config('logscope.features.status', true)) {
+            return response()->json(['error' => 'Status feature is disabled'], 403);
         }
 
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'string',
+            'status' => 'required|string',
         ]);
 
-        $resolvedBy = \LogScope\LogScope::getResolvedBy($request);
+        // Validate status is a valid option
+        $validStatuses = $this->getValidStatuses();
+        $status = $request->input('status');
 
-        $resolved = LogEntry::whereIn('id', $request->input('ids'))
+        if (! in_array($status, $validStatuses)) {
+            return response()->json(['error' => 'Invalid status'], 422);
+        }
+
+        $changedBy = LogScope::getStatusChangedBy($request);
+
+        $updated = LogEntry::whereIn('id', $request->input('ids'))
             ->update([
-                'resolved_at' => now(),
-                'resolved_by' => $resolvedBy,
+                'status' => $status,
+                'status_changed_at' => now(),
+                'status_changed_by' => $changedBy,
             ]);
 
-        return response()->json(['message' => "{$resolved} log entries resolved"]);
+        return response()->json(['message' => "{$updated} log entries updated to {$status}"]);
     }
 
     /**
@@ -323,8 +328,8 @@ class LogController extends Controller
             $query->channel((array) $request->input('channels'));
         }
 
-        if ($request->filled('environments')) {
-            $query->environment((array) $request->input('environments'));
+        if ($request->filled('statuses')) {
+            $query->status((array) $request->input('statuses'));
         }
 
         $deleted = $query->delete();
@@ -384,21 +389,6 @@ class LogController extends Controller
     }
 
     /**
-     * Get available environments (cached).
-     */
-    protected function getAvailableEnvironments(): array
-    {
-        return Cache::remember('logscope:filters:environments', 60, function () {
-            return LogEntry::distinct()
-                ->whereNotNull('environment')
-                ->pluck('environment')
-                ->sort()
-                ->values()
-                ->toArray();
-        });
-    }
-
-    /**
      * Get available HTTP methods (cached).
      */
     protected function getAvailableHttpMethods(): array
@@ -411,5 +401,83 @@ class LogController extends Controller
                 ->values()
                 ->toArray();
         });
+    }
+
+    /**
+     * Get status options for UI (built-in + config overrides/additions).
+     */
+    protected function getStatusOptions(): array
+    {
+        $configStatuses = config('logscope.statuses', []);
+        $options = [];
+
+        // Add built-in statuses (with config overrides)
+        foreach (LogStatus::cases() as $status) {
+            $override = $configStatuses[$status->value] ?? [];
+            // Allow shortcut to be explicitly set to null to disable
+            $shortcut = array_key_exists('shortcut', $override)
+                ? $override['shortcut']
+                : $status->shortcut();
+            $options[] = [
+                'value' => $status->value,
+                'label' => $override['label'] ?? $status->label(),
+                'color' => $override['color'] ?? $status->color(),
+                'closed' => $override['closed'] ?? $status->isClosed(),
+                'shortcut' => $shortcut,
+            ];
+        }
+
+        // Add custom statuses from config (non-built-in keys)
+        $builtInValues = array_column(LogStatus::cases(), 'value');
+        foreach ($configStatuses as $value => $config) {
+            if (in_array($value, $builtInValues)) {
+                continue; // Already handled above
+            }
+            $options[] = [
+                'value' => $value,
+                'label' => $config['label'] ?? ucfirst($value),
+                'color' => $config['color'] ?? 'gray',
+                'closed' => $config['closed'] ?? false,
+                'shortcut' => $config['shortcut'] ?? null,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Get all valid status values (built-in + custom).
+     */
+    protected function getValidStatuses(): array
+    {
+        $statuses = array_column(LogStatus::cases(), 'value');
+
+        // Add custom statuses from config
+        $configStatuses = config('logscope.statuses', []);
+        $builtInValues = array_column(LogStatus::cases(), 'value');
+
+        foreach (array_keys($configStatuses) as $value) {
+            if (! in_array($value, $builtInValues)) {
+                $statuses[] = $value;
+            }
+        }
+
+        return $statuses;
+    }
+
+    /**
+     * Get keyboard shortcuts for status filtering.
+     * Returns array of [key => status_value].
+     */
+    protected function getShortcuts(): array
+    {
+        $shortcuts = [];
+        foreach ($this->getStatusOptions() as $status) {
+            if (! empty($status['shortcut'])) {
+                $shortcuts[$status['shortcut']] = $status['value'];
+            }
+        }
+
+        return $shortcuts;
     }
 }

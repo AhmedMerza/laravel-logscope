@@ -19,11 +19,11 @@ class LogScope
     public static ?Closure $authUsing = null;
 
     /**
-     * The callback that should be used to get the "resolved by" identifier.
+     * The callback that should be used to get the "status changed by" identifier.
      *
      * @var (Closure(Request): ?string)|null
      */
-    public static ?Closure $resolvedByUsing = null;
+    public static ?Closure $statusChangedByUsing = null;
 
     /**
      * The callback that should be used to capture additional context.
@@ -90,35 +90,35 @@ class LogScope
     }
 
     /**
-     * Register the callback used to determine "resolved by" identifier.
+     * Register the callback used to determine "status changed by" identifier.
      *
-     * This allows you to customize how the resolver is identified:
+     * This allows you to customize how the user is identified when changing status:
      *
      * ```php
      * // In AppServiceProvider::boot()
-     * LogScope::resolvedBy(function ($request) {
+     * LogScope::statusChangedBy(function ($request) {
      *     return $request->user()?->full_name;
      * });
      * ```
      *
      * @param  Closure(Request): ?string  $callback
      */
-    public static function resolvedBy(Closure $callback): void
+    public static function statusChangedBy(Closure $callback): void
     {
-        static::$resolvedByUsing = $callback;
+        static::$statusChangedByUsing = $callback;
     }
 
     /**
-     * Get the "resolved by" identifier for the given request.
+     * Get the "status changed by" identifier for the given request.
      *
      * Resolution priority:
-     * 1. Custom callback set via LogScope::resolvedBy()
+     * 1. Custom callback set via LogScope::statusChangedBy()
      * 2. Default: user name or email (if authenticated)
      */
-    public static function getResolvedBy(Request $request): ?string
+    public static function getStatusChangedBy(Request $request): ?string
     {
-        if (static::$resolvedByUsing !== null) {
-            return (static::$resolvedByUsing)($request);
+        if (static::$statusChangedByUsing !== null) {
+            return (static::$statusChangedByUsing)($request);
         }
 
         return $request->user()?->name
@@ -126,11 +126,35 @@ class LogScope
     }
 
     /**
-     * Reset the resolvedBy callback (useful for testing).
+     * Reset the statusChangedBy callback (useful for testing).
+     */
+    public static function resetStatusChangedBy(): void
+    {
+        static::$statusChangedByUsing = null;
+    }
+
+    /**
+     * @deprecated Use statusChangedBy() instead.
+     */
+    public static function resolvedBy(Closure $callback): void
+    {
+        static::statusChangedBy($callback);
+    }
+
+    /**
+     * @deprecated Use getStatusChangedBy() instead.
+     */
+    public static function getResolvedBy(Request $request): ?string
+    {
+        return static::getStatusChangedBy($request);
+    }
+
+    /**
+     * @deprecated Use resetStatusChangedBy() instead.
      */
     public static function resetResolvedBy(): void
     {
-        static::$resolvedByUsing = null;
+        static::resetStatusChangedBy();
     }
 
     /**

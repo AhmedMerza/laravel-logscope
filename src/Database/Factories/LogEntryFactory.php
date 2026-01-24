@@ -6,6 +6,7 @@ namespace LogScope\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
+use LogScope\Enums\LogStatus;
 use LogScope\Models\LogEntry;
 
 /**
@@ -24,8 +25,8 @@ class LogEntryFactory extends Factory
     {
         $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
         $channels = ['stack', 'single', 'daily', 'slack', 'stderr'];
-        $environments = ['local', 'staging', 'production'];
         $httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', null];
+        $statuses = [LogStatus::Open, LogStatus::Investigating, LogStatus::Resolved, LogStatus::Ignored];
 
         $messages = [
             'debug' => [
@@ -106,13 +107,14 @@ class LogEntryFactory extends Factory
         $hasContext = $this->faker->boolean(70);
         $hasRequestContext = $this->faker->boolean(60);
 
+        $status = $this->faker->randomElement($statuses);
+
         return [
             'level' => $level,
             'message' => $message,
             'message_preview' => Str::limit($message, 500),
             'context' => $hasContext ? $this->generateContext() : null,
             'channel' => $this->faker->randomElement($channels),
-            'environment' => $this->faker->randomElement($environments),
             'source' => $this->faker->boolean(80)
                 ? '/app/'.$this->faker->randomElement(['Http/Controllers', 'Services', 'Jobs', 'Models']).'/'.$this->faker->word().'.php'
                 : null,
@@ -130,6 +132,9 @@ class LogEntryFactory extends Factory
                 '/api/products',
                 '/checkout',
             ]) : null,
+            'status' => $status->value,
+            'status_changed_at' => $status !== LogStatus::Open ? $this->faker->dateTimeBetween('-3 days', 'now') : null,
+            'status_changed_by' => $status !== LogStatus::Open && $this->faker->boolean(80) ? $this->faker->name() : null,
             'occurred_at' => $this->faker->dateTimeBetween('-7 days', 'now'),
         ];
     }
@@ -324,6 +329,54 @@ class LogEntryFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'occurred_at' => $this->faker->dateTimeBetween($from, $to),
+        ]);
+    }
+
+    /**
+     * Set status to open.
+     */
+    public function open(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => LogStatus::Open->value,
+            'status_changed_at' => null,
+            'status_changed_by' => null,
+        ]);
+    }
+
+    /**
+     * Set status to investigating.
+     */
+    public function investigating(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => LogStatus::Investigating->value,
+            'status_changed_at' => now(),
+            'status_changed_by' => $this->faker->name(),
+        ]);
+    }
+
+    /**
+     * Set status to resolved.
+     */
+    public function resolved(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => LogStatus::Resolved->value,
+            'status_changed_at' => now(),
+            'status_changed_by' => $this->faker->name(),
+        ]);
+    }
+
+    /**
+     * Set status to ignored.
+     */
+    public function ignored(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => LogStatus::Ignored->value,
+            'status_changed_at' => now(),
+            'status_changed_by' => $this->faker->name(),
         ]);
     }
 }

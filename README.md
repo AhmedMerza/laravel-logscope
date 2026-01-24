@@ -45,10 +45,10 @@ Visit `/logscope` in your browser. That's it!
 | **Advanced Search** | Full-text search with field targeting and NOT support |
 | **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
 | **JSON Viewer** | Syntax-highlighted, collapsible JSON with smart defaults |
-| **Resolvable Logs** | Mark logs as resolved instead of deleting |
+| **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
 | **Log Notes** | Add investigation notes to any log entry |
 | **Quick Filters** | One-click filters for common queries |
-| **Keyboard Shortcuts** | Navigate with `j`/`k`, search with `/`, help with `?` |
+| **Keyboard Shortcuts** | 13 shortcuts for navigation, status changes, and actions |
 | **Dark Mode** | Full dark mode support with persistence |
 | **Shareable URLs** | Current filters reflected in URL for sharing |
 | **Performance** | Batch writes, queue support, proper indexing |
@@ -142,7 +142,7 @@ LOGSCOPE_RETENTION_DAYS=30
 ### Features
 
 ```env
-LOGSCOPE_FEATURE_RESOLVABLE=true   # Mark logs as resolved
+LOGSCOPE_FEATURE_STATUS=true       # Enable status workflow
 LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
 ```
 
@@ -199,24 +199,59 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 
 | Key | Action |
 |-----|--------|
-| `j` | Next log |
-| `k` | Previous log |
-| `/` | Focus search |
-| `?` | Show help |
+| `j` / `k` | Navigate down / up |
+| `Enter` | Open detail panel |
 | `Esc` | Close panel |
+| `/` | Focus search |
+| `n` | Focus note field |
+| `c` | Clear all filters |
+| `d` | Toggle dark mode |
+| `?` | Show keyboard help |
 
-### Resolvable Logs
+**Status shortcuts** (configurable, filter by status):
+| `o` | Open | `i` | Investigating | `r` | Resolved | `x` | Ignored |
 
-Mark logs as resolved instead of deleting. Customize who resolved it:
+### Status Workflow
+
+Logs have a status workflow: **Open** → **Investigating** → **Resolved** or **Ignored**.
+
+Customize who changed the status:
 
 ```php
 // In AppServiceProvider::boot()
 use LogScope\LogScope;
 
-LogScope::resolvedBy(function ($request) {
+LogScope::statusChangedBy(function ($request) {
     return $request->user()?->name;
 });
 ```
+
+#### Customize Statuses
+
+Override built-in statuses or add new ones in `config/logscope.php`:
+
+```php
+'statuses' => [
+    // Override built-in status
+    'investigating' => [
+        'label' => 'In Progress',
+        'color' => 'blue',
+    ],
+    // Add custom statuses
+    'waiting' => [
+        'label' => 'Waiting for Customer',
+        'color' => 'orange',
+        'closed' => false,  // Shows in "Needs Attention"
+    ],
+    'duplicate' => [
+        'label' => 'Duplicate',
+        'color' => 'purple',
+        'closed' => true,   // Hidden from "Needs Attention"
+    ],
+],
+```
+
+Available colors: `gray`, `yellow`, `green`, `slate`, `blue`, `red`, `orange`, `purple`
 
 ### Quick Filters
 
@@ -225,8 +260,24 @@ Configure one-click filters in `config/logscope.php`:
 ```php
 'quick_filters' => [
     ['label' => 'Today', 'icon' => 'calendar', 'from' => 'today'],
-    ['label' => 'Errors', 'icon' => 'alert', 'levels' => ['error', 'critical']],
-    ['label' => 'Last Hour', 'icon' => 'clock', 'from' => '-1 hour'],
+    ['label' => 'Recent Errors', 'icon' => 'alert', 'levels' => ['error', 'critical'], 'from' => '-24 hours'],
+    ['label' => 'Needs Attention', 'icon' => 'filter', 'statuses' => ['open', 'investigating']],
+    ['label' => 'Resolved Today', 'icon' => 'filter', 'statuses' => ['resolved'], 'from' => 'today'],
+],
+```
+
+Available options: `label`, `icon` (calendar/clock/alert/filter), `levels`, `statuses`, `from`, `to`
+
+### Status Shortcuts
+
+Each status has a default keyboard shortcut. Customize in `config/logscope.php`:
+
+```php
+'statuses' => [
+    // Disable a shortcut
+    'ignored' => ['shortcut' => null],
+    // Custom status with shortcut
+    'waiting' => ['label' => 'Waiting', 'color' => 'orange', 'shortcut' => 'w'],
 ],
 ```
 

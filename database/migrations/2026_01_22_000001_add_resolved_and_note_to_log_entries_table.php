@@ -12,8 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
-            $table->timestamp('resolved_at')->nullable()->index();
-            $table->string('resolved_by', 255)->nullable();
+            $table->string('status', 20)->default('open')->index();
+            $table->timestamp('status_changed_at')->nullable();
+            $table->string('status_changed_by', 255)->nullable();
             $table->text('note')->nullable();
         });
     }
@@ -24,8 +25,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
-            $table->dropIndex(['resolved_at']);
-            $table->dropColumn(['resolved_at', 'resolved_by', 'note']);
+            $table->dropIndex(['status']);
+            $table->dropColumn(['status', 'status_changed_at', 'status_changed_by', 'note']);
         });
     }
 };

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Support\Carbon;
 use LogScope\Database\Factories\LogEntryFactory;
+use LogScope\Enums\LogStatus;
 
 class LogEntry extends Model
 {
@@ -36,7 +37,8 @@ class LogEntry extends Model
             'context' => 'array',
             'occurred_at' => 'datetime',
             'created_at' => 'datetime',
-            'resolved_at' => 'datetime',
+            'status_changed_at' => 'datetime',
+            'status' => LogStatus::class,
             'is_truncated' => 'boolean',
         ];
     }
@@ -109,18 +111,6 @@ class LogEntry extends Model
             }
             $q->orWhereNull('channel');
         });
-    }
-
-    /**
-     * Scope: Filter by environment.
-     */
-    public function scopeEnvironment(Builder $query, string|array $environment): Builder
-    {
-        if (is_array($environment)) {
-            return $query->whereIn('environment', $environment);
-        }
-
-        return $query->where('environment', $environment);
     }
 
     /**
@@ -226,31 +216,62 @@ class LogEntry extends Model
     }
 
     /**
-     * Scope: Only resolved entries.
+     * Scope: Filter by status.
      */
-    public function scopeResolved(Builder $query): Builder
+    public function scopeStatus(Builder $query, string|array|LogStatus $status): Builder
     {
-        return $query->whereNotNull('resolved_at');
-    }
-
-    /**
-     * Scope: Only unresolved entries.
-     */
-    public function scopeUnresolved(Builder $query): Builder
-    {
-        return $query->whereNull('resolved_at');
-    }
-
-    /**
-     * Scope: Filter by resolved status.
-     */
-    public function scopeResolvedStatus(Builder $query, ?bool $resolved): Builder
-    {
-        if ($resolved === null) {
-            return $query;
+        if ($status instanceof LogStatus) {
+            return $query->where('status', $status->value);
         }
 
-        return $resolved ? $query->resolved() : $query->unresolved();
+        if (is_array($status)) {
+            $values = array_map(
+                fn ($s) => $s instanceof LogStatus ? $s->value : $s,
+                $status
+            );
+
+            return $query->whereIn('status', $values);
+        }
+
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope: Only open entries (needs attention).
+     */
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->where('status', LogStatus::Open->value);
+    }
+
+    /**
+     * Scope: Only entries needing attention (not resolved/ignored).
+     */
+    public function scopeNeedsAttention(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            LogStatus::Open->value,
+            LogStatus::Investigating->value,
+        ]);
+    }
+
+    /**
+     * Scope: Only closed entries (resolved or ignored).
+     */
+    public function scopeClosed(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            LogStatus::Resolved->value,
+            LogStatus::Ignored->value,
+        ]);
+    }
+
+    /**
+     * Check if the entry needs attention.
+     */
+    public function needsAttention(): bool
+    {
+        return ! $this->status->isClosed();
     }
 
     /**
@@ -258,18 +279,25 @@ class LogEntry extends Model
      */
     public function isResolved(): bool
     {
-        return $this->resolved_at !== null;
+        return $this->status === LogStatus::Resolved;
     }
 
     /**
-     * Mark the entry as resolved.
+     * Set the status of the entry.
      */
-    public function resolve(?string $resolvedBy = null, ?string $note = null): bool
+    public function setStatus(LogStatus|string $status, ?string $changedBy = null, ?string $note = null): bool
     {
-        $data = ['resolved_at' => now()];
+        if (is_string($status)) {
+            $status = LogStatus::from($status);
+        }
 
-        if ($resolvedBy !== null) {
-            $data['resolved_by'] = $resolvedBy;
+        $data = [
+            'status' => $status->value,
+            'status_changed_at' => now(),
+        ];
+
+        if ($changedBy !== null) {
+            $data['status_changed_by'] = $changedBy;
         }
 
         if ($note !== null) {
@@ -277,17 +305,6 @@ class LogEntry extends Model
         }
 
         return $this->update($data);
-    }
-
-    /**
-     * Mark the entry as unresolved.
-     */
-    public function unresolve(): bool
-    {
-        return $this->update([
-            'resolved_at' => null,
-            'resolved_by' => null,
-        ]);
     }
 
     /**
@@ -345,6 +362,11 @@ class LogEntry extends Model
         // Set occurred_at if not provided
         if (! isset($attributes['occurred_at'])) {
             $attributes['occurred_at'] = now();
+        }
+
+        // Set default status
+        if (! isset($attributes['status'])) {
+            $attributes['status'] = LogStatus::Open->value;
         }
 
         return static::create($attributes);

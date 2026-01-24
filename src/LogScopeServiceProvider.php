@@ -137,7 +137,6 @@ class LogScopeServiceProvider extends ServiceProvider
                     'message' => $event->message,
                     'context' => $this->sanitizeContext(array_merge($event->context, $customContext)),
                     'channel' => $channel ?? config('logging.default'),
-                    'environment' => app()->environment(),
                     'source' => $this->extractSource($event->context),
                     'source_line' => $this->extractSourceLine($event->context),
                     'trace_id' => $requestContext['trace_id'] ?? null,

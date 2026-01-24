@@ -320,18 +320,58 @@
                         </div>
                     </div>
 
-                    <!-- Show Resolved Toggle -->
-                    <template x-if="features.resolvable">
-                        <button @click="showResolved = !showResolved; fetchLogs()"
-                            class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
-                            :class="showResolved
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'"
-                            :title="showResolved ? 'Showing resolved logs - click to hide' : 'Resolved logs hidden - click to show'">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </button>
+                    <!-- Status Filter -->
+                    <template x-if="features.status">
+                        <div class="relative" x-data="{ statusFilterOpen: false }">
+                            <button @click="statusFilterOpen = !statusFilterOpen"
+                                class="h-9 px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
+                                :class="filters.statuses.length > 0
+                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span x-text="getStatusFilterLabel()"></span>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="statusFilterOpen" @click.away="statusFilterOpen = false" x-transition
+                                class="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 overflow-hidden z-50">
+                                <!-- Default: Open only -->
+                                <button @click="filters.statuses = []; fetchLogs(); statusFilterOpen = false"
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
+                                    :class="{ 'bg-blue-50 dark:bg-blue-900/20': filters.statuses.length === 0 }">
+                                    <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                                    <span class="text-gray-700 dark:text-gray-300">Open</span>
+                                    <span class="ml-auto text-xs text-gray-400">(default)</span>
+                                </button>
+                                <!-- Needs Attention: All non-closed statuses -->
+                                <button @click="filters.statuses = getNeedsAttentionStatuses(); fetchLogs(); statusFilterOpen = false"
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
+                                    :class="{ 'bg-blue-50 dark:bg-blue-900/20': isNeedsAttentionFilter() }">
+                                    <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                                    <span class="text-gray-700 dark:text-gray-300">Needs Attention</span>
+                                </button>
+                                <div class="border-t border-gray-200 dark:border-slate-600"></div>
+                                <template x-for="status in statuses" :key="status.value">
+                                    <button @click="toggleStatusFilter(status.value)"
+                                        class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
+                                        :class="{ 'bg-blue-50 dark:bg-blue-900/20': filters.statuses.includes(status.value) }">
+                                        <span class="w-2 h-2 rounded-full" :class="'bg-' + status.color + '-500'"></span>
+                                        <span x-text="status.label" class="text-gray-700 dark:text-gray-300"></span>
+                                        <svg x-show="filters.statuses.includes(status.value)" class="w-4 h-4 ml-auto text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </button>
+                                </template>
+                                <div class="border-t border-gray-200 dark:border-slate-600"></div>
+                                <button @click="toggleShowAll(); statusFilterOpen = false"
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300">
+                                    <span x-text="filters.statuses.length === statuses.length ? 'Reset to Open' : 'Show All'"></span>
+                                </button>
+                            </div>
+                        </div>
                     </template>
 
                     <!-- Keyboard shortcuts -->
@@ -509,15 +549,27 @@
                                 <tr class="log-row border-b border-gray-100 dark:border-slate-600/50 cursor-pointer"
                                     :class="{
                                         'selected': selectedLog?.id === log.id,
-                                        'opacity-60': log.resolved_at
+                                        'opacity-60': log.status === 'resolved' || log.status === 'ignored'
                                     }"
                                     @click="selectLog(log)">
                                     <td class="p-0 relative">
                                         <div class="level-indicator h-full" :class="'level-' + log.level"></div>
-                                        <div x-show="log.resolved_at" class="absolute top-1 left-1 w-3 h-3 text-green-500" title="Resolved">
-                                            <svg fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                            </svg>
+                                        <div x-show="log.status && log.status !== 'open'" class="absolute top-1 left-1 w-3 h-3" :class="getStatusIconColor(log.status)" :title="getStatusLabel(log.status)">
+                                            <template x-if="log.status === 'resolved'">
+                                                <svg fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                </svg>
+                                            </template>
+                                            <template x-if="log.status === 'investigating'">
+                                                <svg fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                                                </svg>
+                                            </template>
+                                            <template x-if="log.status === 'ignored'">
+                                                <svg fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"/>
+                                                </svg>
+                                            </template>
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 relative group">
@@ -698,25 +750,38 @@
                         </div>
                     </div>
 
-                    <!-- Resolved Status -->
-                    <div x-show="features.resolvable && selectedLog?.resolved_at">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Resolved</p>
-                        <div class="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                            <div class="flex items-center gap-2 text-green-700 dark:text-green-300">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                </svg>
-                                <span class="text-sm font-medium">Resolved</span>
+                    <!-- Status -->
+                    <div x-show="features.status && selectedLog?.status && selectedLog?.status !== 'open'">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Status</p>
+                        <div class="p-3 rounded-lg border" :class="getStatusBgClass(selectedLog?.status)">
+                            <div class="flex items-center gap-2" :class="getStatusTextClass(selectedLog?.status)">
+                                <template x-if="selectedLog?.status === 'resolved'">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                </template>
+                                <template x-if="selectedLog?.status === 'investigating'">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                                    </svg>
+                                </template>
+                                <template x-if="selectedLog?.status === 'ignored'">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                </template>
+                                <span class="text-sm font-medium" x-text="getStatusLabel(selectedLog?.status)"></span>
                             </div>
-                            <p class="mt-1 text-xs text-green-600 dark:text-green-400">
-                                <span x-text="formatRelativeTime(selectedLog?.resolved_at)"></span>
-                                <span x-show="selectedLog?.resolved_by"> by <span x-text="selectedLog?.resolved_by"></span></span>
+                            <p class="mt-1 text-xs" :class="getStatusMutedTextClass(selectedLog?.status)">
+                                <span x-text="formatRelativeTime(selectedLog?.status_changed_at)"></span>
+                                <span x-show="selectedLog?.status_changed_by"> by <span x-text="selectedLog?.status_changed_by"></span></span>
                             </p>
                         </div>
                     </div>
 
                     <!-- Note -->
-                    <div x-show="features.notes" x-data="{ editing: false, noteText: '' }" x-effect="if (selectedLog) { editing = false; noteText = ''; }">
+                    <div x-show="features.notes" x-data="{ editing: false, noteText: '' }" x-effect="if (selectedLog) { editing = false; noteText = ''; }"
+                        @focus-note.window="editing = true; noteText = selectedLog?.note || ''; $nextTick(() => $refs.noteInput?.focus())">
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Note</p>
                         <div x-show="!editing" @click="editing = true; noteText = selectedLog?.note || ''; $nextTick(() => $refs.noteInput.focus())"
                             class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 min-h-[60px] cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
@@ -744,17 +809,28 @@
 
                 <!-- Panel Footer -->
                 <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-slate-600">
-                    <template x-if="features.resolvable">
-                        <button x-show="!selectedLog?.resolved_at" @click="resolveLog()"
-                            class="flex-1 h-9 rounded-lg text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                            Resolve
-                        </button>
-                    </template>
-                    <template x-if="features.resolvable">
-                        <button x-show="selectedLog?.resolved_at" @click="unresolveLog()"
-                            class="flex-1 h-9 rounded-lg text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
-                            Unresolve
-                        </button>
+                    <template x-if="features.status">
+                        <div class="flex-1 relative" x-data="{ statusOpen: false }">
+                            <button @click="statusOpen = !statusOpen"
+                                class="w-full h-9 px-3 rounded-lg text-sm font-medium flex items-center justify-between gap-2 transition-colors"
+                                :class="getStatusButtonClass(selectedLog?.status)">
+                                <span x-text="getStatusLabel(selectedLog?.status)"></span>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div x-show="statusOpen" @click.away="statusOpen = false" x-transition
+                                class="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 overflow-hidden z-50">
+                                <template x-for="status in statuses" :key="status.value">
+                                    <button @click="setStatus(status.value); statusOpen = false"
+                                        class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
+                                        :class="{ 'bg-gray-50 dark:bg-slate-650': selectedLog?.status === status.value }">
+                                        <span class="w-2 h-2 rounded-full" :class="'bg-' + status.color + '-500'"></span>
+                                        <span x-text="status.label" class="text-gray-700 dark:text-gray-300"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
                     </template>
                     <button @click="confirmDelete()"
                         class="flex-1 h-9 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
@@ -841,7 +917,8 @@
                     </svg>
                 </button>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-2">
+                <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Navigation</h4>
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Navigate down</span>
                     <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">j</kbd>
@@ -851,12 +928,42 @@
                     <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">k</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus search</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">/</kbd>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Open detail panel</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">Enter</kbd>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Close panel</span>
                     <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">Esc</kbd>
+                </div>
+
+                <template x-if="Object.keys(shortcuts).length > 0">
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2">Filter by Status</h4>
+                        <template x-for="(status, key) in shortcuts" :key="key">
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-sm text-gray-600 dark:text-gray-300 capitalize" x-text="getStatusLabel(status)"></span>
+                                <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded" x-text="key"></kbd>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2">Actions</h4>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus search</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">/</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus note</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">n</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Clear filters</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">c</kbd>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Toggle dark mode</span>
+                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">d</kbd>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Show this help</span>
@@ -888,7 +995,8 @@ function logScope() {
         jsonCollapseState: {},
         jsonRenderKey: 0,
         _lastJsonLogId: null,
-        showResolved: false,
+        statuses: @json($statuses),
+        shortcuts: @json($shortcuts),
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
         filters: {
@@ -898,6 +1006,7 @@ function logScope() {
             excludeChannels: [],
             httpMethods: [],
             excludeHttpMethods: [],
+            statuses: [],
             from: '',
             to: '',
             trace_id: '',
@@ -1164,7 +1273,7 @@ function logScope() {
             try {
                 const params = new URLSearchParams();
                 params.append('page', this.page);
-                params.append('show_resolved', this.showResolved ? '1' : '0');
+                this.filters.statuses.forEach(s => params.append('statuses[]', s));
                 if (this.filters.from) params.append('from', this.filters.from);
                 if (this.filters.to) params.append('to', this.filters.to);
                 if (this.filters.from || this.filters.to) {
@@ -1246,18 +1355,20 @@ function logScope() {
             }
         },
 
-        async resolveLog(note = null) {
+        async setStatus(status, note = null) {
             if (!this.selectedLog) return;
             try {
-                const body = note ? JSON.stringify({ note }) : '{}';
-                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/resolve`, {
-                    method: 'POST',
+                const body = { status };
+                if (note) body.note = note;
+
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/status`, {
+                    method: 'PATCH',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body
+                    body: JSON.stringify(body)
                 });
                 const data = await response.json();
                 if (response.ok) {
@@ -1265,28 +1376,107 @@ function logScope() {
                     await this.fetchLogs();
                 }
             } catch (error) {
-                console.error('Failed to resolve log:', error);
+                console.error('Failed to update status:', error);
             }
         },
 
-        async unresolveLog() {
-            if (!this.selectedLog) return;
-            try {
-                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}/unresolve`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    }
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    this.selectedLog = data.data;
-                    await this.fetchLogs();
-                }
-            } catch (error) {
-                console.error('Failed to unresolve log:', error);
+        getStatusLabel(status) {
+            const found = this.statuses.find(s => s.value === status);
+            return found ? found.label : (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Open');
+        },
+
+        getStatusIconColor(status) {
+            const colors = {
+                'open': 'text-gray-400',
+                'investigating': 'text-yellow-500',
+                'resolved': 'text-green-500',
+                'ignored': 'text-slate-400'
+            };
+            return colors[status] || 'text-gray-400';
+        },
+
+        getStatusBgClass(status) {
+            const classes = {
+                'investigating': 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
+                'resolved': 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
+                'ignored': 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
+            };
+            return classes[status] || 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600';
+        },
+
+        getStatusTextClass(status) {
+            const classes = {
+                'investigating': 'text-yellow-700 dark:text-yellow-300',
+                'resolved': 'text-green-700 dark:text-green-300',
+                'ignored': 'text-slate-600 dark:text-slate-300'
+            };
+            return classes[status] || 'text-gray-700 dark:text-gray-300';
+        },
+
+        getStatusMutedTextClass(status) {
+            const classes = {
+                'investigating': 'text-yellow-600 dark:text-yellow-400',
+                'resolved': 'text-green-600 dark:text-green-400',
+                'ignored': 'text-slate-500 dark:text-slate-400'
+            };
+            return classes[status] || 'text-gray-600 dark:text-gray-400';
+        },
+
+        getStatusButtonClass(status) {
+            const classes = {
+                'open': 'text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500',
+                'investigating': 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30',
+                'resolved': 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30',
+                'ignored': 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-600 hover:bg-slate-200 dark:hover:bg-slate-500'
+            };
+            return classes[status] || classes['open'];
+        },
+
+        getStatusFilterLabel() {
+            if (this.filters.statuses.length === 0) {
+                return 'Open';
             }
+            if (this.isNeedsAttentionFilter()) {
+                return 'Needs Attention';
+            }
+            if (this.filters.statuses.length === this.statuses.length) {
+                return 'All Statuses';
+            }
+            if (this.filters.statuses.length === 1) {
+                return this.getStatusLabel(this.filters.statuses[0]);
+            }
+            return `${this.filters.statuses.length} Statuses`;
+        },
+
+        getNeedsAttentionStatuses() {
+            return this.statuses.filter(s => !s.closed).map(s => s.value);
+        },
+
+        isNeedsAttentionFilter() {
+            const needsAttention = this.getNeedsAttentionStatuses();
+            if (this.filters.statuses.length !== needsAttention.length) return false;
+            return needsAttention.every(s => this.filters.statuses.includes(s));
+        },
+
+        toggleStatusFilter(status) {
+            const index = this.filters.statuses.indexOf(status);
+            if (index === -1) {
+                this.filters.statuses.push(status);
+            } else {
+                this.filters.statuses.splice(index, 1);
+            }
+            this.fetchLogs();
+        },
+
+        toggleShowAll() {
+            if (this.filters.statuses.length === this.statuses.length) {
+                // All selected, reset to default (empty = open only)
+                this.filters.statuses = [];
+            } else {
+                // Select all
+                this.filters.statuses = this.statuses.map(s => s.value);
+            }
+            this.fetchLogs();
         },
 
         async updateNote(note) {
@@ -1572,6 +1762,7 @@ function logScope() {
                 excludeChannels: [],
                 httpMethods: [],
                 excludeHttpMethods: [],
+                statuses: [],
                 from: '',
                 to: '',
                 trace_id: '',
@@ -1591,6 +1782,11 @@ function logScope() {
             // Handle levels
             if (filter.levels && Array.isArray(filter.levels)) {
                 this.filters.levels = filter.levels;
+            }
+
+            // Handle statuses
+            if (filter.statuses && Array.isArray(filter.statuses)) {
+                this.filters.statuses = filter.statuses;
             }
 
             // Handle time ranges
@@ -1677,6 +1873,35 @@ function logScope() {
                 case '?':
                     event.preventDefault();
                     this.showKeyboardHelp = !this.showKeyboardHelp;
+                    break;
+                case 'Enter':
+                    event.preventDefault();
+                    if (this.selectedLog && !this.detailPanelWidth) {
+                        this.detailPanelWidth = 500;
+                        localStorage.setItem('logscope_panel_width', '500');
+                    }
+                    break;
+                case 'd':
+                    event.preventDefault();
+                    this.darkMode = !this.darkMode;
+                    break;
+                case 'c':
+                    event.preventDefault();
+                    this.clearFilters();
+                    break;
+                case 'n':
+                    event.preventDefault();
+                    if (this.selectedLog && this.features.notes && this.detailPanelWidth) {
+                        this.$dispatch('focus-note');
+                    }
+                    break;
+                default:
+                    // Check for status shortcuts
+                    if (this.shortcuts[event.key]) {
+                        event.preventDefault();
+                        this.filters.statuses = [this.shortcuts[event.key]];
+                        this.fetchLogs();
+                    }
                     break;
             }
         },

@@ -5,10 +5,12 @@ use LogScope\LogScope;
 
 beforeEach(function () {
     LogScope::resetCaptureContext();
+    LogScope::resetStatusChangedBy();
 });
 
 afterEach(function () {
     LogScope::resetCaptureContext();
+    LogScope::resetStatusChangedBy();
 });
 
 it('returns empty array when no capture context callback is set', function () {
@@ -73,4 +75,47 @@ it('resets capture context callback', function () {
     $context = LogScope::getCapturedContext($request);
 
     expect($context)->toBe([]);
+});
+
+it('returns null when no statusChangedBy callback is set and no user', function () {
+    $request = Request::create('/test');
+
+    $changedBy = LogScope::getStatusChangedBy($request);
+
+    expect($changedBy)->toBeNull();
+});
+
+it('uses custom statusChangedBy callback', function () {
+    LogScope::statusChangedBy(function ($request) {
+        return 'Custom User Name';
+    });
+
+    $request = Request::create('/test');
+    $changedBy = LogScope::getStatusChangedBy($request);
+
+    expect($changedBy)->toBe('Custom User Name');
+});
+
+it('resets statusChangedBy callback', function () {
+    LogScope::statusChangedBy(function ($request) {
+        return 'Custom User';
+    });
+
+    LogScope::resetStatusChangedBy();
+
+    $request = Request::create('/test');
+    $changedBy = LogScope::getStatusChangedBy($request);
+
+    expect($changedBy)->toBeNull();
+});
+
+it('supports deprecated resolvedBy alias', function () {
+    LogScope::resolvedBy(function ($request) {
+        return 'Legacy User';
+    });
+
+    $request = Request::create('/test');
+    $changedBy = LogScope::getResolvedBy($request);
+
+    expect($changedBy)->toBe('Legacy User');
 });

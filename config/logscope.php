@@ -118,18 +118,62 @@ return [
     |
     | Enable or disable optional features.
     |
-    | 'resolvable' - Allow marking logs as resolved instead of deleting them.
-    |                Resolved logs are hidden by default but can be viewed.
+    | 'status' - Allow changing log status (open, investigating, resolved, ignored).
+    |            Closed logs (resolved/ignored) are hidden by default but can be viewed.
     |
-    | 'notes'      - Allow adding notes/comments to log entries.
-    |                Useful for documenting investigation findings.
+    | 'notes'  - Allow adding notes/comments to log entries.
+    |            Useful for documenting investigation findings.
     |
     */
 
     'features' => [
-        'resolvable' => env('LOGSCOPE_FEATURE_RESOLVABLE', true),
+        'status' => env('LOGSCOPE_FEATURE_STATUS', true),
         'notes' => env('LOGSCOPE_FEATURE_NOTES', true),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Status Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Customize the built-in statuses (open, investigating, resolved, ignored)
+    | or add new ones. Each status can have:
+    |
+    | - label:    Display name
+    | - color:    gray, yellow, green, slate, blue, red, orange, purple
+    | - closed:   true for statuses that mean "no action needed"
+    | - shortcut: Single key for keyboard shortcut to filter by this status
+    |
+    | Built-in defaults:
+    |   open:          { label: 'Open',          color: 'gray',   closed: false, shortcut: 'o' }
+    |   investigating: { label: 'Investigating', color: 'yellow', closed: false, shortcut: 'i' }
+    |   resolved:      { label: 'Resolved',      color: 'green',  closed: true,  shortcut: 'r' }
+    |   ignored:       { label: 'Ignored',       color: 'slate',  closed: true,  shortcut: 'x' }
+    |
+    | Example - override built-in + add custom:
+    |
+    | 'statuses' => [
+    |     // Override built-in status
+    |     'investigating' => [
+    |         'label' => 'In Progress',
+    |         'color' => 'blue',
+    |     ],
+    |     // Disable shortcut for a status
+    |     'ignored' => [
+    |         'shortcut' => null,
+    |     ],
+    |     // Add custom status with shortcut
+    |     'waiting' => [
+    |         'label' => 'Waiting for Customer',
+    |         'color' => 'orange',
+    |         'closed' => false,
+    |         'shortcut' => 'w',
+    |     ],
+    | ],
+    |
+    */
+
+    'statuses' => [],
 
     /*
     |--------------------------------------------------------------------------
@@ -300,6 +344,7 @@ return [
     | - label: Display name (required)
     | - icon: calendar, clock, alert, filter (default: filter)
     | - levels: Array of log levels to filter by
+    | - statuses: Array of statuses to filter by (e.g., ['open', 'investigating'])
     | - from: Time filter - 'today', '-1 hour', '-4 hours', '-24 hours', '-7 days', etc.
     | - to: End time filter (optional, defaults to now)
     |
@@ -331,15 +376,16 @@ return [
             'from' => '-24 hours',
         ],
         [
-            'label' => 'Errors Only',
+            'label' => 'Recent Errors',
             'icon' => 'alert',
             'levels' => ['error', 'critical', 'alert', 'emergency'],
+            'from' => '-24 hours',
         ],
         // More examples:
         // [
-        //     'label' => 'Last 4 Hours',
-        //     'icon' => 'clock',
-        //     'from' => '-4 hours',
+        //     'label' => 'Needs Attention',
+        //     'icon' => 'alert',
+        //     'statuses' => ['open', 'investigating'],
         // ],
         // [
         //     'label' => 'Last Week',
@@ -347,15 +393,10 @@ return [
         //     'from' => '-7 days',
         // ],
         // [
-        //     'label' => 'Warnings',
-        //     'icon' => 'alert',
-        //     'levels' => ['warning'],
-        // ],
-        // [
-        //     'label' => 'Recent Errors',
-        //     'icon' => 'alert',
-        //     'levels' => ['error', 'critical'],
-        //     'from' => '-24 hours',
+        //     'label' => 'Resolved Today',
+        //     'icon' => 'filter',
+        //     'statuses' => ['resolved'],
+        //     'from' => 'today',
         // ],
     ],
 
