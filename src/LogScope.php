@@ -7,6 +7,7 @@ namespace LogScope;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\HtmlString;
 
 class LogScope
 {
@@ -174,5 +175,26 @@ class LogScope
     public static function resetCaptureContext(): void
     {
         static::$captureContextUsing = null;
+    }
+
+    /**
+     * Get the CSS for LogScope (inlined).
+     */
+    public static function css(): HtmlString
+    {
+        $css = file_get_contents(__DIR__.'/../dist/app.css');
+
+        return new HtmlString("<style>{$css}</style>");
+    }
+
+    /**
+     * Get the JavaScript for LogScope (inlined).
+     */
+    public static function js(): HtmlString
+    {
+        $collapse = file_get_contents(__DIR__.'/../dist/alpine-collapse.min.js');
+        $alpine = file_get_contents(__DIR__.'/../dist/alpine.min.js');
+
+        return new HtmlString("<script>{$collapse}{$alpine}</script>");
     }
 }

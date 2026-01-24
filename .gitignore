@@ -4,7 +4,6 @@
 
 # Build output
 /build/
-/dist/
 
 # IDE
 /.fleet/
@@ -52,3 +51,4 @@ composer.lock
 
 # GitHub workflows (not needed yet)
 .github/
+package-lock.json

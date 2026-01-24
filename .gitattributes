@@ -10,6 +10,8 @@
 /.claude export-ignore
 /.github export-ignore
 /.vscode export-ignore
+/node_modules export-ignore
+/resources/css export-ignore
 /stubs export-ignore
 /tests export-ignore
 .editorconfig export-ignore
@@ -20,4 +22,7 @@ boost.json export-ignore
 CHANGELOG.md export-ignore
 CLAUDE.md export-ignore
 GEMINI.md export-ignore
+package.json export-ignore
+package-lock.json export-ignore
 phpunit.xml export-ignore
+tailwind.config.js export-ignore
