@@ -139,6 +139,16 @@ class ImportCommand extends Command
 
         foreach ($this->parser->parseFile($path, $since) as $entry) {
             try {
+                // Check if entry was marked as skipped (older than --days filter)
+                if (! empty($entry['_skipped'])) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                // Remove the internal flag before storing
+                unset($entry['_skipped']);
+
                 $batch[] = $this->prepareEntry($entry);
 
                 if (count($batch) >= $chunkSize) {

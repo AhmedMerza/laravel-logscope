@@ -84,8 +84,19 @@ LOG;
     $since = Carbon::parse('2024-01-14');
     $entries = iterator_to_array($this->parser->parseFile($this->testLogPath, $since));
 
-    expect($entries)->toHaveCount(2);
-    expect($entries[0]['message'])->toBe('Recent message');
+    // All entries are yielded, but old ones have _skipped flag
+    expect($entries)->toHaveCount(3);
+
+    // First entry is old and should be marked as skipped
+    expect($entries[0]['_skipped'])->toBeTrue();
+    expect($entries[0]['message'])->toBe('Old message');
+
+    // Recent entries should not be skipped
+    expect($entries[1]['_skipped'])->toBeFalse();
+    expect($entries[1]['message'])->toBe('Recent message');
+
+    expect($entries[2]['_skipped'])->toBeFalse();
+    expect($entries[2]['message'])->toBe('Newer message');
 });
 
 it('handles empty log file', function () {

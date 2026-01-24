@@ -55,7 +55,8 @@ class LogParser
                     // Yield the previous entry if exists
                     if ($currentEntry !== null) {
                         $parsed = $this->finalizeEntry($currentEntry, $channel);
-                        if ($parsed && ($since === null || $parsed['occurred_at']->gte($since))) {
+                        if ($parsed) {
+                            $parsed['_skipped'] = $since !== null && $parsed['occurred_at']->lt($since);
                             yield $parsed;
                         }
                     }
@@ -76,7 +77,8 @@ class LogParser
             // Don't forget the last entry
             if ($currentEntry !== null) {
                 $parsed = $this->finalizeEntry($currentEntry, $channel);
-                if ($parsed && ($since === null || $parsed['occurred_at']->gte($since))) {
+                if ($parsed) {
+                    $parsed['_skipped'] = $since !== null && $parsed['occurred_at']->lt($since);
                     yield $parsed;
                 }
             }
