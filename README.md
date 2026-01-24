@@ -82,7 +82,7 @@ LogScope stores logs in your database - a deliberate choice that works great for
 
 | Concern | Solution |
 |---------|----------|
-| Database bloat | Retention policies auto-delete old logs (default: 30 days) |
+| Database bloat | Retention policies with scheduled pruning (default: 30 days) |
 | Performance | Batch mode writes logs *after* response is sent |
 | Query speed | Proper indexes on common filter combinations |
 
@@ -136,6 +136,8 @@ LOGSCOPE_QUEUE_CONNECTION=
 LOGSCOPE_RETENTION_ENABLED=true
 LOGSCOPE_RETENTION_DAYS=30
 ```
+
+> **Note:** Retention requires scheduling `logscope:prune` - see [Schedule Pruning](#schedule-pruning).
 
 ### Features
 
