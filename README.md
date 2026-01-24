@@ -267,7 +267,7 @@ This data is merged into the log's `context` field and appears in the JSON viewe
 ### Artisan Commands
 
 ```bash
-# Import existing log files
+# Import existing log files (one-time migration)
 php artisan logscope:import
 php artisan logscope:import storage/logs/laravel.log --days=7
 
@@ -276,6 +276,8 @@ php artisan logscope:prune
 php artisan logscope:prune --dry-run
 php artisan logscope:prune --days=14
 ```
+
+> **Note:** The import command is a one-time migration for existing log files. After setup, new logs are captured automatically.
 
 ---
 
