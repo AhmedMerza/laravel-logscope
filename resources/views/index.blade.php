@@ -1752,7 +1752,7 @@ function logScope() {
             return line ? `${short}:${line}` : short;
         },
 
-        clearFilters() {
+        resetFilters() {
             this.searches = [{ field: 'any', value: '', exclude: false }];
             this.searchMode = 'and';
             this.filters = {
@@ -1771,11 +1771,15 @@ function logScope() {
                 url: ''
             };
             this.page = 1;
+        },
+
+        clearFilters() {
+            this.resetFilters();
             this.fetchLogs();
         },
 
         applyQuickFilter(index) {
-            this.clearFilters();
+            this.resetFilters();
             const filter = this.quickFilters[index];
             if (!filter) return;
 
