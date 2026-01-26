@@ -237,6 +237,14 @@
                             title="Toggle NOT (exclude matching)">
                             NOT
                         </button>
+                        <button x-show="features.regex" @click="useRegex = !useRegex; fetchLogs()"
+                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border flex-shrink-0"
+                            :class="useRegex
+                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700'
+                                : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                            title="Toggle regex mode">
+                            .*
+                        </button>
                         <div class="flex-1 relative min-w-[200px]">
                             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 :class="searches[0].exclude ? 'text-red-400' : 'text-gray-400'">
@@ -244,11 +252,11 @@
                             </svg>
                             <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
                                 x-ref="searchInput"
-                                :placeholder="searches[0].exclude ? 'Exclude logs containing...' : 'Search logs...'"
+                                :placeholder="useRegex ? 'Regex pattern...' : (searches[0].exclude ? 'Exclude logs containing...' : (features.search_syntax ? 'Search... (try field:value)' : 'Search logs...'))"
                                 class="w-full h-9 pl-9 pr-4 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2"
                                 :class="searches[0].exclude
                                     ? 'bg-red-50 dark:bg-red-900/20 focus:ring-red-500'
-                                    : 'bg-gray-100 dark:bg-slate-600 focus:ring-blue-500'">
+                                    : (useRegex ? 'bg-purple-50 dark:bg-purple-900/20 focus:ring-purple-500' : 'bg-gray-100 dark:bg-slate-600 focus:ring-blue-500')">
                         </div>
                         <!-- Add search button -->
                         <button @click="addSearch()"
@@ -999,6 +1007,7 @@ function logScope() {
         shortcuts: @json($shortcuts),
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
+        useRegex: false,
         filters: {
             levels: [],
             excludeLevels: [],
@@ -1299,6 +1308,9 @@ function logScope() {
                         params.append(`searches[${i}][exclude]`, s.exclude ? '1' : '0');
                     });
                     params.append('search_mode', this.searchMode);
+                }
+                if (this.useRegex) {
+                    params.append('regex', '1');
                 }
 
                 const response = await fetch(`{{ route('logscope.logs') }}?${params}`);
@@ -1755,6 +1767,7 @@ function logScope() {
         resetFilters() {
             this.searches = [{ field: 'any', value: '', exclude: false }];
             this.searchMode = 'and';
+            this.useRegex = false;
             this.filters = {
                 levels: [],
                 excludeLevels: [],

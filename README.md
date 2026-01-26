@@ -42,7 +42,7 @@ Visit `/logscope` in your browser. That's it!
 |---------|-------------|
 | **Zero-Config Capture** | Automatically captures ALL logs from ALL channels |
 | **Request Context** | Trace ID, user ID, IP, URL, and user agent for every log |
-| **Advanced Search** | Full-text search with field targeting and NOT support |
+| **Advanced Search** | Search syntax (`field:value`), regex support, NOT toggle |
 | **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
 | **JSON Viewer** | Syntax-highlighted, collapsible JSON with smart defaults |
 | **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
@@ -210,6 +210,80 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 
 **Status shortcuts** (configurable, filter by status):
 | `o` | Open | `i` | Investigating | `r` | Resolved | `x` | Ignored |
+
+### Search Syntax
+
+Type directly in the search box using `field:value` syntax:
+
+| Syntax | Example | Description |
+|--------|---------|-------------|
+| `field:value` | `message:error` | Search in specific field |
+| `-field:value` | `-level:debug` | Exclude matches |
+| `field:"value"` | `message:"user login"` | Quoted values with spaces |
+| `text` | `error` | Search in all fields |
+| `-text` | `-deprecated` | Exclude from all fields |
+
+**Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`
+
+> **Tip:** The dedicated URL and trace ID inputs in the sidebar only support inclusive filtering. Use the search syntax to exclude values, e.g., `-url:/health` or `-trace_id:abc123`.
+
+**Examples:**
+
+```bash
+# Find errors in the API channel
+channel:api level:error
+
+# Find payment logs excluding debug
+channel:payment -level:debug
+
+# Find logs mentioning a specific user ID
+user_id:123
+
+# Find logs containing "timeout" anywhere
+timeout
+
+# Find logs with "connection failed" in message
+message:"connection failed"
+
+# Find context containing a job ID
+context:abc123
+
+# Exclude deprecated warnings
+-message:deprecated
+
+# Combine multiple conditions
+level:error channel:database message:timeout
+
+# Find all POST requests
+http_method:POST
+
+# Find logs from specific URL path
+url:/api/payments
+
+# Exclude health check endpoints
+-url:/health -url:/ping
+
+# Find logs from specific IP range
+ip_address:192.168
+
+# Track a specific request by trace ID
+trace_id:abc-123-def
+```
+
+**Regex mode:** Click the `.*` button to enable regex patterns:
+
+```bash
+# Match error OR warning levels
+level:error|warning
+
+# Match any payment-related message
+message:payment.*failed
+
+# Match IP addresses starting with 192.168
+ip_address:192\.168\.\d+\.\d+
+```
+
+Both search syntax and regex can be disabled in config if not needed.
 
 ### Status Workflow
 

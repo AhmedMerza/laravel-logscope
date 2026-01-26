@@ -29,6 +29,8 @@ class LogController extends Controller
             'features' => [
                 'status' => config('logscope.features.status', true),
                 'notes' => config('logscope.features.notes', true),
+                'search_syntax' => config('logscope.features.search_syntax', true),
+                'regex' => config('logscope.features.regex', true),
             ],
             'jsonViewer' => [
                 'collapseThreshold' => config('logscope.json_viewer.collapse_threshold', 5),
@@ -70,61 +72,54 @@ class LogController extends Controller
             $query->excludeChannel((array) $request->input('exclude_channels'));
         }
 
-        // Handle advanced search with multiple conditions
+        // Handle search
+        $useRegex = config('logscope.features.regex', true) && $request->boolean('regex', false);
+        $useSearchSyntax = config('logscope.features.search_syntax', true);
+
         if ($request->filled('searches')) {
+            // Advanced search with structured conditions (from UI dropdowns)
             $searches = $request->input('searches');
-            $searchMode = $request->input('search_mode', 'and');
 
             if (is_array($searches) && count($searches) > 0) {
-                $method = $searchMode === 'or' ? 'orWhere' : 'where';
-
-                $query->where(function ($q) use ($searches, $searchMode) {
-                    foreach ($searches as $index => $search) {
-                        if (empty($search['value'])) {
-                            continue;
-                        }
-
-                        $field = $search['field'] ?? 'any';
-                        $value = '%'.$search['value'].'%';
-                        $boolean = ($index === 0 || $searchMode === 'and') ? 'and' : 'or';
-                        $exclude = ! empty($search['exclude']) && $search['exclude'] !== '0';
-
-                        if ($field === 'any') {
-                            if ($exclude) {
-                                // NOT: all fields must NOT match (handle NULLs)
-                                $q->where(function ($subQ) use ($value) {
-                                    $subQ->where(function ($mq) use ($value) {
-                                        $mq->where('message', 'not like', $value)->orWhereNull('message');
-                                    })->where(function ($cq) use ($value) {
-                                        $cq->where('context', 'not like', $value)->orWhereNull('context');
-                                    })->where(function ($sq) use ($value) {
-                                        $sq->where('source', 'not like', $value)->orWhereNull('source');
-                                    });
-                                }, null, null, $boolean);
-                            } else {
-                                // INCLUDE: any field can match
-                                $q->where(function ($subQ) use ($value) {
-                                    $subQ->where('message', 'like', $value)
-                                        ->orWhere('context', 'like', $value)
-                                        ->orWhere('source', 'like', $value);
-                                }, null, null, $boolean);
-                            }
-                        } else {
-                            if ($exclude) {
-                                // Handle NULL for specific field exclude
-                                $q->where(function ($subQ) use ($field, $value) {
-                                    $subQ->where($field, 'not like', $value)->orWhereNull($field);
-                                }, null, null, $boolean);
-                            } else {
-                                $q->where($field, 'like', $value, $boolean);
-                            }
-                        }
+                $terms = [];
+                foreach ($searches as $search) {
+                    if (empty($search['value'])) {
+                        continue;
                     }
-                });
+
+                    $field = $search['field'] ?? 'any';
+                    $value = $search['value'];
+                    $exclude = ! empty($search['exclude']) && $search['exclude'] !== '0';
+
+                    // Parse syntax if field is 'any' and syntax feature is enabled
+                    if ($field === 'any' && $useSearchSyntax && str_contains($value, ':')) {
+                        $parsed = $this->parseSearchSyntax($value);
+                        foreach ($parsed as $term) {
+                            // Apply exclude from UI if the parsed term isn't already excluding
+                            if ($exclude && ! $term['exclude']) {
+                                $term['exclude'] = true;
+                            }
+                            $terms[] = $term;
+                        }
+                    } else {
+                        $terms[] = [
+                            'field' => $field,
+                            'value' => $value,
+                            'exclude' => $exclude,
+                        ];
+                    }
+                }
+                $this->applySearchTerms($query, $terms, $useRegex);
             }
         } elseif ($request->filled('search')) {
-            // Fallback to simple search for backwards compatibility
-            $query->search($request->input('search'));
+            if ($useSearchSyntax) {
+                // Parse search syntax (field:value, -field:value, plain text)
+                $terms = $this->parseSearchSyntax($request->input('search'));
+                $this->applySearchTerms($query, $terms, $useRegex);
+            } else {
+                // Simple LIKE search on all fields
+                $query->search($request->input('search'));
+            }
         }
 
         if ($request->filled('from') || $request->filled('to')) {
@@ -479,5 +474,202 @@ class LogController extends Controller
         }
 
         return $shortcuts;
+    }
+
+    /**
+     * Get list of searchable fields.
+     */
+    protected function getSearchableFields(): array
+    {
+        return [
+            'message',
+            'source',
+            'context',
+            'level',
+            'channel',
+            'user_id',
+            'ip_address',
+            'url',
+            'trace_id',
+            'http_method',
+        ];
+    }
+
+    /**
+     * Parse search syntax string into structured search terms.
+     *
+     * Supported syntax:
+     * - field:value (search specific field)
+     * - -field:value (exclude from field)
+     * - field:"value with spaces" (quoted values)
+     * - plain text (search in any field)
+     *
+     * @return array Array of ['field' => string, 'value' => string, 'exclude' => bool]
+     */
+    protected function parseSearchSyntax(string $input): array
+    {
+        $terms = [];
+        $validFields = $this->getSearchableFields();
+
+        // Pattern matches: -field:"quoted value" OR -field:value OR plain text
+        // Updated to handle quoted values and negation
+        $pattern = '/(-)?(\w+):"([^"]+)"|(-)?(\w+):(\S+)|"([^"]+)"|(\S+)/';
+
+        preg_match_all($pattern, $input, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            if (! empty($match[3])) {
+                // -field:"quoted value" or field:"quoted value"
+                $exclude = $match[1] === '-';
+                $field = strtolower($match[2]);
+                $value = $match[3];
+
+                if (in_array($field, $validFields)) {
+                    $terms[] = ['field' => $field, 'value' => $value, 'exclude' => $exclude];
+                } else {
+                    // Unknown field, treat as plain text search
+                    $terms[] = ['field' => 'any', 'value' => $match[0], 'exclude' => false];
+                }
+            } elseif (! empty($match[6])) {
+                // -field:value or field:value (unquoted)
+                $exclude = $match[4] === '-';
+                $field = strtolower($match[5]);
+                $value = $match[6];
+
+                if (in_array($field, $validFields)) {
+                    $terms[] = ['field' => $field, 'value' => $value, 'exclude' => $exclude];
+                } else {
+                    // Unknown field, treat as plain text search
+                    $terms[] = ['field' => 'any', 'value' => $match[0], 'exclude' => false];
+                }
+            } elseif (! empty($match[7])) {
+                // "quoted plain text"
+                $terms[] = ['field' => 'any', 'value' => $match[7], 'exclude' => false];
+            } elseif (! empty($match[8])) {
+                // Plain text (no field prefix)
+                $value = $match[8];
+                // Check if it starts with - for exclusion
+                if (str_starts_with($value, '-') && strlen($value) > 1) {
+                    $terms[] = ['field' => 'any', 'value' => substr($value, 1), 'exclude' => true];
+                } else {
+                    $terms[] = ['field' => 'any', 'value' => $value, 'exclude' => false];
+                }
+            }
+        }
+
+        return $terms;
+    }
+
+    /**
+     * Apply search terms to query.
+     */
+    protected function applySearchTerms($query, array $terms, bool $useRegex = false): void
+    {
+        if (empty($terms)) {
+            return;
+        }
+
+        $query->where(function ($q) use ($terms, $useRegex) {
+            foreach ($terms as $index => $term) {
+                $field = $term['field'];
+                $value = $term['value'];
+                $exclude = $term['exclude'];
+
+                if ($useRegex) {
+                    $this->applyRegexSearch($q, $field, $value, $exclude, $index);
+                } else {
+                    $this->applyLikeSearch($q, $field, $value, $exclude, $index);
+                }
+            }
+        });
+    }
+
+    /**
+     * Apply LIKE-based search.
+     */
+    protected function applyLikeSearch($q, string $field, string $value, bool $exclude, int $index): void
+    {
+        $likeValue = '%'.$value.'%';
+        $boolean = $index === 0 ? 'and' : 'and';
+
+        if ($field === 'any') {
+            if ($exclude) {
+                $q->where(function ($subQ) use ($likeValue) {
+                    $subQ->where(function ($mq) use ($likeValue) {
+                        $mq->where('message', 'not like', $likeValue)->orWhereNull('message');
+                    })->where(function ($cq) use ($likeValue) {
+                        $cq->where('context', 'not like', $likeValue)->orWhereNull('context');
+                    })->where(function ($sq) use ($likeValue) {
+                        $sq->where('source', 'not like', $likeValue)->orWhereNull('source');
+                    });
+                }, null, null, $boolean);
+            } else {
+                $q->where(function ($subQ) use ($likeValue) {
+                    $subQ->where('message', 'like', $likeValue)
+                        ->orWhere('context', 'like', $likeValue)
+                        ->orWhere('source', 'like', $likeValue);
+                }, null, null, $boolean);
+            }
+        } else {
+            if ($exclude) {
+                $q->where(function ($subQ) use ($field, $likeValue) {
+                    $subQ->where($field, 'not like', $likeValue)->orWhereNull($field);
+                }, null, null, $boolean);
+            } else {
+                $q->where($field, 'like', $likeValue, $boolean);
+            }
+        }
+    }
+
+    /**
+     * Apply regex-based search.
+     */
+    protected function applyRegexSearch($q, string $field, string $value, bool $exclude, int $index): void
+    {
+        $boolean = $index === 0 ? 'and' : 'and';
+        $driver = $q->getConnection()->getDriverName();
+
+        // Build regex operator based on database driver
+        $regexOp = match ($driver) {
+            'mysql', 'mariadb' => $exclude ? 'not regexp' : 'regexp',
+            'pgsql' => $exclude ? '!~*' : '~*',  // Case-insensitive
+            'sqlite' => $exclude ? 'not regexp' : 'regexp',  // Requires extension
+            default => null,
+        };
+
+        // Fall back to LIKE if regex not supported
+        if ($regexOp === null) {
+            $this->applyLikeSearch($q, $field, $value, $exclude, $index);
+
+            return;
+        }
+
+        if ($field === 'any') {
+            if ($exclude) {
+                $q->where(function ($subQ) use ($value, $regexOp) {
+                    $subQ->where(function ($mq) use ($value, $regexOp) {
+                        $mq->whereRaw("message {$regexOp} ?", [$value])->orWhereNull('message');
+                    })->where(function ($cq) use ($value, $regexOp) {
+                        $cq->whereRaw("context {$regexOp} ?", [$value])->orWhereNull('context');
+                    })->where(function ($sq) use ($value, $regexOp) {
+                        $sq->whereRaw("source {$regexOp} ?", [$value])->orWhereNull('source');
+                    });
+                }, null, null, $boolean);
+            } else {
+                $q->where(function ($subQ) use ($value, $regexOp) {
+                    $subQ->whereRaw("message {$regexOp} ?", [$value])
+                        ->orWhereRaw("context {$regexOp} ?", [$value])
+                        ->orWhereRaw("source {$regexOp} ?", [$value]);
+                }, null, null, $boolean);
+            }
+        } else {
+            if ($exclude) {
+                $q->where(function ($subQ) use ($field, $value, $regexOp) {
+                    $subQ->whereRaw("{$field} {$regexOp} ?", [$value])->orWhereNull($field);
+                }, null, null, $boolean);
+            } else {
+                $q->whereRaw("{$field} {$regexOp} ?", [$value], $boolean);
+            }
+        }
     }
 }

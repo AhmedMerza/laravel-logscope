@@ -129,6 +129,8 @@ return [
     'features' => [
         'status' => env('LOGSCOPE_FEATURE_STATUS', true),
         'notes' => env('LOGSCOPE_FEATURE_NOTES', true),
+        'search_syntax' => env('LOGSCOPE_FEATURE_SEARCH_SYNTAX', true),
+        'regex' => env('LOGSCOPE_FEATURE_REGEX', true),
     ],
 
     /*
