@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/packagist/l/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 [![PHP Version](https://img.shields.io/packagist/php-v/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 
-A beautiful, fast, database-backed log viewer for Laravel applications.
+A beautiful, fast, database-backed log viewer for Laravel applications. Production-ready.
 
 <!-- TODO: Add screenshot here -->
 <!-- ![LogScope Screenshot](art/screenshot.png) -->
