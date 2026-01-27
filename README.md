@@ -171,15 +171,33 @@ Configure collapsible JSON behavior in `config/logscope.php`:
 LOGSCOPE_ROUTES_ENABLED=true
 LOGSCOPE_ROUTE_PREFIX=logscope
 LOGSCOPE_DOMAIN=
+LOGSCOPE_FORBIDDEN_REDIRECT=/
+LOGSCOPE_UNAUTHENTICATED_REDIRECT=/login
 ```
 
-Add middleware in config:
+Add middleware and configure error redirects:
 
 ```php
 'routes' => [
     'middleware' => ['web', 'auth'],
+    'forbidden_redirect' => '/',           // Where to redirect on 403 (access denied)
+    'unauthenticated_redirect' => '/login', // Where to redirect on 401/419 (session expired)
 ],
 ```
+
+### Error Handling
+
+LogScope handles errors gracefully with toast notifications:
+
+| Error | Behavior |
+|-------|----------|
+| 401/419 (Session expired) | Toast + redirect to `unauthenticated_redirect` |
+| 403 (Access denied) | Toast + redirect to `forbidden_redirect` |
+| 429 (Rate limited) | Toast only (retry later) |
+| 500+ (Server error) | Toast only (temporary issue) |
+| Network error | Toast only (check connection) |
+
+> **Note:** Redirect URLs can be relative paths (`/login`) or absolute URLs (`https://auth.example.com/login`).
 
 ---
 
@@ -481,6 +499,8 @@ LOGSCOPE_ROUTES_ENABLED=true
 LOGSCOPE_ROUTE_PREFIX=logscope
 LOGSCOPE_DOMAIN=
 LOGSCOPE_MIDDLEWARE_ENABLED=true
+LOGSCOPE_FORBIDDEN_REDIRECT=/
+LOGSCOPE_UNAUTHENTICATED_REDIRECT=/login
 
 # Search
 LOGSCOPE_SEARCH_DRIVER=database

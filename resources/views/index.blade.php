@@ -853,6 +853,56 @@
         </div>
     </div>
 
+    <!-- Toast Notification -->
+    <div x-show="toast.visible" x-cloak
+        style="position: fixed; bottom: 24px; right: 24px; z-index: 9999;"
+        class="max-w-md"
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-y-2 scale-95">
+        <div class="flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl"
+            :style="{
+                'background-color': toast.type === 'error' ? '#dc2626' : toast.type === 'warning' ? '#f59e0b' : toast.type === 'success' ? '#16a34a' : '#2563eb',
+                'color': 'white',
+                'border': '1px solid ' + (toast.type === 'error' ? '#b91c1c' : toast.type === 'warning' ? '#d97706' : toast.type === 'success' ? '#15803d' : '#1d4ed8')
+            }">
+            <!-- Icon -->
+            <div class="flex-shrink-0">
+                <template x-if="toast.type === 'error'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </template>
+                <template x-if="toast.type === 'warning'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </template>
+                <template x-if="toast.type === 'success'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                </template>
+                <template x-if="toast.type === 'info'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </template>
+            </div>
+            <!-- Message -->
+            <p class="text-sm font-semibold" x-text="toast.message"></p>
+            <!-- Close button -->
+            <button @click="hideToast()" class="flex-shrink-0 ml-auto -mr-1 p-1 rounded hover:bg-white/20 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <!-- Delete Confirmation Dialog -->
     <div x-show="showDeleteDialog" x-cloak
         class="fixed inset-0 z-50 flex items-center justify-center"
@@ -1008,6 +1058,13 @@ function logScope() {
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
         useRegex: false,
+        // Toast notifications
+        toast: { message: '', type: 'error', visible: false },
+        toastTimeout: null,
+        // Error handling
+        errorRedirecting: false,
+        forbiddenRedirect: @json(config('logscope.routes.forbidden_redirect', '/')),
+        unauthenticatedRedirect: @json(config('logscope.routes.unauthenticated_redirect', '/login')),
         filters: {
             levels: [],
             excludeLevels: [],
@@ -1313,22 +1370,24 @@ function logScope() {
                     params.append('regex', '1');
                 }
 
-                const response = await fetch(`{{ route('logscope.logs') }}?${params}`);
-                const data = await response.json();
+                const response = await fetch(`{{ route('logscope.logs') }}?${params}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
 
                 if (!response.ok) {
-                    this.error = data.message || data.error || 'Failed to fetch logs';
+                    this.handleApiError(response, 'fetching logs');
                     this.logs = [];
                     this.meta = { current_page: 1, last_page: 1, per_page: 50, total: 0 };
                     return;
                 }
 
+                const data = await response.json();
                 this.logs = data.data;
                 this.meta = data.meta;
+                this.error = null;
                 this.syncFiltersToUrl();
             } catch (error) {
-                console.error('Failed to fetch logs:', error);
-                this.error = 'Failed to fetch logs. Please try again.';
+                this.handleNetworkError(error, 'fetching logs');
             } finally {
                 this.loading = false;
             }
@@ -1336,11 +1395,17 @@ function logScope() {
 
         async fetchStats() {
             try {
-                const response = await fetch('{{ route('logscope.stats') }}');
+                const response = await fetch('{{ route('logscope.stats') }}', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    this.handleApiError(response, 'fetching stats');
+                    return;
+                }
                 const data = await response.json();
                 this.stats = data.data;
             } catch (error) {
-                console.error('Failed to fetch stats:', error);
+                this.handleNetworkError(error, 'fetching stats');
             }
         },
 
@@ -1355,15 +1420,23 @@ function logScope() {
         async deleteLog() {
             if (!this.selectedLog) return;
             try {
-                await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}`, {
+                const response = await fetch(`{{ url(config('logscope.routes.prefix', 'logscope')) }}/api/logs/${this.selectedLog.id}`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    }
                 });
+                if (!response.ok) {
+                    this.handleApiError(response, 'deleting log');
+                    return;
+                }
                 this.showDeleteDialog = false;
                 this.selectedLog = null;
+                this.showToast('Log deleted successfully', 'success', 2000);
                 await Promise.all([this.fetchLogs(), this.fetchStats()]);
             } catch (error) {
-                console.error('Failed to delete log:', error);
+                this.handleNetworkError(error, 'deleting log');
             }
         },
 
@@ -1382,13 +1455,15 @@ function logScope() {
                     },
                     body: JSON.stringify(body)
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    this.selectedLog = data.data;
-                    await this.fetchLogs();
+                if (!response.ok) {
+                    this.handleApiError(response, 'updating status');
+                    return;
                 }
+                const data = await response.json();
+                this.selectedLog = data.data;
+                await this.fetchLogs();
             } catch (error) {
-                console.error('Failed to update status:', error);
+                this.handleNetworkError(error, 'updating status');
             }
         },
 
@@ -1503,12 +1578,14 @@ function logScope() {
                     },
                     body: JSON.stringify({ note })
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    this.selectedLog = data.data;
+                if (!response.ok) {
+                    this.handleApiError(response, 'saving note');
+                    return;
                 }
+                const data = await response.json();
+                this.selectedLog = data.data;
             } catch (error) {
-                console.error('Failed to update note:', error);
+                this.handleNetworkError(error, 'saving note');
             }
         },
 
@@ -1542,6 +1619,75 @@ function logScope() {
             const sidebarWidth = this.sidebarOpen ? 256 : 0; // w-64 = 256px
             const availableWidth = window.innerWidth - sidebarWidth;
             return Math.max(400, Math.min(900, Math.floor(availableWidth * 0.5)));
+        },
+
+        // Toast notifications
+        showToast(message, type = 'error', duration = 4000) {
+            if (this.toastTimeout) clearTimeout(this.toastTimeout);
+            this.toast = { message, type, visible: true };
+            this.toastTimeout = setTimeout(() => {
+                this.toast.visible = false;
+            }, duration);
+        },
+
+        hideToast() {
+            if (this.toastTimeout) clearTimeout(this.toastTimeout);
+            this.toast.visible = false;
+        },
+
+        // API error handling
+        handleApiError(response, context = 'request') {
+            // Prevent multiple redirects
+            if (this.errorRedirecting) return;
+
+            const status = response.status;
+
+            // Auth errors - redirect
+            if (status === 401 || status === 419) {
+                this.errorRedirecting = true;
+                this.showToast('Session expired. Redirecting...', 'warning', 3000);
+                setTimeout(() => {
+                    window.location.href = this.unauthenticatedRedirect || '/login';
+                }, 2000);
+                return;
+            }
+
+            if (status === 403) {
+                this.errorRedirecting = true;
+                this.showToast('Access denied. Redirecting...', 'warning', 3000);
+                setTimeout(() => {
+                    window.location.href = this.forbiddenRedirect || '/';
+                }, 2000);
+                return;
+            }
+
+            // Rate limiting
+            if (status === 429) {
+                this.showToast('Too many requests. Please wait a moment.', 'warning');
+                return;
+            }
+
+            // Server errors
+            if (status >= 500) {
+                this.showToast('Server error. Please try again later.', 'error');
+                return;
+            }
+
+            // Generic error
+            this.showToast(`Failed to complete ${context}. Please try again.`, 'error');
+        },
+
+        // Network error handling
+        handleNetworkError(error, context = 'request') {
+            if (this.errorRedirecting) return;
+
+            console.error(`Network error during ${context}:`, error);
+
+            if (!navigator.onLine) {
+                this.showToast('You appear to be offline. Please check your connection.', 'warning');
+            } else {
+                this.showToast('Connection error. Please try again.', 'error');
+            }
         },
 
         renderJsonContext() {

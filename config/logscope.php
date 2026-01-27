@@ -70,6 +70,8 @@ return [
         'prefix' => env('LOGSCOPE_ROUTE_PREFIX', 'logscope'),
         'middleware' => ['web'],
         'domain' => env('LOGSCOPE_DOMAIN'),
+        'forbidden_redirect' => env('LOGSCOPE_FORBIDDEN_REDIRECT', '/'), // Where to redirect on 403, null to show default 403 page
+        'unauthenticated_redirect' => env('LOGSCOPE_UNAUTHENTICATED_REDIRECT', '/login'), // Where to redirect on 401/419 (session expired)
     ],
 
     /*

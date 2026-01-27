@@ -10,6 +10,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     LogScope::resetAuth();
+    // Set forbidden_redirect to null so middleware throws exception instead of redirecting
+    config(['logscope.routes.forbidden_redirect' => null]);
 });
 
 describe('Authorize middleware', function () {
@@ -86,5 +88,32 @@ describe('Authorize middleware', function () {
 
         expect($passedRequest)->toBe($request);
         expect($passedRequest->header('X-Test'))->toBe('value');
+    });
+
+    it('redirects when forbidden_redirect is configured', function () {
+        app()->detectEnvironment(fn () => 'production');
+        config(['logscope.routes.forbidden_redirect' => '/dashboard']);
+
+        $middleware = new Authorize;
+        $request = Request::create('/logscope');
+
+        $response = $middleware->handle($request, fn ($req) => new Response('OK'));
+
+        expect($response->getStatusCode())->toBe(302);
+        expect($response->headers->get('Location'))->toContain('/dashboard');
+    });
+
+    it('returns JSON 403 for API requests when unauthorized', function () {
+        app()->detectEnvironment(fn () => 'production');
+        config(['logscope.routes.forbidden_redirect' => '/']);
+
+        $middleware = new Authorize;
+        $request = Request::create('/logscope/api/logs');
+        $request->headers->set('Accept', 'application/json');
+
+        $response = $middleware->handle($request, fn ($req) => new Response('OK'));
+
+        expect($response->getStatusCode())->toBe(403);
+        expect($response->headers->get('Content-Type'))->toContain('application/json');
     });
 });
