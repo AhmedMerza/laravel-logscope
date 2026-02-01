@@ -149,10 +149,12 @@ LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
 ### Noise Reduction
 
 ```env
-# Filter out noisy logs (both enabled by default)
-LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip "is deprecated" messages
-LOGSCOPE_IGNORE_NULL_CHANNEL=true  # Skip logs without a channel
+# Filter out noisy logs
+LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip "is deprecated" messages (default: true)
+LOGSCOPE_IGNORE_NULL_CHANNEL=false # Skip logs without a channel (default: false)
 ```
+
+> **Note:** `null_channel` defaults to `false` because `Log::build()` (dynamic loggers) produce logs without a channel. Setting this to `true` would filter out those logs.
 
 ### JSON Viewer
 
@@ -486,7 +488,7 @@ LOGSCOPE_QUEUE_CONNECTION=
 LOGSCOPE_FEATURE_RESOLVABLE=true
 LOGSCOPE_FEATURE_NOTES=true
 LOGSCOPE_IGNORE_DEPRECATIONS=true
-LOGSCOPE_IGNORE_NULL_CHANNEL=true
+LOGSCOPE_IGNORE_NULL_CHANNEL=false
 
 # Database & Retention
 LOGSCOPE_TABLE=log_entries
