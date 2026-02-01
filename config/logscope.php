@@ -110,7 +110,7 @@ return [
 
     'ignore' => [
         'deprecations' => env('LOGSCOPE_IGNORE_DEPRECATIONS', true),
-        'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', true),
+        'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', false),
     ],
 
     /*

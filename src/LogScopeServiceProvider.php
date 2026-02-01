@@ -119,8 +119,10 @@ class LogScopeServiceProvider extends ServiceProvider
                 return;
             }
 
-            // Check if this log should be ignored based on config
+            // Get channel and reset for next log (prevents sticky channel on Log::build())
             $channel = ChannelContextProcessor::getLastChannel();
+            ChannelContextProcessor::clearLastChannel();
+
             if ($this->shouldIgnoreLog($event, $channel)) {
                 return;
             }
@@ -141,7 +143,7 @@ class LogScopeServiceProvider extends ServiceProvider
                     'level' => $event->level,
                     'message' => $event->message,
                     'context' => $this->sanitizeContext(array_merge($event->context, $customContext)),
-                    'channel' => $channel ?? config('logging.default'),
+                    'channel' => $channel,
                     'source' => $this->extractSource($event->context),
                     'source_line' => $this->extractSourceLine($event->context),
                     'trace_id' => $requestContext['trace_id'] ?? null,
