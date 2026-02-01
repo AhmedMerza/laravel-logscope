@@ -34,6 +34,11 @@ class LogScopeServiceProvider extends ServiceProvider
     protected static bool $terminatingRegistered = false;
 
     /**
+     * Whether shutdown function is registered.
+     */
+    protected static bool $shutdownRegistered = false;
+
+    /**
      * Register any application services.
      */
     public function register(): void
@@ -180,12 +185,22 @@ class LogScopeServiceProvider extends ServiceProvider
     {
         self::$logBuffer[] = $data;
 
-        // Register terminating callback once
+        // Register terminating callback once (for normal Laravel lifecycle)
         if (! self::$terminatingRegistered) {
             self::$terminatingRegistered = true;
 
             $this->app->terminating(function () {
                 $this->flushLogBuffer();
+            });
+        }
+
+        // Register shutdown function as backup (for exit/die scenarios)
+        // This runs at the END of PHP execution, even after exit() or die()
+        if (! self::$shutdownRegistered) {
+            self::$shutdownRegistered = true;
+
+            register_shutdown_function(function () {
+                self::flushLogBufferStatic();
             });
         }
     }
@@ -195,21 +210,47 @@ class LogScopeServiceProvider extends ServiceProvider
      */
     protected function flushLogBuffer(): void
     {
+        self::flushLogBufferStatic();
+    }
+
+    /**
+     * Static method to flush the log buffer (used by shutdown function).
+     *
+     * This can be called multiple times safely:
+     * 1. First by Laravel's terminating callback (during normal request lifecycle)
+     * 2. Then by PHP's shutdown function (catches logs from user's shutdown functions)
+     */
+    public static function flushLogBufferStatic(): void
+    {
+        // Nothing to flush
         if (empty(self::$logBuffer)) {
             return;
         }
 
+        // Take the current buffer and clear it immediately
+        // This prevents re-processing the same logs if flush is called again
+        $logsToFlush = self::$logBuffer;
+        self::$logBuffer = [];
+
         try {
-            foreach (self::$logBuffer as $data) {
+            foreach ($logsToFlush as $data) {
                 LogEntry::createEntry($data);
             }
         } catch (Throwable $e) {
             if (config('app.debug')) {
                 error_log('LogScope: Failed to flush log buffer: '.$e->getMessage());
             }
-        } finally {
-            self::$logBuffer = [];
         }
+    }
+
+    /**
+     * Reset the buffer state (used for testing).
+     */
+    public static function resetBufferState(): void
+    {
+        self::$logBuffer = [];
+        self::$terminatingRegistered = false;
+        self::$shutdownRegistered = false;
     }
 
     /**
