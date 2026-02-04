@@ -3,7 +3,8 @@
 use LogScope\Http\Controllers\LogController;
 
 beforeEach(function () {
-    $this->controller = new class extends LogController {
+    $this->controller = new class extends LogController
+    {
         public function testParseSearchSyntax(string $input): array
         {
             return $this->parseSearchSyntax($input);
