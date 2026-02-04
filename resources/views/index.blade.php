@@ -5,26 +5,26 @@
     @keydown.escape.window="closePanel()"
     @keydown.window="handleKeydown($event)">
     <!-- Sidebar -->
-    <aside class="w-64 flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-r border-gray-200 dark:border-slate-600 flex flex-col"
+    <aside class="w-64 flex-shrink-0 surface-1 border-r border-[var(--border)] flex flex-col"
         :class="{ 'hidden': !sidebarOpen }" x-cloak>
         <!-- Logo -->
-        <div class="h-14 flex items-center gap-2 px-4 border-b border-gray-200 dark:border-slate-600">
-            <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div class="h-14 flex items-center gap-3 px-4 border-b border-[var(--border)]">
+            <div class="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow)]">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
             </div>
-            <span class="font-semibold text-gray-900 dark:text-white">LogScope</span>
+            <span class="font-semibold text-[var(--text-primary)] tracking-tight">LogScope</span>
         </div>
 
         <!-- Scrollable Filters -->
         <div class="flex-1 overflow-y-auto custom-scrollbar">
             <!-- Quick Filters Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
+            <div class="border-b border-[var(--border)]">
                 <button @click="sections.quickFilters = !sections.quickFilters"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
+                    class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                     <span>Quick Filters</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.quickFilters }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.quickFilters }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
@@ -33,14 +33,14 @@
                         <!-- Quick Filters from Config -->
                         @foreach($quickFilters as $index => $filter)
                         <button @click="applyQuickFilter({{ $index }})"
-                            class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
+                            class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] transition-colors">
                             @php $icon = $filter['icon'] ?? 'filter'; @endphp
                             @if($icon === 'calendar')
-                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
                             @elseif($icon === 'clock')
-                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             @elseif($icon === 'alert')
@@ -48,7 +48,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                             </svg>
                             @else
-                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
                             </svg>
                             @endif
@@ -60,11 +60,11 @@
             </div>
 
             <!-- Severity Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
+            <div class="border-b border-[var(--border)]">
                 <button @click="sections.severity = !sections.severity"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
+                    class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                     <span>Severity</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.severity }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.severity }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
@@ -74,14 +74,14 @@
                         <button @click="toggleLevel('{{ $level }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="{
-                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.levels.includes('{{ $level }}'),
-                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeLevels.includes('{{ $level }}'),
-                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.levels.includes('{{ $level }}') && !filters.excludeLevels.includes('{{ $level }}')
+                                'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]': filters.levels.includes('{{ $level }}'),
+                                'bg-red-500/10 text-red-400 ring-1 ring-red-500/30 line-through': filters.excludeLevels.includes('{{ $level }}'),
+                                'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]': !filters.levels.includes('{{ $level }}') && !filters.excludeLevels.includes('{{ $level }}')
                             }">
                             <span class="level-{{ $level }} level-dot flex-shrink-0"></span>
                             <span class="flex-1 text-left capitalize">{{ $level }}</span>
-                            <span class="text-xs tabular-nums"
-                                :class="filters.excludeLevels.includes('{{ $level }}') ? 'text-red-400 dark:text-red-500' : 'text-gray-400 dark:text-gray-500'"
+                            <span class="text-xs tabular-nums font-mono"
+                                :class="filters.excludeLevels.includes('{{ $level }}') ? 'text-red-400' : 'text-[var(--text-muted)]'"
                                 x-text="stats.by_level?.{{ $level }} || 0"></span>
                         </button>
                         @endforeach
@@ -91,11 +91,11 @@
 
             @if(count($channels) > 0)
             <!-- Channels Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
+            <div class="border-b border-[var(--border)]">
                 <button @click="sections.channels = !sections.channels"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
+                    class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                     <span>Channels</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
@@ -105,15 +105,15 @@
                         <button @click="toggleChannel('{{ $channel }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="{
-                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.channels.includes('{{ $channel }}'),
-                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeChannels.includes('{{ $channel }}'),
-                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.channels.includes('{{ $channel }}') && !filters.excludeChannels.includes('{{ $channel }}')
+                                'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]': filters.channels.includes('{{ $channel }}'),
+                                'bg-red-500/10 text-red-400 ring-1 ring-red-500/30 line-through': filters.excludeChannels.includes('{{ $channel }}'),
+                                'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]': !filters.channels.includes('{{ $channel }}') && !filters.excludeChannels.includes('{{ $channel }}')
                             }">
                             <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                :class="filters.excludeChannels.includes('{{ $channel }}') ? 'text-red-400' : 'text-gray-400'">
+                                :class="filters.excludeChannels.includes('{{ $channel }}') ? 'text-red-400' : 'text-[var(--text-muted)]'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                             </svg>
-                            <span class="flex-1 text-left truncate" title="{{ $channel }}">{{ $channel }}</span>
+                            <span class="flex-1 text-left truncate font-mono text-xs" title="{{ $channel }}">{{ $channel }}</span>
                         </button>
                         @endforeach
                     </div>
@@ -123,11 +123,11 @@
 
             @if(count($httpMethods) > 0)
             <!-- HTTP Method Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
+            <div class="border-b border-[var(--border)]">
                 <button @click="sections.httpMethods = !sections.httpMethods"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
+                    class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                     <span>HTTP Method</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.httpMethods }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.httpMethods }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
@@ -137,13 +137,13 @@
                         <button @click="toggleHttpMethod('{{ $method }}')"
                             class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
                             :class="{
-                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300': filters.httpMethods.includes('{{ $method }}'),
-                                'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through': filters.excludeHttpMethods.includes('{{ $method }}'),
-                                'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500': !filters.httpMethods.includes('{{ $method }}') && !filters.excludeHttpMethods.includes('{{ $method }}')
+                                'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]': filters.httpMethods.includes('{{ $method }}'),
+                                'bg-red-500/10 text-red-400 ring-1 ring-red-500/30 line-through': filters.excludeHttpMethods.includes('{{ $method }}'),
+                                'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]': !filters.httpMethods.includes('{{ $method }}') && !filters.excludeHttpMethods.includes('{{ $method }}')
                             }">
-                            <span class="w-4 h-4 flex items-center justify-center text-xs font-bold"
-                                :class="filters.excludeHttpMethods.includes('{{ $method }}') ? 'text-red-400' : 'text-gray-400'">{{ substr($method, 0, 1) }}</span>
-                            <span class="flex-1 text-left">{{ $method }}</span>
+                            <span class="w-4 h-4 flex items-center justify-center text-xs font-bold font-mono"
+                                :class="filters.excludeHttpMethods.includes('{{ $method }}') ? 'text-red-400' : 'text-[var(--text-muted)]'">{{ substr($method, 0, 1) }}</span>
+                            <span class="flex-1 text-left font-mono">{{ $method }}</span>
                         </button>
                         @endforeach
                     </div>
@@ -152,47 +152,47 @@
             @endif
 
             <!-- Request Context Section -->
-            <div class="border-b border-gray-200 dark:border-slate-600">
+            <div class="border-b border-[var(--border)]">
                 <button @click="sections.request = !sections.request"
-                    class="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-500/50">
+                    class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                     <span>Request</span>
-                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': !sections.request }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.request }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
                 <div x-show="sections.request" x-collapse class="px-4 pb-4 space-y-3">
                     <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Trace ID</label>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">Trace ID</label>
                         <input type="text" x-model="filters.trace_id" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by trace..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">User ID</label>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">User ID</label>
                         <input type="text" x-model="filters.user_id" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by user..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">IP Address</label>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">IP Address</label>
                         <input type="text" x-model="filters.ip_address" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by IP..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">URL</label>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">URL</label>
                         <input type="text" x-model="filters.url" @input.debounce.300ms="fetchLogs()"
                             placeholder="Filter by URL..."
-                            class="w-full h-8 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Theme Toggle -->
-        <div class="p-4 border-t border-gray-200 dark:border-slate-600">
+        <div class="p-4 border-t border-[var(--border)]">
             <button @click="darkMode = !darkMode"
-                class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
+                class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] transition-colors">
                 <svg x-show="!darkMode" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                 </svg>
@@ -207,12 +207,12 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">
         <!-- Header -->
-        <header class="bg-slate-100 dark:bg-slate-850 border-b border-gray-200 dark:border-slate-600">
+        <header class="surface-1 border-b border-[var(--border)]">
             <!-- Main header row -->
             <div class="h-14 flex items-center gap-4 px-4">
                 <!-- Sidebar Toggle -->
                 <button @click="sidebarOpen = !sidebarOpen"
-                    class="p-1.5 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500">
+                    class="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
@@ -223,44 +223,44 @@
                     <!-- Search input group -->
                     <div class="flex-1 flex items-center gap-2 min-w-0">
                         <select x-model="searches[0].field"
-                            class="h-9 px-2 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0">
+                            class="h-9 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)] flex-shrink-0 font-mono">
                             <option value="any">Any field</option>
                             <option value="message">Message</option>
                             <option value="context">Context</option>
                             <option value="source">Source</option>
                         </select>
                         <button @click="searches[0].exclude = !searches[0].exclude; fetchLogs()"
-                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border flex-shrink-0"
+                            class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
                             :class="searches[0].exclude
-                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700'
-                                : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                                ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)]'"
                             title="Toggle NOT (exclude matching)">
                             NOT
                         </button>
                         <button x-show="features.regex" @click="useRegex = !useRegex; fetchLogs()"
-                            class="h-9 px-2 rounded-lg text-xs font-bold transition-colors border flex-shrink-0"
+                            class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
                             :class="useRegex
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700'
-                                : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                                ? 'bg-violet-500/20 text-violet-400 border-violet-500/50 shadow-[0_0_10px_rgba(139,92,246,0.2)]'
+                                : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)]'"
                             title="Toggle regex mode">
                             .*
                         </button>
                         <div class="flex-1 relative min-w-[200px]">
                             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                :class="searches[0].exclude ? 'text-red-400' : 'text-gray-400'">
+                                :class="searches[0].exclude ? 'text-red-400' : 'text-[var(--text-muted)]'">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
                             <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
                                 x-ref="searchInput"
                                 :placeholder="useRegex ? 'Regex pattern...' : (searches[0].exclude ? 'Exclude logs containing...' : (features.search_syntax ? 'Search... (try field:value)' : 'Search logs...'))"
-                                class="w-full h-9 pl-9 pr-4 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2"
+                                class="search-input w-full h-9 pl-9 pr-4 border rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
                                 :class="searches[0].exclude
-                                    ? 'bg-red-50 dark:bg-red-900/20 focus:ring-red-500'
-                                    : (useRegex ? 'bg-purple-50 dark:bg-purple-900/20 focus:ring-purple-500' : 'bg-gray-100 dark:bg-slate-600 focus:ring-blue-500')">
+                                    ? 'bg-red-500/10 border-red-500/30 focus:ring-red-500/50 focus:border-red-500'
+                                    : (useRegex ? 'bg-violet-500/10 border-violet-500/30 focus:ring-violet-500/50 focus:border-violet-500' : 'bg-[var(--surface-2)] border-[var(--border)] focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]')">
                         </div>
                         <!-- Add search button -->
                         <button @click="addSearch()"
-                            class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500 flex-shrink-0"
+                            class="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] flex-shrink-0 transition-colors"
                             title="Add search condition (Ctrl+Shift+F)">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -269,15 +269,15 @@
                     </div>
 
                     <!-- AND/OR toggle (only show if multiple searches) -->
-                    <div x-show="searches.length > 1" x-cloak class="flex items-center bg-gray-100 dark:bg-slate-600 rounded-lg p-0.5 flex-shrink-0">
+                    <div x-show="searches.length > 1" x-cloak class="flex items-center bg-[var(--surface-2)] rounded-lg p-0.5 flex-shrink-0">
                         <button @click="searchMode = 'and'"
-                            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'and' ? 'bg-slate-100 dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            class="px-3 py-1.5 rounded-md text-xs font-bold font-mono transition-colors"
+                            :class="searchMode === 'and' ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent-glow)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'">
                             AND
                         </button>
                         <button @click="searchMode = 'or'"
-                            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                            :class="searchMode === 'or' ? 'bg-slate-100 dark:bg-slate-500 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'">
+                            class="px-3 py-1.5 rounded-md text-xs font-bold font-mono transition-colors"
+                            :class="searchMode === 'or' ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent-glow)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'">
                             OR
                         </button>
                     </div>
@@ -290,8 +290,8 @@
                         <button @click="dateOpen = !dateOpen"
                             class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
                             :class="(filters.from || filters.to)
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'"
+                                ? 'bg-[rgba(var(--accent-rgb),0.2)] text-[var(--accent)] shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]'"
                             title="Date range filter">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -304,23 +304,23 @@
                             x-transition:leave="transition ease-in duration-75"
                             x-transition:leave-start="opacity-100 scale-100"
                             x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 p-4 z-50">
+                            class="absolute right-0 mt-2 w-72 glass-panel rounded-lg shadow-xl p-4 z-50">
                             <div class="space-y-3">
-                                <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date Range</div>
+                                <div class="section-header">Date Range</div>
                                 <div class="space-y-2">
                                     <label class="block">
-                                        <span class="text-xs text-gray-600 dark:text-gray-300">From</span>
+                                        <span class="text-xs text-[var(--text-secondary)]">From</span>
                                         <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
-                                            class="mt-1 w-full h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs text-gray-600 dark:text-gray-300">To</span>
+                                        <span class="text-xs text-[var(--text-secondary)]">To</span>
                                         <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
-                                            class="mt-1 w-full h-9 px-3 bg-gray-100 dark:bg-slate-600 border-0 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                                     </label>
                                 </div>
                                 <button @click="filters.from = ''; filters.to = ''; fetchLogs(); dateOpen = false"
-                                    class="w-full h-8 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                                    class="w-full h-8 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] transition-colors"
                                     x-show="filters.from || filters.to">
                                     Clear dates
                                 </button>
@@ -334,48 +334,48 @@
                             <button @click="statusFilterOpen = !statusFilterOpen"
                                 class="h-9 px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
                                 :class="filters.statuses.length > 0
-                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500'">
+                                    ? 'bg-[rgba(var(--accent-rgb),0.2)] text-[var(--accent)] shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]'">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span x-text="getStatusFilterLabel()"></span>
+                                <span x-text="getStatusFilterLabel()" class="font-medium"></span>
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
                             <div x-show="statusFilterOpen" @click.away="statusFilterOpen = false" x-transition
-                                class="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 overflow-hidden z-50">
+                                class="absolute top-full right-0 mt-1 w-48 glass-panel rounded-lg shadow-xl overflow-hidden z-50">
                                 <!-- Default: Open only -->
                                 <button @click="filters.statuses = []; fetchLogs(); statusFilterOpen = false"
-                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
-                                    :class="{ 'bg-blue-50 dark:bg-blue-900/20': filters.statuses.length === 0 }">
-                                    <span class="w-2 h-2 rounded-full bg-gray-400"></span>
-                                    <span class="text-gray-700 dark:text-gray-300">Open</span>
-                                    <span class="ml-auto text-xs text-gray-400">(default)</span>
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
+                                    :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': filters.statuses.length === 0 }">
+                                    <span class="w-2 h-2 rounded-full bg-[var(--text-muted)]"></span>
+                                    <span class="text-[var(--text-secondary)]">Open</span>
+                                    <span class="ml-auto text-xs text-[var(--text-muted)]">(default)</span>
                                 </button>
                                 <!-- Needs Attention: All non-closed statuses -->
                                 <button @click="filters.statuses = getNeedsAttentionStatuses(); fetchLogs(); statusFilterOpen = false"
-                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
-                                    :class="{ 'bg-blue-50 dark:bg-blue-900/20': isNeedsAttentionFilter() }">
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
+                                    :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': isNeedsAttentionFilter() }">
                                     <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
-                                    <span class="text-gray-700 dark:text-gray-300">Needs Attention</span>
+                                    <span class="text-[var(--text-secondary)]">Needs Attention</span>
                                 </button>
-                                <div class="border-t border-gray-200 dark:border-slate-600"></div>
+                                <div class="border-t border-[var(--border)]"></div>
                                 <template x-for="status in statuses" :key="status.value">
                                     <button @click="toggleStatusFilter(status.value)"
-                                        class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
-                                        :class="{ 'bg-blue-50 dark:bg-blue-900/20': filters.statuses.includes(status.value) }">
+                                        class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
+                                        :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': filters.statuses.includes(status.value) }">
                                         <span class="w-2 h-2 rounded-full" :class="'bg-' + status.color + '-500'"></span>
-                                        <span x-text="status.label" class="text-gray-700 dark:text-gray-300"></span>
-                                        <svg x-show="filters.statuses.includes(status.value)" class="w-4 h-4 ml-auto text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <span x-text="status.label" class="text-[var(--text-secondary)]"></span>
+                                        <svg x-show="filters.statuses.includes(status.value)" class="w-4 h-4 ml-auto text-[var(--accent)]" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                                         </svg>
                                     </button>
                                 </template>
-                                <div class="border-t border-gray-200 dark:border-slate-600"></div>
+                                <div class="border-t border-[var(--border)]"></div>
                                 <button @click="toggleShowAll(); statusFilterOpen = false"
-                                    class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300">
+                                    class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] text-[var(--text-secondary)]">
                                     <span x-text="filters.statuses.length === statuses.length ? 'Reset to Open' : 'Show All'"></span>
                                 </button>
                             </div>
@@ -384,7 +384,7 @@
 
                     <!-- Keyboard shortcuts -->
                     <button @click="showKeyboardHelp = true"
-                        class="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
+                        class="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
                         title="Keyboard shortcuts (?)">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -393,14 +393,14 @@
 
                     <!-- Clear -->
                     <button @click="clearFilters()"
-                        class="h-9 px-3 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors"
+                        class="btn-ghost h-9 px-3 rounded-lg text-sm font-medium"
                         title="Clear all filters">
                         Clear
                     </button>
 
                     <!-- Refresh -->
                     <button @click="fetchLogs(); fetchStats()"
-                        class="h-9 px-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        class="btn-primary h-9 px-4 rounded-lg text-sm flex items-center gap-2">
                         <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
@@ -411,31 +411,31 @@
 
             <!-- Additional search rows -->
             <template x-for="(search, index) in searches.slice(1)" :key="index + 1">
-                <div class="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-600/30">
-                    <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-10" x-text="searchMode.toUpperCase()"></span>
+                <div class="flex items-center gap-2 px-4 py-2 border-t border-[var(--border)] bg-[var(--surface-0)]/50">
+                    <span class="text-xs font-bold font-mono text-[var(--accent)] w-10" x-text="searchMode.toUpperCase()"></span>
                     <select x-model="searches[index + 1].field"
-                        class="h-8 px-2 bg-slate-100 dark:bg-slate-600 border border-gray-200 dark:border-slate-500 rounded-md text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-md text-sm text-[var(--text-secondary)] font-mono focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                         <option value="any">Any field</option>
                         <option value="message">Message</option>
                         <option value="context">Context</option>
                         <option value="source">Source</option>
                     </select>
                     <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; fetchLogs()"
-                        class="h-8 px-2 rounded-md text-xs font-bold transition-colors border"
+                        class="h-8 px-2 rounded-md text-xs font-bold font-mono transition-colors border"
                         :class="searches[index + 1].exclude
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-slate-500 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-400 dark:hover:border-slate-400'"
+                            ? 'bg-red-500/20 text-red-400 border-red-500/50'
+                            : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)]'"
                         title="Toggle NOT (exclude matching)">
                         NOT
                     </button>
                     <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
                         :placeholder="searches[index + 1].exclude ? 'Exclude...' : 'Search...'"
-                        class="flex-1 h-8 px-3 border rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2"
+                        class="search-input flex-1 h-8 px-3 border rounded-md text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
                         :class="searches[index + 1].exclude
-                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 focus:ring-red-500'
-                            : 'bg-slate-100 dark:bg-slate-600 border-gray-200 dark:border-slate-500 focus:ring-blue-500'">
+                            ? 'bg-red-500/10 border-red-500/30 focus:ring-red-500/50 focus:border-red-500'
+                            : 'bg-[var(--surface-2)] border-[var(--border)] focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]'">
                     <button @click="removeSearch(index + 1)"
-                        class="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                        class="h-8 w-8 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
@@ -446,54 +446,54 @@
 
         <!-- Active Filters Bar -->
         <div x-show="hasActiveFilters()" x-cloak
-            class="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900/30">
-            <span class="text-xs font-medium text-blue-600 dark:text-blue-400">Active filters:</span>
+            class="flex items-center gap-2 px-4 py-2 bg-[rgba(var(--accent-rgb),0.05)] border-b border-[rgba(var(--accent-rgb),0.2)]">
+            <span class="text-xs font-medium font-mono text-[var(--accent)] uppercase tracking-wider">Filters:</span>
             <div class="flex flex-wrap gap-1">
                 <template x-for="level in filters.levels" :key="'inc-' + level">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-[rgba(var(--accent-rgb),0.2)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]">
                         <span x-text="level" class="capitalize"></span>
-                        <button @click="clearLevelFilter(level)" class="hover:text-blue-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearLevelFilter(level)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="level in filters.excludeLevels" :key="'exc-' + level">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-300 ring-1 ring-red-500/30">
                         <span class="line-through capitalize" x-text="level"></span>
-                        <button @click="clearLevelFilter(level)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearLevelFilter(level)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="channel in filters.channels" :key="'inc-' + channel">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/30">
                         <span x-text="channel"></span>
-                        <button @click="clearChannelFilter(channel)" class="hover:text-green-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearChannelFilter(channel)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="channel in filters.excludeChannels" :key="'exc-' + channel">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono bg-red-500/20 text-red-300 ring-1 ring-red-500/30">
                         <span class="line-through" x-text="channel"></span>
-                        <button @click="clearChannelFilter(channel)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearChannelFilter(channel)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="method in filters.httpMethods" :key="'inc-http-' + method">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30">
                         <span x-text="method"></span>
-                        <button @click="clearHttpMethodFilter(method)" class="hover:text-purple-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearHttpMethodFilter(method)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="method in filters.excludeHttpMethods" :key="'exc-http-' + method">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono bg-red-500/20 text-red-300 ring-1 ring-red-500/30">
                         <span class="line-through" x-text="method"></span>
-                        <button @click="clearHttpMethodFilter(method)" class="hover:text-red-900 dark:hover:text-white">&times;</button>
+                        <button @click="clearHttpMethodFilter(method)" class="hover:text-white">&times;</button>
                     </span>
                 </template>
                 <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono"
                         :class="search.exclude
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                            : 'bg-gray-100 dark:bg-slate-500 text-gray-700 dark:text-gray-200'">
+                            ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
+                            : 'bg-[var(--surface-3)] text-[var(--text-secondary)] ring-1 ring-[var(--border)]'">
                         <span x-show="search.exclude" class="font-bold">NOT</span>
                         <span x-text="search.field === 'any' ? '' : search.field + ':'"></span>
                         <span x-text="search.value" class="max-w-[100px] truncate"></span>
-                        <button @click="search.value = ''; fetchLogs()" class="hover:text-gray-900 dark:hover:text-white">&times;</button>
+                        <button @click="search.value = ''; fetchLogs()" class="hover:text-white">&times;</button>
                     </span>
                 </template>
             </div>
@@ -502,26 +502,26 @@
         <!-- Content Area -->
         <div class="flex-1 flex overflow-hidden">
             <!-- Log List -->
-            <div class="flex-1 flex flex-col min-w-0">
+            <div class="flex-1 flex flex-col min-w-0 surface-0">
                 <!-- Loading -->
                 <div x-show="loading" class="flex-1 flex items-center justify-center">
-                    <div class="flex items-center gap-3 text-gray-500 dark:text-gray-400">
-                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <div class="flex items-center gap-3 text-[var(--text-muted)]">
+                        <svg class="w-5 h-5 animate-spin text-[var(--accent)]" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span class="text-sm">Loading logs...</span>
+                        <span class="text-sm font-mono">Loading logs...</span>
                     </div>
                 </div>
 
                 <!-- Error Alert -->
                 <div x-show="error" x-cloak class="mx-4 mt-4">
-                    <div class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                        <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <p class="text-sm text-red-700 dark:text-red-300" x-text="error"></p>
-                        <button @click="error = null" class="ml-auto text-red-500 hover:text-red-700 dark:hover:text-red-300">
+                        <p class="text-sm text-red-300" x-text="error"></p>
+                        <button @click="error = null" class="ml-auto text-red-400 hover:text-red-300 transition-colors">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -532,36 +532,36 @@
                 <!-- Empty State -->
                 <div x-show="!loading && !error && logs.length === 0" x-cloak class="flex-1 flex items-center justify-center">
                     <div class="text-center">
-                        <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        <svg class="w-16 h-16 mx-auto empty-state-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        <p class="mt-4 text-sm font-medium text-gray-900 dark:text-gray-100">No logs found</p>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Try adjusting your filters</p>
+                        <p class="mt-4 text-sm font-medium text-[var(--text-primary)]">No logs found</p>
+                        <p class="mt-1 text-sm text-[var(--text-muted)]">Try adjusting your filters</p>
                     </div>
                 </div>
 
                 <!-- Log Table -->
                 <div x-show="!loading && logs.length > 0" x-cloak class="flex-1 overflow-auto custom-scrollbar">
-                    <table class="w-full">
-                        <thead class="sticky top-0 bg-gray-50 dark:bg-slate-850 z-10">
-                            <tr class="border-b border-gray-200 dark:border-slate-600">
+                    <table class="log-table w-full">
+                        <thead>
+                            <tr>
                                 <th class="w-[3px] p-0"></th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">Time</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">Level</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Message</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">Channel</th>
+                                <th class="px-4 py-3 text-left w-40">Time</th>
+                                <th class="px-4 py-3 text-left w-24">Level</th>
+                                <th class="px-4 py-3 text-left">Message</th>
+                                <th class="px-4 py-3 text-left w-28">Channel</th>
                             </tr>
                         </thead>
                         <tbody>
                             <template x-for="log in logs" :key="log.id">
-                                <tr class="log-row border-b border-gray-100 dark:border-slate-600/50 cursor-pointer"
+                                <tr class="log-row cursor-pointer"
                                     :class="{
                                         'selected': selectedLog?.id === log.id,
-                                        'opacity-60': log.status === 'resolved' || log.status === 'ignored'
+                                        'opacity-50': log.status === 'resolved' || log.status === 'ignored'
                                     }"
                                     @click="selectLog(log)">
                                     <td class="p-0 relative">
-                                        <div class="level-indicator h-full" :class="'level-' + log.level"></div>
+                                        <div class="level-indicator h-full absolute inset-y-0 left-0" :class="'level-' + log.level"></div>
                                         <div x-show="log.status && log.status !== 'open'" class="absolute top-1 left-1 w-3 h-3" :class="getStatusIconColor(log.status)" :title="getStatusLabel(log.status)">
                                             <template x-if="log.status === 'resolved'">
                                                 <svg fill="currentColor" viewBox="0 0 20 20">
@@ -581,20 +581,20 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 relative group">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400 tabular-nums whitespace-nowrap cursor-help"
+                                        <span class="text-sm text-[var(--text-muted)] tabular-nums whitespace-nowrap cursor-help font-mono"
                                             x-text="formatRelativeTime(log.occurred_at)"></span>
-                                        <div class="absolute left-0 bottom-full mb-1 px-2 py-1 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20"
+                                        <div class="absolute left-0 bottom-full mb-1 px-2 py-1 text-xs bg-[var(--surface-3)] text-[var(--text-primary)] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 font-mono"
                                             x-text="formatFullDateTime(log.occurred_at)"></div>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="level-badge" :class="'level-' + log.level" x-text="log.level"></span>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <p class="text-sm text-gray-900 dark:text-gray-100 truncate" :style="{ maxWidth: getMessagePreviewWidth() + 'px' }" x-text="log.message_preview || log.message"></p>
-                                        <p x-show="log.source" class="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate font-mono" x-text="formatSource(log.source, log.source_line)"></p>
+                                        <p class="text-sm text-[var(--text-primary)] truncate" :style="{ maxWidth: getMessagePreviewWidth() + 'px' }" x-text="log.message_preview || log.message"></p>
+                                        <p x-show="log.source" class="mt-0.5 text-xs text-[var(--text-muted)] truncate font-mono" x-text="formatSource(log.source, log.source_line)"></p>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <span class="text-sm text-gray-500 dark:text-gray-400 truncate block max-w-[120px]" :title="log.channel" x-text="log.channel"></span>
+                                        <span class="text-xs text-[var(--text-muted)] truncate block max-w-[120px] font-mono" :title="log.channel" x-text="log.channel"></span>
                                     </td>
                                 </tr>
                             </template>
@@ -604,22 +604,22 @@
 
                 <!-- Pagination -->
                 <div x-show="!loading && logs.length > 0" x-cloak
-                    class="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-850 border-t border-gray-200 dark:border-slate-600">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        Showing <span class="font-medium text-gray-900 dark:text-gray-100" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
-                        to <span class="font-medium text-gray-900 dark:text-gray-100" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
-                        of <span class="font-medium text-gray-900 dark:text-gray-100" x-text="meta.total?.toLocaleString()"></span>
+                    class="flex items-center justify-between px-4 py-3 surface-1 border-t border-[var(--border)]">
+                    <p class="text-sm text-[var(--text-muted)] font-mono">
+                        Showing <span class="font-medium text-[var(--text-primary)]" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
+                        to <span class="font-medium text-[var(--text-primary)]" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
+                        of <span class="font-medium text-[var(--accent)]" x-text="meta.total?.toLocaleString()"></span>
                     </p>
                     <div class="flex items-center gap-1">
                         <button @click="prevPage()" :disabled="meta.current_page <= 1"
-                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="btn-ghost h-8 px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
                             Previous
                         </button>
-                        <span class="px-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span x-text="meta.current_page"></span> / <span x-text="meta.last_page"></span>
+                        <span class="px-3 text-sm text-[var(--text-muted)] font-mono">
+                            <span x-text="meta.current_page" class="text-[var(--accent)]"></span> / <span x-text="meta.last_page"></span>
                         </span>
                         <button @click="nextPage()" :disabled="meta.current_page >= meta.last_page"
-                            class="h-8 px-3 rounded text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="btn-ghost h-8 px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
                             Next
                         </button>
                     </div>
@@ -628,31 +628,31 @@
 
             <!-- Detail Panel -->
             <div x-show="selectedLog" x-cloak
-                class="flex-shrink-0 bg-slate-100 dark:bg-slate-850 border-l border-gray-200 dark:border-slate-600 flex flex-col overflow-hidden relative"
+                class="flex-shrink-0 surface-1 border-l border-[var(--border)] flex flex-col overflow-hidden relative"
                 :style="{ width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' }"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-x-4"
-                x-transition:enter-end="opacity-100 translate-x-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-x-0"
-                x-transition:leave-end="opacity-0 translate-x-4">
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="translate-x-4"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="translate-x-4">
                 <!-- Resize Handle -->
-                <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-10"
-                    :class="isResizing ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-400/50'"
+                <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10"
+                    :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"
                     @mousedown.prevent="startResize($event)"></div>
                 <!-- Panel Header -->
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-600">
-                    <h3 class="font-semibold text-gray-900 dark:text-white">Log Details</h3>
+                <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                    <h3 class="font-semibold text-[var(--text-primary)]">Log Details</h3>
                     <div class="flex items-center gap-1">
                         <button x-show="detailPanelWidth" @click="resetPanelWidth()"
-                            class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
+                            class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
                             title="Reset panel width">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
                             </svg>
                         </button>
                         <button @click="closePanel()"
-                            class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-500"
+                            class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
                             title="Close panel">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -665,41 +665,41 @@
                 <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
                     <!-- Meta -->
                     <div class="grid grid-cols-3 gap-3">
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
-                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Level</p>
+                        <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                            <p class="section-header mb-1">Level</p>
                             <p class="mt-1">
                                 <span class="level-badge" :class="'level-' + selectedLog?.level" x-text="selectedLog?.level"></span>
                             </p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 overflow-hidden">
-                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Channel</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white truncate" :title="selectedLog?.channel" x-text="selectedLog?.channel || '-'"></p>
+                        <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] overflow-hidden">
+                            <p class="section-header mb-1">Channel</p>
+                            <p class="mt-1 text-sm font-medium font-mono text-[var(--text-primary)] truncate" :title="selectedLog?.channel" x-text="selectedLog?.channel || '-'"></p>
                         </div>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600">
-                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</p>
-                            <p class="mt-1 text-sm font-medium text-gray-900 dark:text-white" x-text="formatRelativeTime(selectedLog?.occurred_at)"></p>
-                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400" x-text="formatTime(selectedLog?.occurred_at)"></p>
+                        <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                            <p class="section-header mb-1">Time</p>
+                            <p class="mt-1 text-sm font-medium text-[var(--text-primary)] font-mono" x-text="formatRelativeTime(selectedLog?.occurred_at)"></p>
+                            <p class="mt-0.5 text-xs text-[var(--text-muted)] font-mono" x-text="formatTime(selectedLog?.occurred_at)"></p>
                         </div>
                     </div>
 
                     <!-- Source -->
                     <div x-show="selectedLog?.source">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Source</p>
-                        <div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 font-mono text-sm text-gray-700 dark:text-gray-300 break-all"
+                        <p class="section-header mb-2">Source</p>
+                        <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] font-mono text-sm text-cyan-400 break-all"
                             x-text="formatSource(selectedLog?.source, selectedLog?.source_line)"></div>
                     </div>
 
                     <!-- Message -->
                     <div>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Message</p>
-                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto"
+                        <p class="section-header mb-2">Message</p>
+                        <pre class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm text-[var(--text-primary)] whitespace-pre-wrap break-words overflow-x-auto"
                             x-text="selectedLog?.message"></pre>
                     </div>
 
                     <!-- Context -->
                     <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Context</p>
-                        <pre class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm overflow-x-auto font-mono json-highlight"
+                        <p class="section-header mb-2">Context</p>
+                        <pre class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm overflow-x-auto json-highlight"
                             x-ref="jsonContext"
                             @click="handleJsonToggle($event)"
                             x-html="renderJsonContext()"></pre>
@@ -707,60 +707,60 @@
 
                     <!-- Request Context -->
                     <div x-show="selectedLog?.trace_id || selectedLog?.user_id || selectedLog?.ip_address || selectedLog?.url">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Request Context</p>
+                        <p class="section-header mb-2">Request Context</p>
                         <div class="space-y-2">
                             <!-- Trace ID -->
                             <div x-show="selectedLog?.trace_id">
                                 <button @click="filterByTraceId(selectedLog?.trace_id)"
-                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-indigo-400 dark:border-indigo-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left break-all transition-colors">
-                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">Trace ID</span>
-                                    <span x-text="selectedLog?.trace_id" class="text-xs font-mono text-slate-700 dark:text-slate-200"></span>
+                                    class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-violet-500 hover:bg-[var(--surface-3)] text-left break-all transition-colors group">
+                                    <span class="text-xs text-[var(--text-muted)] block">Trace ID</span>
+                                    <span x-text="selectedLog?.trace_id" class="text-xs font-mono text-violet-400 group-hover:text-violet-300"></span>
                                 </button>
                             </div>
                             <!-- User ID -->
                             <div x-show="selectedLog?.user_id">
                                 <button @click="filterByUserId(selectedLog?.user_id)"
-                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-cyan-400 dark:border-cyan-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left transition-colors">
-                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">User ID</span>
-                                    <span x-text="selectedLog?.user_id" class="text-sm font-mono text-slate-700 dark:text-slate-200"></span>
+                                    class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-cyan-500 hover:bg-[var(--surface-3)] text-left transition-colors group">
+                                    <span class="text-xs text-[var(--text-muted)] block">User ID</span>
+                                    <span x-text="selectedLog?.user_id" class="text-sm font-mono text-cyan-400 group-hover:text-cyan-300"></span>
                                 </button>
                             </div>
                             <!-- IP Address -->
                             <div x-show="selectedLog?.ip_address">
                                 <button @click="filterByIpAddress(selectedLog?.ip_address)"
-                                    class="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-600 border-l-4 border-amber-400 dark:border-amber-500 hover:bg-slate-200 dark:hover:bg-slate-500 text-left transition-colors">
-                                    <span class="text-xs text-slate-500 dark:text-slate-400 block">IP Address</span>
-                                    <span x-text="selectedLog?.ip_address" class="text-sm font-mono text-slate-700 dark:text-slate-200"></span>
+                                    class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-amber-500 hover:bg-[var(--surface-3)] text-left transition-colors group">
+                                    <span class="text-xs text-[var(--text-muted)] block">IP Address</span>
+                                    <span x-text="selectedLog?.ip_address" class="text-sm font-mono text-amber-400 group-hover:text-amber-300"></span>
                                 </button>
                             </div>
                             <!-- HTTP Method & URL -->
-                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-600">
-                                <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">Request</span>
+                            <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                                <span class="text-xs text-[var(--text-muted)] block mb-1">Request</span>
                                 <div class="flex items-center gap-2 text-sm">
                                     <span x-show="selectedLog?.http_method"
-                                        class="px-2 py-0.5 rounded text-xs font-bold"
+                                        class="px-2 py-0.5 rounded text-xs font-bold font-mono"
                                         :class="{
-                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300': selectedLog?.http_method === 'GET',
-                                            'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300': selectedLog?.http_method === 'POST',
-                                            'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300': selectedLog?.http_method === 'PUT' || selectedLog?.http_method === 'PATCH',
-                                            'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300': selectedLog?.http_method === 'DELETE',
-                                            'bg-slate-200 dark:bg-slate-500 text-slate-700 dark:text-slate-200': !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(selectedLog?.http_method)
+                                            'bg-[rgba(var(--accent-rgb),0.2)] text-[var(--accent)]': selectedLog?.http_method === 'GET',
+                                            'bg-blue-500/20 text-blue-400': selectedLog?.http_method === 'POST',
+                                            'bg-amber-500/20 text-amber-400': selectedLog?.http_method === 'PUT' || selectedLog?.http_method === 'PATCH',
+                                            'bg-red-500/20 text-red-400': selectedLog?.http_method === 'DELETE',
+                                            'bg-[var(--surface-3)] text-[var(--text-secondary)]': !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(selectedLog?.http_method)
                                         }"
                                         x-text="selectedLog?.http_method"></span>
-                                    <span x-show="selectedLog?.url" class="font-mono text-slate-700 dark:text-slate-200 break-all text-xs" x-text="selectedLog?.url"></span>
+                                    <span x-show="selectedLog?.url" class="font-mono text-[var(--text-secondary)] break-all text-xs" x-text="selectedLog?.url"></span>
                                 </div>
                             </div>
                             <!-- User Agent -->
-                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-600">
-                                <span class="text-xs text-slate-500 dark:text-slate-400 block">User Agent</span>
-                                <span class="text-xs font-mono text-slate-700 dark:text-slate-200 break-all" x-text="selectedLog?.user_agent"></span>
+                            <div x-show="selectedLog?.user_agent" class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                                <span class="text-xs text-[var(--text-muted)] block">User Agent</span>
+                                <span class="text-xs font-mono text-[var(--text-muted)] break-all" x-text="selectedLog?.user_agent"></span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Status -->
                     <div x-show="features.status && selectedLog?.status && selectedLog?.status !== 'open'">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Status</p>
+                        <p class="section-header mb-2">Status</p>
                         <div class="p-3 rounded-lg border" :class="getStatusBgClass(selectedLog?.status)">
                             <div class="flex items-center gap-2" :class="getStatusTextClass(selectedLog?.status)">
                                 <template x-if="selectedLog?.status === 'resolved'">
@@ -780,7 +780,7 @@
                                 </template>
                                 <span class="text-sm font-medium" x-text="getStatusLabel(selectedLog?.status)"></span>
                             </div>
-                            <p class="mt-1 text-xs" :class="getStatusMutedTextClass(selectedLog?.status)">
+                            <p class="mt-1 text-xs font-mono" :class="getStatusMutedTextClass(selectedLog?.status)">
                                 <span x-text="formatRelativeTime(selectedLog?.status_changed_at)"></span>
                                 <span x-show="selectedLog?.status_changed_by"> by <span x-text="selectedLog?.status_changed_by"></span></span>
                             </p>
@@ -790,24 +790,24 @@
                     <!-- Note -->
                     <div x-show="features.notes" x-data="{ editing: false, noteText: '' }" x-effect="if (selectedLog) { editing = false; noteText = ''; }"
                         @focus-note.window="editing = true; noteText = selectedLog?.note || ''; $nextTick(() => $refs.noteInput?.focus())">
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Note</p>
+                        <p class="section-header mb-2">Note</p>
                         <div x-show="!editing" @click="editing = true; noteText = selectedLog?.note || ''; $nextTick(() => $refs.noteInput.focus())"
-                            class="p-3 rounded-lg bg-gray-50 dark:bg-slate-600 min-h-[60px] cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-500 transition-colors">
-                            <p x-show="selectedLog?.note" class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap" x-text="selectedLog?.note"></p>
-                            <p x-show="!selectedLog?.note" class="text-sm text-gray-400 dark:text-gray-500 italic">Click to add a note...</p>
+                            class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] min-h-[60px] cursor-pointer hover:bg-[var(--surface-3)] transition-colors">
+                            <p x-show="selectedLog?.note" class="text-sm text-[var(--text-secondary)] whitespace-pre-wrap" x-text="selectedLog?.note"></p>
+                            <p x-show="!selectedLog?.note" class="text-sm text-[var(--text-muted)] italic">Click to add a note...</p>
                         </div>
                         <div x-show="editing" class="space-y-2">
                             <textarea x-model="noteText" x-ref="noteInput"
-                                class="w-full p-3 rounded-lg bg-gray-50 dark:bg-slate-600 text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                class="w-full p-3 rounded-lg bg-[var(--surface-2)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)] resize-none"
                                 rows="3"
                                 placeholder="Add a note about this log entry..."></textarea>
                             <div class="flex gap-2">
                                 <button @click="updateNote(noteText); editing = false"
-                                    class="px-3 py-1.5 rounded text-xs font-medium text-white bg-blue-600 hover:bg-blue-700">
+                                    class="btn-primary px-3 py-1.5 rounded text-xs">
                                     Save
                                 </button>
                                 <button @click="editing = false"
-                                    class="px-3 py-1.5 rounded text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-500 hover:bg-gray-200 dark:hover:bg-slate-400">
+                                    class="btn-ghost px-3 py-1.5 rounded text-xs">
                                     Cancel
                                 </button>
                             </div>
@@ -816,7 +816,7 @@
                 </div>
 
                 <!-- Panel Footer -->
-                <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-200 dark:border-slate-600">
+                <div class="flex items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
                     <template x-if="features.status">
                         <div class="flex-1 relative" x-data="{ statusOpen: false }">
                             <button @click="statusOpen = !statusOpen"
@@ -828,24 +828,24 @@
                                 </svg>
                             </button>
                             <div x-show="statusOpen" @click.away="statusOpen = false" x-transition
-                                class="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-slate-700 rounded-lg shadow-lg border border-gray-200 dark:border-slate-600 overflow-hidden z-50">
+                                class="absolute bottom-full left-0 right-0 mb-1 glass-panel rounded-lg shadow-xl overflow-hidden z-50">
                                 <template x-for="status in statuses" :key="status.value">
                                     <button @click="setStatus(status.value); statusOpen = false"
-                                        class="w-full px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center gap-2"
-                                        :class="{ 'bg-gray-50 dark:bg-slate-650': selectedLog?.status === status.value }">
+                                        class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
+                                        :class="{ 'bg-[rgba(var(--accent-rgb),0.1)]': selectedLog?.status === status.value }">
                                         <span class="w-2 h-2 rounded-full" :class="'bg-' + status.color + '-500'"></span>
-                                        <span x-text="status.label" class="text-gray-700 dark:text-gray-300"></span>
+                                        <span x-text="status.label" class="text-[var(--text-secondary)]"></span>
                                     </button>
                                 </template>
                             </div>
                         </div>
                     </template>
                     <button @click="confirmDelete()"
-                        class="flex-1 h-9 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                        class="flex-1 h-9 rounded-lg text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-colors">
                         Delete
                     </button>
                     <button @click="closePanel()"
-                        class="flex-1 h-9 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 transition-colors">
+                        class="btn-ghost flex-1 h-9 rounded-lg text-sm font-medium">
                         Close
                     </button>
                 </div>
@@ -863,11 +863,12 @@
         x-transition:leave="ease-in duration-200"
         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
         x-transition:leave-end="opacity-0 translate-y-2 scale-95">
-        <div class="flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl"
-            :style="{
-                'background-color': toast.type === 'error' ? '#dc2626' : toast.type === 'warning' ? '#f59e0b' : toast.type === 'success' ? '#16a34a' : '#2563eb',
-                'color': 'white',
-                'border': '1px solid ' + (toast.type === 'error' ? '#b91c1c' : toast.type === 'warning' ? '#d97706' : toast.type === 'success' ? '#15803d' : '#1d4ed8')
+        <div class="toast flex items-center gap-3 px-5 py-4 rounded-xl"
+            :class="{
+                'bg-red-500 text-white border border-red-400': toast.type === 'error',
+                'bg-amber-500 text-white border border-amber-400': toast.type === 'warning',
+                'bg-[var(--accent)] text-white border border-[var(--accent)]': toast.type === 'success',
+                'bg-cyan-500 text-white border border-cyan-400': toast.type === 'info'
             }">
             <!-- Icon -->
             <div class="flex-shrink-0">
@@ -913,9 +914,9 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" @click="cancelDelete()"></div>
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="cancelDelete()"></div>
         <!-- Dialog -->
-        <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6"
+        <div class="relative glass-panel rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6"
             x-transition:enter="ease-out duration-200"
             x-transition:enter-start="opacity-0 scale-95"
             x-transition:enter-end="opacity-100 scale-100"
@@ -923,23 +924,23 @@
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-95">
             <div class="flex items-center gap-3 mb-4">
-                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Log Entry</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone.</p>
+                    <h3 class="text-lg font-semibold text-[var(--text-primary)]">Delete Log Entry</h3>
+                    <p class="text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
                 </div>
             </div>
             <div class="flex gap-3">
                 <button @click="cancelDelete()"
-                    class="flex-1 h-10 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 transition-colors">
+                    class="btn-ghost flex-1 h-10 rounded-lg text-sm font-medium">
                     Cancel
                 </button>
                 <button @click="deleteLog()"
-                    class="flex-1 h-10 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">
+                    class="flex-1 h-10 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 transition-colors">
                     Delete
                 </button>
             </div>
@@ -957,9 +958,9 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" @click="showKeyboardHelp = false"></div>
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showKeyboardHelp = false"></div>
         <!-- Dialog -->
-        <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6"
+        <div class="relative glass-panel rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6"
             x-transition:enter="ease-out duration-200"
             x-transition:enter-start="opacity-0 scale-95"
             x-transition:enter-end="opacity-100 scale-100"
@@ -967,65 +968,65 @@
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-95">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Keyboard Shortcuts</h3>
+                <h3 class="text-lg font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
                 <button @click="showKeyboardHelp = false"
-                    class="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-600">
+                    class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
             <div class="space-y-2">
-                <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Navigation</h4>
+                <h4 class="section-header pt-0">Navigation</h4>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Navigate down</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">j</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Navigate down</span>
+                    <kbd>j</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Navigate up</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">k</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Navigate up</span>
+                    <kbd>k</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Open detail panel</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">Enter</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Open detail panel</span>
+                    <kbd>Enter</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Close panel</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">Esc</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Close panel</span>
+                    <kbd>Esc</kbd>
                 </div>
 
                 <template x-if="Object.keys(shortcuts).length > 0">
                     <div>
-                        <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2">Filter by Status</h4>
+                        <h4 class="section-header pt-3">Filter by Status</h4>
                         <template x-for="(status, key) in shortcuts" :key="key">
                             <div class="flex items-center justify-between mt-2">
-                                <span class="text-sm text-gray-600 dark:text-gray-300 capitalize" x-text="getStatusLabel(status)"></span>
-                                <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded" x-text="key"></kbd>
+                                <span class="text-sm text-[var(--text-secondary)] capitalize" x-text="getStatusLabel(status)"></span>
+                                <kbd x-text="key"></kbd>
                             </div>
                         </template>
                     </div>
                 </template>
 
-                <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2">Actions</h4>
+                <h4 class="section-header pt-3">Actions</h4>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus search</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">/</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Focus search</span>
+                    <kbd>/</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Focus note</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">n</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Focus note</span>
+                    <kbd>n</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Clear filters</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">c</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Clear filters</span>
+                    <kbd>c</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Toggle dark mode</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">d</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Toggle dark mode</span>
+                    <kbd>d</kbd>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-600 dark:text-gray-300">Show this help</span>
-                    <kbd class="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded">?</kbd>
+                    <span class="text-sm text-[var(--text-secondary)]">Show this help</span>
+                    <kbd>?</kbd>
                 </div>
             </div>
         </div>
@@ -1474,47 +1475,47 @@ function logScope() {
 
         getStatusIconColor(status) {
             const colors = {
-                'open': 'text-gray-400',
-                'investigating': 'text-yellow-500',
-                'resolved': 'text-green-500',
-                'ignored': 'text-slate-400'
+                'open': 'text-[var(--text-muted)]',
+                'investigating': 'text-amber-400',
+                'resolved': 'text-[var(--accent)]',
+                'ignored': 'text-[var(--text-muted)]'
             };
-            return colors[status] || 'text-gray-400';
+            return colors[status] || 'text-[var(--text-muted)]';
         },
 
         getStatusBgClass(status) {
             const classes = {
-                'investigating': 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-                'resolved': 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-                'ignored': 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
+                'investigating': 'bg-amber-500/10 border-amber-500/30',
+                'resolved': 'bg-[rgba(var(--accent-rgb),0.1)] border-[rgba(var(--accent-rgb),0.3)]',
+                'ignored': 'bg-[var(--surface-2)] border-[var(--border)]'
             };
-            return classes[status] || 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600';
+            return classes[status] || 'bg-[var(--surface-2)] border-[var(--border)]';
         },
 
         getStatusTextClass(status) {
             const classes = {
-                'investigating': 'text-yellow-700 dark:text-yellow-300',
-                'resolved': 'text-green-700 dark:text-green-300',
-                'ignored': 'text-slate-600 dark:text-slate-300'
+                'investigating': 'text-amber-400',
+                'resolved': 'text-[var(--accent)]',
+                'ignored': 'text-[var(--text-muted)]'
             };
-            return classes[status] || 'text-gray-700 dark:text-gray-300';
+            return classes[status] || 'text-[var(--text-secondary)]';
         },
 
         getStatusMutedTextClass(status) {
             const classes = {
-                'investigating': 'text-yellow-600 dark:text-yellow-400',
-                'resolved': 'text-green-600 dark:text-green-400',
-                'ignored': 'text-slate-500 dark:text-slate-400'
+                'investigating': 'text-amber-500/70',
+                'resolved': 'text-[var(--accent)]/70',
+                'ignored': 'text-[var(--text-muted)]'
             };
-            return classes[status] || 'text-gray-600 dark:text-gray-400';
+            return classes[status] || 'text-[var(--text-muted)]';
         },
 
         getStatusButtonClass(status) {
             const classes = {
-                'open': 'text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500',
-                'investigating': 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30',
-                'resolved': 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30',
-                'ignored': 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-600 hover:bg-slate-200 dark:hover:bg-slate-500'
+                'open': 'text-[var(--text-secondary)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)]',
+                'investigating': 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30',
+                'resolved': 'text-[var(--accent)] bg-[rgba(var(--accent-rgb),0.1)] hover:bg-[rgba(var(--accent-rgb),0.2)] border border-[rgba(var(--accent-rgb),0.3)]',
+                'ignored': 'text-[var(--text-muted)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)]'
             };
             return classes[status] || classes['open'];
         },

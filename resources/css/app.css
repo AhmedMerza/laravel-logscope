@@ -2,148 +2,429 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   LOGSCOPE - Terminal Noir Design System
+   ============================================ */
+
 /* Cloak for Alpine.js */
 [x-cloak] { display: none !important; }
 
 /* Base styles */
-html, body { height: 100%; }
+html, body {
+    height: 100%;
+}
 
-/* Level colors - these use CSS variables set dynamically */
-.level-debug { --level-color: var(--color-debug); }
-.level-info { --level-color: var(--color-info); }
-.level-notice { --level-color: var(--color-notice); }
-.level-warning { --level-color: var(--color-warning); }
-.level-error { --level-color: var(--color-error); }
-.level-critical { --level-color: var(--color-critical); }
-.level-alert { --level-color: var(--color-alert); }
-.level-emergency { --level-color: var(--color-emergency); }
+/* ============================================
+   Level Colors with Glow Effects
+   ============================================ */
+.level-debug { --level-color: var(--color-debug); --level-glow: rgba(100, 116, 139, 0.3); }
+.level-info { --level-color: var(--color-info); --level-glow: rgba(6, 182, 212, 0.3); }
+.level-notice { --level-color: var(--color-notice); --level-glow: rgba(139, 92, 246, 0.3); }
+.level-warning { --level-color: var(--color-warning); --level-glow: rgba(245, 158, 11, 0.3); }
+.level-error { --level-color: var(--color-error); --level-glow: rgba(239, 68, 68, 0.4); }
+.level-critical { --level-color: var(--color-critical); --level-glow: rgba(220, 38, 38, 0.5); }
+.level-alert { --level-color: var(--color-alert); --level-glow: rgba(249, 115, 22, 0.4); }
+.level-emergency { --level-color: var(--color-emergency); --level-glow: rgba(190, 18, 60, 0.5); }
 
+/* Level indicator bar */
 .level-indicator {
     width: 3px;
     background-color: var(--level-color);
+    box-shadow: 0 0 8px var(--level-glow);
 }
 
+/* Level badge with glow */
 .level-badge {
     background-color: var(--level-color);
     color: white;
+    font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.025em;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 12px var(--level-glow);
+    transition: box-shadow 0.2s ease;
 }
 
+.level-badge:hover {
+    box-shadow: 0 0 20px var(--level-glow);
+}
+
+/* Pulsing animation for critical levels */
+.level-emergency .level-indicator,
+.level-critical .level-indicator,
+.level-alert .level-indicator {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px var(--level-glow); }
+    50% { box-shadow: 0 0 20px var(--level-glow), 0 0 30px var(--level-glow); }
+}
+
+/* Level dot in sidebar */
 .level-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background-color: var(--level-color);
+    box-shadow: 0 0 6px var(--level-glow);
 }
 
-/* Custom scrollbar */
+/* ============================================
+   Surface & Card Styles
+   ============================================ */
+.surface-0 { background-color: var(--surface-0); }
+.surface-1 { background-color: var(--surface-1); }
+.surface-2 { background-color: var(--surface-2); }
+.surface-3 { background-color: var(--surface-3); }
+
+/* Glass morphism effect for panels */
+.glass-panel {
+    background: rgba(17, 17, 19, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+.light .glass-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(203, 213, 225, 0.8);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   Log Row Styles
+   ============================================ */
+.log-row {
+    transition: all 0.15s ease;
+    border-left: 3px solid transparent;
+}
+
+.log-row:hover {
+    background-color: rgba(var(--accent-rgb), 0.08);
+    border-left-color: var(--level-color);
+}
+
+.light .log-row:hover {
+    background-color: rgba(var(--accent-rgb), 0.06);
+}
+
+.log-row.selected {
+    background-color: rgba(var(--accent-rgb), 0.15);
+    border-left-color: var(--accent);
+}
+
+.light .log-row.selected {
+    background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+/* ============================================
+   Typography - Monospace for Data
+   ============================================ */
+.font-mono {
+    font-family: var(--font-mono) !important;
+}
+
+.font-sans {
+    font-family: var(--font-sans) !important;
+}
+
+/* Code/data display */
+pre, code, .mono-data {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* ============================================
+   JSON Syntax Highlighting - Enhanced
+   ============================================ */
+.json-highlight {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.json-toggle {
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    margin-right: 4px;
+    transition: color 0.15s;
+}
+
+.json-toggle:hover {
+    color: var(--accent);
+}
+
+.json-collapsed {
+    color: var(--text-muted);
+    font-style: italic;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.json-collapsed:hover {
+    color: var(--accent);
+}
+
+.json-key {
+    color: #22d3ee;
+}
+
+.light .json-key {
+    color: #0891b2;
+}
+
+.json-string {
+    color: #34d399;
+}
+
+.light .json-string {
+    color: #059669;
+}
+
+.json-number {
+    color: #fbbf24;
+}
+
+.light .json-number {
+    color: #d97706;
+}
+
+.json-boolean {
+    color: #a78bfa;
+}
+
+.light .json-boolean {
+    color: #7c3aed;
+}
+
+.json-null {
+    color: var(--text-muted);
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+input, select, textarea {
+    font-family: var(--font-sans);
+}
+
+input[type="text"],
+input[type="datetime-local"],
+select,
+textarea {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="datetime-local"]:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+    outline: none;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.4);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+}
+
+.btn-ghost:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+}
+
+/* ============================================
+   Sidebar Section Headers
+   ============================================ */
+.section-header {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   Custom Scrollbar
+   ============================================ */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
 
-/* Slide panel */
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glow {
+    0%, 100% { box-shadow: 0 0 5px var(--accent-glow); }
+    50% { box-shadow: 0 0 20px var(--accent-glow); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-in {
+    animation: slideIn 0.25s ease-out;
+}
+
+/* ============================================
+   Table Styles
+   ============================================ */
+.log-table {
+    font-size: 13px;
+}
+
+.log-table thead th {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--surface-1);
+}
+
+.log-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+/* ============================================
+   Focus ring
+   ============================================ */
+.focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.5);
+}
+
+/* ============================================
+   Slide panel
+   ============================================ */
 .slide-panel {
     transition: transform 0.25s ease-out;
 }
+
 .slide-panel.closed {
     transform: translateX(100%);
 }
 
-/* Focus ring */
-.focus-ring:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+/* ============================================
+   Kbd Styles
+   ============================================ */
+kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Log row */
-.log-row {
-    transition: background-color 0.1s ease;
-}
-.log-row:hover {
-    background-color: rgba(59, 130, 246, 0.04);
-}
-.dark .log-row:hover {
-    background-color: rgba(59, 130, 246, 0.08);
-}
-.log-row.selected {
-    background-color: rgba(59, 130, 246, 0.08);
-}
-.dark .log-row.selected {
-    background-color: rgba(59, 130, 246, 0.15);
+/* ============================================
+   Status Colors
+   ============================================ */
+.status-open { --status-color: #71717a; }
+.status-investigating { --status-color: #f59e0b; }
+.status-resolved { --status-color: var(--accent); }
+.status-ignored { --status-color: #64748b; }
+
+/* ============================================
+   Noise texture overlay (subtle)
+   ============================================ */
+.noise-overlay::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.015;
+    z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 }
 
-/* JSON syntax highlighting */
-.json-highlight {
-    color: #374151;
+/* ============================================
+   Empty State
+   ============================================ */
+.empty-state-icon {
+    color: var(--text-muted);
+    opacity: 0.5;
 }
-.dark .json-highlight {
-    color: #d1d5db;
+
+/* ============================================
+   Toast Notifications
+   ============================================ */
+.toast {
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
-.json-toggle {
-    cursor: pointer;
-    user-select: none;
-    color: #6b7280;
-    font-size: 0.75em;
-    margin-right: 2px;
+
+/* ============================================
+   Search Input with Terminal Feel
+   ============================================ */
+.search-input {
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
 }
-.json-toggle:hover {
-    color: #3b82f6;
-}
-.dark .json-toggle {
-    color: #9ca3af;
-}
-.dark .json-toggle:hover {
-    color: #60a5fa;
-}
-.json-collapsed {
-    color: #9ca3af;
-    font-style: italic;
-    cursor: pointer;
-}
-.json-collapsed:hover {
-    color: #3b82f6;
-}
-.dark .json-collapsed {
-    color: #6b7280;
-}
-.dark .json-collapsed:hover {
-    color: #60a5fa;
-}
-.json-key {
-    color: #2563eb;
-}
-.dark .json-key {
-    color: #60a5fa;
-}
-.json-string {
-    color: #059669;
-}
-.dark .json-string {
-    color: #34d399;
-}
-.json-number {
-    color: #d97706;
-}
-.dark .json-number {
-    color: #fbbf24;
-}
-.json-boolean {
-    color: #7c3aed;
-}
-.dark .json-boolean {
-    color: #a78bfa;
-}
-.json-null {
-    color: #6b7280;
-}
-.dark .json-null {
-    color: #9ca3af;
+
+.search-input::placeholder {
+    font-family: var(--font-mono);
+    opacity: 0.5;
 }

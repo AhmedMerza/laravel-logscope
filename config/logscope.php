@@ -320,8 +320,8 @@ return [
     */
 
     'theme' => [
-        // Primary accent color (used for buttons, links, etc.)
-        'primary' => '#6366f1', // Indigo
+        // Primary accent color (used for buttons, links, selections, etc.)
+        'primary' => '#10b981', // Emerald
 
         // Log level colors
         'levels' => [
