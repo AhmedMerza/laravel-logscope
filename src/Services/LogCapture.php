@@ -7,6 +7,8 @@ namespace LogScope\Services;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Event;
+use LogScope\Contracts\ContextSanitizerInterface;
+use LogScope\Contracts\LogWriterInterface;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\Logging\LogScopeHandler;
 use LogScope\LogScope;
@@ -18,8 +20,8 @@ use Throwable;
 class LogCapture
 {
     public function __construct(
-        protected LogWriter $writer,
-        protected ContextSanitizer $sanitizer
+        protected LogWriterInterface $writer,
+        protected ContextSanitizerInterface $sanitizer
     ) {}
 
     /**

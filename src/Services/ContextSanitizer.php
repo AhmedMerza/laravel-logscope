@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace LogScope\Services;
 
+use LogScope\Contracts\ContextSanitizerInterface;
 use Throwable;
 
 /**
  * Sanitizes log context for safe storage and extracts source information.
  */
-class ContextSanitizer
+class ContextSanitizer implements ContextSanitizerInterface
 {
     /**
      * Sanitize context array for storage.

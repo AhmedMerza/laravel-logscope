@@ -10,6 +10,9 @@ use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
 use LogScope\Console\Commands\SeedCommand;
+use LogScope\Contracts\ContextSanitizerInterface;
+use LogScope\Contracts\LogBufferInterface;
+use LogScope\Contracts\LogWriterInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\Logging\AddChannelToContext;
 use LogScope\Services\ContextSanitizer;
@@ -45,19 +48,22 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->app->singleton(LogBuffer::class, function ($app) {
             return new LogBuffer($app);
         });
+        $this->app->alias(LogBuffer::class, LogBufferInterface::class);
 
         $this->app->singleton(ContextSanitizer::class, function () {
             return new ContextSanitizer;
         });
+        $this->app->alias(ContextSanitizer::class, ContextSanitizerInterface::class);
 
         $this->app->singleton(LogWriter::class, function ($app) {
-            return new LogWriter($app->make(LogBuffer::class));
+            return new LogWriter($app->make(LogBufferInterface::class));
         });
+        $this->app->alias(LogWriter::class, LogWriterInterface::class);
 
         $this->app->singleton(LogCapture::class, function ($app) {
             return new LogCapture(
-                $app->make(LogWriter::class),
-                $app->make(ContextSanitizer::class)
+                $app->make(LogWriterInterface::class),
+                $app->make(ContextSanitizerInterface::class)
             );
         });
     }

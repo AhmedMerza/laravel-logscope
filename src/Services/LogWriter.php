@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace LogScope\Services;
 
+use LogScope\Contracts\LogBufferInterface;
+use LogScope\Contracts\LogWriterInterface;
 use LogScope\Jobs\WriteLogEntry;
 use LogScope\Models\LogEntry;
 
 /**
  * Routes log writes to the appropriate handler based on write mode.
  */
-class LogWriter
+class LogWriter implements LogWriterInterface
 {
     public function __construct(
-        protected LogBuffer $buffer
+        protected LogBufferInterface $buffer
     ) {}
 
     /**

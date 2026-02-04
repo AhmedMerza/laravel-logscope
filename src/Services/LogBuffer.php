@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Services;
 
 use Illuminate\Contracts\Foundation\Application;
+use LogScope\Contracts\LogBufferInterface;
 use LogScope\Models\LogEntry;
 use Throwable;
 
@@ -14,7 +15,7 @@ use Throwable;
  * Handles accumulating logs during request lifecycle and flushing
  * them at the end via terminating callback and shutdown function.
  */
-class LogBuffer
+class LogBuffer implements LogBufferInterface
 {
     /**
      * Buffer for batch write mode.
