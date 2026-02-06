@@ -1,7 +1,9 @@
 {
     "private": true,
     "scripts": {
-        "build": "tailwindcss -i resources/css/app.css -o dist/app.css --minify"
+        "build:css": "tailwindcss -i resources/css/app.css -o dist/app.css --minify",
+        "build:js": "cp resources/js/logscope.js dist/logscope.js",
+        "build": "npm run build:css && npm run build:js"
     },
     "devDependencies": {
         "tailwindcss": "^3.4.0"

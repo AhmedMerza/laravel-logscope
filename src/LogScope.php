@@ -221,4 +221,14 @@ class LogScope
 
         return new HtmlString("<script>{$collapse}{$alpine}</script>");
     }
+
+    /**
+     * Get the LogScope application JavaScript (inlined).
+     */
+    public static function appJs(): HtmlString
+    {
+        $js = file_get_contents(__DIR__.'/../dist/logscope.js');
+
+        return new HtmlString("<script>{$js}</script>");
+    }
 }
