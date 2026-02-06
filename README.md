@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/packagist/l/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 [![PHP Version](https://img.shields.io/packagist/php-v/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 
-A beautiful, fast, database-backed log viewer for Laravel applications. Production-ready.
+A beautiful, database-backed log viewer for Laravel applications. Production-ready.
 
 <!-- TODO: Add screenshot here -->
 <!-- ![LogScope Screenshot](art/screenshot.png) -->
@@ -466,6 +466,42 @@ For thousands of requests/day:
 ---
 
 ## 🎨 Customization
+
+### Theme
+
+Customize the appearance in `config/logscope.php`:
+
+```php
+'theme' => [
+    // Primary accent color (buttons, links, selections)
+    'primary' => '#10b981',
+
+    // Default to dark mode for new users (users can toggle and preference is saved)
+    'dark_mode_default' => true,
+
+    // Google Fonts (set to false to use system fonts)
+    'fonts' => [
+        'sans' => 'Outfit',         // UI text
+        'mono' => 'JetBrains Mono', // Code/logs
+    ],
+
+    // Log level badge colors
+    'levels' => [
+        'error' => ['bg' => '#dc2626', 'text' => '#ffffff'],
+        'warning' => ['bg' => '#f59e0b', 'text' => '#1f2937'],
+        // ... other levels
+    ],
+],
+```
+
+**Disable external fonts** (use system fonts instead):
+
+```php
+'fonts' => [
+    'sans' => false,
+    'mono' => false,
+],
+```
 
 ### Publishing Assets
 
