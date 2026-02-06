@@ -100,21 +100,39 @@
                     <div class="space-y-3">
                         <div class="section-header">Date Range</div>
                         <div class="space-y-2">
-                            <label class="block">
-                                <span class="text-xs text-[var(--text-secondary)]">From</span>
-                                <input type="datetime-local" x-model="filters.from" @change="fetchLogs()"
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-[var(--text-secondary)]">From</span>
+                                    <button x-show="filters.from" @click.stop="filters.from = ''; fetchLogs()"
+                                        class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                                        type="button">
+                                        clear
+                                    </button>
+                                </div>
+                                <input type="datetime-local"
+                                    x-model="filters.from"
+                                    @change="fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
-                            </label>
-                            <label class="block">
-                                <span class="text-xs text-[var(--text-secondary)]">To</span>
-                                <input type="datetime-local" x-model="filters.to" @change="fetchLogs()"
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-[var(--text-secondary)]">To</span>
+                                    <button x-show="filters.to" @click.stop="filters.to = ''; fetchLogs()"
+                                        class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                                        type="button">
+                                        clear
+                                    </button>
+                                </div>
+                                <input type="datetime-local"
+                                    x-model="filters.to"
+                                    @change="fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
-                            </label>
+                            </div>
                         </div>
-                        <button @click="filters.from = ''; filters.to = ''; fetchLogs(); dateOpen = false"
-                            class="w-full h-8 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)] transition-colors"
-                            x-show="filters.from || filters.to">
-                            Clear dates
+                        <button @click.stop="filters.from = ''; filters.to = ''; fetchLogs(); dateOpen = false"
+                            type="button"
+                            class="w-full h-8 rounded-lg text-xs font-medium transition-colors text-[var(--text-secondary)] hover:bg-red-500/10 hover:text-red-400">
+                            Clear all dates
                         </button>
                     </div>
                 </div>
