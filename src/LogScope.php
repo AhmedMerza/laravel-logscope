@@ -206,7 +206,13 @@ class LogScope
      */
     public static function css(): HtmlString
     {
-        $css = file_get_contents(__DIR__.'/../dist/app.css');
+        $path = __DIR__.'/../dist/app.css';
+
+        if (! file_exists($path)) {
+            return new HtmlString('<!-- LogScope CSS not found. Run: npm run build -->');
+        }
+
+        $css = file_get_contents($path);
 
         return new HtmlString("<style>{$css}</style>");
     }
@@ -216,9 +222,32 @@ class LogScope
      */
     public static function js(): HtmlString
     {
-        $collapse = file_get_contents(__DIR__.'/../dist/alpine-collapse.min.js');
-        $alpine = file_get_contents(__DIR__.'/../dist/alpine.min.js');
+        $collapsePath = __DIR__.'/../dist/alpine-collapse.min.js';
+        $alpinePath = __DIR__.'/../dist/alpine.min.js';
+
+        if (! file_exists($collapsePath) || ! file_exists($alpinePath)) {
+            return new HtmlString('<script>console.error("LogScope: Alpine.js not found. Run: npm run build");</script>');
+        }
+
+        $collapse = file_get_contents($collapsePath);
+        $alpine = file_get_contents($alpinePath);
 
         return new HtmlString("<script>{$collapse}{$alpine}</script>");
+    }
+
+    /**
+     * Get the LogScope application JavaScript (inlined).
+     */
+    public static function appJs(): HtmlString
+    {
+        $path = __DIR__.'/../dist/logscope.js';
+
+        if (! file_exists($path)) {
+            return new HtmlString('<script>console.error("LogScope: Application JS not found. Run: npm run build");</script>');
+        }
+
+        $js = file_get_contents($path);
+
+        return new HtmlString("<script>{$js}</script>");
     }
 }
