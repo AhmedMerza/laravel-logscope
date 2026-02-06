@@ -1,5 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" x-data="{ darkMode: localStorage.getItem('logscope-dark') !== 'false' }"
+@php
+    $theme = config('logscope.theme', []);
+    $levelColors = $theme['levels'] ?? [];
+    $primaryColor = $theme['primary'] ?? '#10b981';
+    $darkModeDefault = $theme['dark_mode_default'] ?? true;
+    $fonts = $theme['fonts'] ?? ['sans' => 'Outfit', 'mono' => 'JetBrains Mono'];
+
+    // Parse hex to RGB for glow effect
+    $hex = ltrim($primaryColor, '#');
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    $faviconColor = urlencode($primaryColor);
+
+    // Build font CSS values
+    $fontSans = $fonts['sans'] ? "'{$fonts['sans']}', " : '';
+    $fontMono = $fonts['mono'] ? "'{$fonts['mono']}', " : '';
+@endphp
+<html lang="en" x-data="{ darkMode: localStorage.getItem('logscope-dark') !== null ? localStorage.getItem('logscope-dark') === 'true' : {{ $darkModeDefault ? 'true' : 'false' }} }"
     x-init="$watch('darkMode', val => localStorage.setItem('logscope-dark', val))"
     :class="darkMode ? 'dark' : 'light'">
 <head>
@@ -7,23 +25,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>LogScope</title>
-    @php
-        $theme = config('logscope.theme', []);
-        $levelColors = $theme['levels'] ?? [];
-        $primaryColor = $theme['primary'] ?? '#10b981';
-        // Parse hex to RGB for glow effect
-        $hex = ltrim($primaryColor, '#');
-        $r = hexdec(substr($hex, 0, 2));
-        $g = hexdec(substr($hex, 2, 2));
-        $b = hexdec(substr($hex, 4, 2));
-        $faviconColor = urlencode($primaryColor);
-    @endphp
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='{{ $faviconColor }}'/><path d='M8 10h16M8 16h12M8 22h14' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round'/></svg>">
 
-    {{-- Fonts --}}
+    {{-- Google Fonts (configurable via logscope.theme.fonts) --}}
+    @if($fonts['sans'] || $fonts['mono'])
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    @php
+        $fontFamilies = [];
+        if ($fonts['sans']) $fontFamilies[] = urlencode($fonts['sans']) . ':wght@400;500;600;700';
+        if ($fonts['mono']) $fontFamilies[] = urlencode($fonts['mono']) . ':wght@400;500;600;700';
+    @endphp
+    <link href="https://fonts.googleapis.com/css2?family={{ implode('&family=', $fontFamilies) }}&display=swap" rel="stylesheet">
+    @endif
 
     {{ \LogScope\LogScope::css() }}
     <style>
@@ -37,8 +51,8 @@
             --color-alert: {{ $levelColors['alert']['bg'] ?? '#f97316' }};
             --color-emergency: {{ $levelColors['emergency']['bg'] ?? '#be123c' }};
 
-            --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-            --font-sans: 'Outfit', system-ui, sans-serif;
+            --font-mono: {{ $fontMono }}ui-monospace, SFMono-Regular, monospace;
+            --font-sans: {{ $fontSans }}system-ui, -apple-system, sans-serif;
 
             --surface-0: #0a0a0b;
             --surface-1: #111113;
@@ -89,8 +103,7 @@
     </style>
 </head>
 <body class="h-full font-sans antialiased"
-    :class="darkMode ? 'bg-[#0a0a0b] text-zinc-100' : 'bg-white text-zinc-900'"
-    style="font-family: var(--font-sans);">
+    style="font-family: var(--font-sans); background-color: var(--surface-0); color: var(--text-primary);">
     @yield('content')
     {{ \LogScope\LogScope::js() }}
 </body>

@@ -323,6 +323,16 @@ return [
         // Primary accent color (used for buttons, links, selections, etc.)
         'primary' => '#10b981', // Emerald
 
+        // Default to dark mode for new users (users can toggle and their preference is saved)
+        'dark_mode_default' => true,
+
+        // Google Fonts to load (set to false to disable external fonts)
+        // When disabled, the UI will fall back to system fonts
+        'fonts' => [
+            'sans' => 'Outfit',  // Used for UI text
+            'mono' => 'JetBrains Mono',  // Used for code/logs
+        ],
+
         // Log level colors
         'levels' => [
             'emergency' => ['bg' => '#7f1d1d', 'text' => '#fecaca'],
