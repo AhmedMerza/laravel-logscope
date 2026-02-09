@@ -210,7 +210,17 @@ pre, code, .mono-data {
 
 /* JSON Copy Functionality */
 .json-line-hover {
-    display: inline;
+    display: inline-block;
+    min-width: 100%;
+    padding-right: 24px;
+    position: relative;
+    border-radius: 3px;
+    margin: 0 -4px;
+    padding-left: 4px;
+}
+
+.json-line-hover:hover {
+    background: rgba(var(--accent-rgb), 0.05);
 }
 
 .json-line-hover:hover > .json-copy-icon {
@@ -222,18 +232,20 @@ pre, code, .mono-data {
     cursor: pointer;
     color: var(--text-muted);
     font-size: 10px;
-    margin-left: 6px;
-    padding: 1px 3px;
+    margin-left: 8px;
+    padding: 2px 4px;
     border-radius: 3px;
     transition: all 0.15s ease;
     vertical-align: middle;
     background: var(--surface-3);
+    border: 1px solid transparent;
 }
 
 .json-copy-icon:hover {
     opacity: 1 !important;
     color: var(--accent);
     background: rgba(var(--accent-rgb), 0.15);
+    border-color: rgba(var(--accent-rgb), 0.3);
 }
 
 /* Copy all button in context header */

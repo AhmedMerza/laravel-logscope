@@ -619,10 +619,10 @@ function logScope() {
             const copyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(collapseId)}" title="Copy object">⧉</span>`;
 
             if (isCollapsed) {
-                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> {<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${keys.length} ${keys.length === 1 ? 'property' : 'properties'}</span>}${copyIcon}`;
+                return `<span class="json-line-hover"><span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> {<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${keys.length} ${keys.length === 1 ? 'property' : 'properties'}</span>}${copyIcon}</span>`;
             }
 
-            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> {${copyIcon}\n`;
+            let html = `<span class="json-line-hover"><span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> {${copyIcon}</span>\n`;
             keys.forEach((key, i) => {
                 const childPath = `${path}.${key}`;
                 const valueCopyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(childPath)}" title="Copy value">⧉</span>`;
@@ -656,10 +656,10 @@ function logScope() {
             const copyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(collapseId)}" title="Copy array">⧉</span>`;
 
             if (isCollapsed) {
-                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> [<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span>]${copyIcon}`;
+                return `<span class="json-line-hover"><span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> [<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span>]${copyIcon}</span>`;
             }
 
-            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> [${copyIcon}\n`;
+            let html = `<span class="json-line-hover"><span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> [${copyIcon}</span>\n`;
             arr.forEach((item, i) => {
                 const childPath = `${path}[${i}]`;
                 const valueCopyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(childPath)}" title="Copy item">⧉</span>`;
@@ -753,9 +753,17 @@ function logScope() {
 
             try {
                 const value = this.getValueByPath(this.selectedLog.context, path);
-                let textToCopy;
 
-                if (typeof value === 'object' && value !== null) {
+                // Handle undefined/missing paths
+                if (value === undefined) {
+                    this.showToast('Value not found', 'error');
+                    return;
+                }
+
+                let textToCopy;
+                if (value === null) {
+                    textToCopy = 'null';
+                } else if (typeof value === 'object') {
                     textToCopy = JSON.stringify(value, null, 2);
                 } else if (typeof value === 'string') {
                     textToCopy = value;
@@ -1117,6 +1125,12 @@ function logScope() {
                     event.preventDefault();
                     if (this.selectedLog && this.features.notes && this.detailPanelWidth) {
                         this.$dispatch('focus-note');
+                    }
+                    break;
+                case 'y':
+                    event.preventDefault();
+                    if (this.selectedLog?.context) {
+                        this.copyContext();
                     }
                     break;
                 default:

@@ -64,6 +64,10 @@
                 <kbd>/</kbd>
             </div>
             <div class="flex items-center justify-between">
+                <span class="text-sm text-[var(--text-secondary)]">Copy context</span>
+                <kbd>y</kbd>
+            </div>
+            <div class="flex items-center justify-between">
                 <span class="text-sm text-[var(--text-secondary)]">Focus note</span>
                 <kbd>n</kbd>
             </div>
