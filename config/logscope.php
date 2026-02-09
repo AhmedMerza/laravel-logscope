@@ -263,6 +263,46 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Context Sanitization
+    |--------------------------------------------------------------------------
+    |
+    | Configure how objects in log context are sanitized for storage.
+    |
+    | 'expand_objects' - When true, objects that implement Arrayable,
+    |                    JsonSerializable, or Jsonable will be converted
+    |                    to arrays. Request objects will be expanded to
+    |                    show method, url, input, headers, etc.
+    |                    When false, objects show as [Object: ClassName].
+    |
+    | 'redact_sensitive' - When true, sensitive keys/headers are redacted.
+    |                      Set to false to disable all redaction (not recommended).
+    |
+    | 'sensitive_keys' - Keys that should be redacted in request data.
+    |                    Values containing these strings (case-insensitive)
+    |                    will be replaced with [REDACTED].
+    |                    Set to [] to use defaults, or provide your own list.
+    |
+    | 'sensitive_headers' - Request headers that should be redacted.
+    |                       Set to [] to use defaults, or provide your own list.
+    |
+    */
+
+    'context' => [
+        'expand_objects' => env('LOGSCOPE_EXPAND_OBJECTS', true),
+        'redact_sensitive' => env('LOGSCOPE_REDACT_SENSITIVE', true),
+
+        // Set to [] to use defaults, or provide your own list to override
+        // Defaults: password, password_confirmation, secret, token, api_key,
+        //           apikey, authorization, credit_card, card_number, cvv, ssn
+        'sensitive_keys' => [],
+
+        // Set to [] to use defaults, or provide your own list to override
+        // Defaults: authorization, cookie, x-csrf-token, x-xsrf-token
+        'sensitive_headers' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | JSON Viewer
     |--------------------------------------------------------------------------
     |

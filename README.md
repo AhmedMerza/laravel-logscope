@@ -45,6 +45,7 @@ Visit `/logscope` in your browser. That's it!
 | **Advanced Search** | Search syntax (`field:value`), regex support, NOT toggle |
 | **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
 | **JSON Viewer** | Syntax-highlighted, collapsible JSON with smart defaults |
+| **Smart Context** | Auto-expand Request/Model objects, redact sensitive data |
 | **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
 | **Log Notes** | Add investigation notes to any log entry |
 | **Quick Filters** | One-click filters for common queries |
@@ -503,6 +504,38 @@ Customize the appearance in `config/logscope.php`:
 ],
 ```
 
+### Context Sanitization
+
+LogScope automatically expands objects in your log context for better debugging:
+
+```php
+// Request objects show useful data
+Log::info('API request', ['request' => $request]);
+// Context: { "request": { "_type": "request", "method": "POST", "url": "...", "input": {...} } }
+
+// Models and Arrayable objects are converted
+Log::info('User action', ['user' => $user]);
+// Context: { "user": { "name": "John", "email": "..." } }
+```
+
+**Sensitive data is automatically redacted** (password, token, api_key, credit_card, etc.):
+
+```php
+Log::info('Login', ['request' => $request]);
+// Input: { "email": "john@example.com", "password": "[REDACTED]" }
+```
+
+Configure in `config/logscope.php`:
+
+```php
+'context' => [
+    'expand_objects' => true,      // Set false to show [Object: ClassName]
+    'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
+    'sensitive_keys' => [],        // Empty = use defaults, or provide your own list
+    'sensitive_headers' => [],     // Empty = use defaults, or provide your own list
+],
+```
+
 ### Publishing Assets
 
 ```bash
@@ -542,6 +575,10 @@ LOGSCOPE_UNAUTHENTICATED_REDIRECT=/login
 
 # Search
 LOGSCOPE_SEARCH_DRIVER=database
+
+# Context Sanitization
+LOGSCOPE_EXPAND_OBJECTS=true
+LOGSCOPE_REDACT_SENSITIVE=true
 ```
 
 ---
