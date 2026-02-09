@@ -925,14 +925,14 @@ function logScope() {
             const filter = this.quickFilters[index];
             if (!filter) return;
 
-            // Handle levels
+            // Handle levels (clone to avoid mutating the original config)
             if (filter.levels && Array.isArray(filter.levels)) {
-                this.filters.levels = filter.levels;
+                this.filters.levels = [...filter.levels];
             }
 
-            // Handle statuses
+            // Handle statuses (clone to avoid mutating the original config)
             if (filter.statuses && Array.isArray(filter.statuses)) {
-                this.filters.statuses = filter.statuses;
+                this.filters.statuses = [...filter.statuses];
             }
 
             // Handle time ranges
