@@ -111,6 +111,7 @@
                                 </div>
                                 <input type="datetime-local"
                                     x-model="filters.from"
+                                    :max="filters.to"
                                     @change="fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
@@ -125,6 +126,7 @@
                                 </div>
                                 <input type="datetime-local"
                                     x-model="filters.to"
+                                    :min="filters.from"
                                     @change="fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
