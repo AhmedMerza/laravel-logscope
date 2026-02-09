@@ -84,9 +84,14 @@ function logScope() {
             this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
             // Load filters from URL on init
-            this.loadFiltersFromUrl();
+            const pendingLogId = this.loadFiltersFromUrl();
 
             await Promise.all([this.fetchLogs(), this.fetchStats()]);
+
+            // Deep link: load specific log if ID in URL
+            if (pendingLogId) {
+                await this.fetchLogById(pendingLogId);
+            }
         },
 
         loadFiltersFromUrl() {
@@ -138,6 +143,9 @@ function logScope() {
             if (params.get('page')) {
                 this.page = parseInt(params.get('page')) || 1;
             }
+
+            // Return log ID for deep linking (handled after init)
+            return params.get('log') || null;
         },
 
         syncFiltersToUrl() {
@@ -178,6 +186,9 @@ function logScope() {
 
             // Add page if not first
             if (this.page > 1) params.set('page', this.page);
+
+            // Add selected log ID for deep linking
+            if (this.selectedLog?.id) params.set('log', this.selectedLog.id);
 
             // Update URL without reload
             const newUrl = params.toString()
@@ -798,10 +809,34 @@ function logScope() {
         // === UI HELPERS ===
         selectLog(log) {
             this.selectedLog = this.selectedLog?.id === log.id ? null : log;
+            this.syncFiltersToUrl();
         },
 
         closePanel() {
             this.selectedLog = null;
+            this.syncFiltersToUrl();
+        },
+
+        // Fetch a single log by ID (for deep linking)
+        async fetchLogById(id) {
+            try {
+                const response = await fetch(`${this.routes.apiBase}/logs/${id}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        this.showToast('Log not found', 'error');
+                    } else {
+                        this.handleApiError(response, 'loading log');
+                    }
+                    return;
+                }
+                const data = await response.json();
+                this.selectedLog = data.data;
+                this.syncFiltersToUrl();
+            } catch (error) {
+                this.handleNetworkError(error, 'loading log');
+            }
         },
 
         getDefaultPanelWidth() {
