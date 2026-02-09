@@ -208,6 +208,44 @@ pre, code, .mono-data {
     color: var(--text-muted);
 }
 
+/* JSON Copy Functionality */
+.json-line-hover {
+    display: inline;
+}
+
+.json-line-hover:hover > .json-copy-icon {
+    opacity: 1;
+}
+
+.json-copy-icon {
+    opacity: 0;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-left: 6px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+    vertical-align: middle;
+    background: var(--surface-3);
+}
+
+.json-copy-icon:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.15);
+}
+
+/* Copy all button in context header */
+.copy-btn {
+    opacity: 0.6;
+    transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+    opacity: 1;
+}
+
 /* ============================================
    Form Elements
    ============================================ */

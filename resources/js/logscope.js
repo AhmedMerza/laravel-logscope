@@ -616,18 +616,25 @@ function logScope() {
 
             const spaces = '  '.repeat(indent);
             const innerSpaces = '  '.repeat(indent + 1);
+            const copyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(collapseId)}" title="Copy object">⧉</span>`;
 
             if (isCollapsed) {
-                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> {<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${keys.length} ${keys.length === 1 ? 'property' : 'properties'}</span>}`;
+                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> {<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${keys.length} ${keys.length === 1 ? 'property' : 'properties'}</span>}${copyIcon}`;
             }
 
-            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> {\n`;
+            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> {${copyIcon}\n`;
             keys.forEach((key, i) => {
                 const childPath = `${path}.${key}`;
-                html += `${innerSpaces}<span class="json-key">"${this.escapeHtml(key)}"</span>: `;
+                const valueCopyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(childPath)}" title="Copy value">⧉</span>`;
+                html += `<span class="json-line-hover">${innerSpaces}<span class="json-key">"${this.escapeHtml(key)}"</span>: `;
                 html += this.renderJsonValue(obj[key], childPath, indent + 1);
                 if (i < keys.length - 1) html += ',';
-                html += '\n';
+                // Only add copy icon for leaf values (non-objects/arrays already have their own)
+                const valueType = this.getJsonType(obj[key]);
+                if (valueType !== 'object' && valueType !== 'array') {
+                    html += valueCopyIcon;
+                }
+                html += '</span>\n';
             });
             html += `${spaces}}`;
             return html;
@@ -646,17 +653,24 @@ function logScope() {
 
             const spaces = '  '.repeat(indent);
             const innerSpaces = '  '.repeat(indent + 1);
+            const copyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(collapseId)}" title="Copy array">⧉</span>`;
 
             if (isCollapsed) {
-                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> [<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span>]`;
+                return `<span class="json-toggle" data-path="${collapseId}" data-action="expand">▶</span> [<span class="json-collapsed" data-path="${collapseId}" data-action="expand" title="Click to expand">${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span>]${copyIcon}`;
             }
 
-            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> [\n`;
+            let html = `<span class="json-toggle" data-path="${collapseId}" data-action="collapse">▼</span> [${copyIcon}\n`;
             arr.forEach((item, i) => {
                 const childPath = `${path}[${i}]`;
-                html += `${innerSpaces}${this.renderJsonValue(item, childPath, indent + 1)}`;
+                const valueCopyIcon = `<span class="json-copy-icon" data-copy-path="${this.escapeHtml(childPath)}" title="Copy item">⧉</span>`;
+                html += `<span class="json-line-hover">${innerSpaces}${this.renderJsonValue(item, childPath, indent + 1)}`;
                 if (i < arr.length - 1) html += ',';
-                html += '\n';
+                // Only add copy icon for leaf values
+                const valueType = this.getJsonType(item);
+                if (valueType !== 'object' && valueType !== 'array') {
+                    html += valueCopyIcon;
+                }
+                html += '</span>\n';
             });
             html += `${spaces}]`;
             return html;
@@ -693,8 +707,18 @@ function logScope() {
                 .replace(/"/g, '&quot;');
         },
 
-        handleJsonToggle(event) {
-            // Find the clicked element or closest parent with data-path
+        handleJsonClick(event) {
+            // Check if it's a copy action
+            const copyTarget = event.target.closest('[data-copy-path]');
+            if (copyTarget) {
+                event.preventDefault();
+                event.stopPropagation();
+                const path = copyTarget.dataset.copyPath;
+                this.copyJsonValue(path);
+                return;
+            }
+
+            // Otherwise handle toggle
             const target = event.target.closest('[data-path]');
             if (!target) return;
 
@@ -708,6 +732,59 @@ function logScope() {
 
             // Increment render key to trigger Alpine re-render
             this.jsonRenderKey++;
+        },
+
+        // Copy entire context as formatted JSON
+        async copyContext() {
+            if (!this.selectedLog?.context) return;
+
+            try {
+                const json = JSON.stringify(this.selectedLog.context, null, 2);
+                await navigator.clipboard.writeText(json);
+                this.showToast('Context copied to clipboard', 'success', 2000);
+            } catch (err) {
+                this.showToast('Failed to copy to clipboard', 'error');
+            }
+        },
+
+        // Copy a specific JSON value by path
+        async copyJsonValue(path) {
+            if (!this.selectedLog?.context) return;
+
+            try {
+                const value = this.getValueByPath(this.selectedLog.context, path);
+                let textToCopy;
+
+                if (typeof value === 'object' && value !== null) {
+                    textToCopy = JSON.stringify(value, null, 2);
+                } else if (typeof value === 'string') {
+                    textToCopy = value;
+                } else {
+                    textToCopy = String(value);
+                }
+
+                await navigator.clipboard.writeText(textToCopy);
+                this.showToast('Copied to clipboard', 'success', 1500);
+            } catch (err) {
+                this.showToast('Failed to copy to clipboard', 'error');
+            }
+        },
+
+        // Get value from context by path string (e.g., "root.user.name" or "root.items[0]")
+        getValueByPath(obj, path) {
+            // Remove 'root.' prefix
+            const cleanPath = path.replace(/^root\.?/, '');
+            if (!cleanPath) return obj;
+
+            // Parse path segments (handles both dot notation and array brackets)
+            const segments = cleanPath.match(/[^.\[\]]+/g) || [];
+
+            let current = obj;
+            for (const segment of segments) {
+                if (current === null || current === undefined) return undefined;
+                current = current[segment];
+            }
+            return current;
         },
 
         // === UI HELPERS ===

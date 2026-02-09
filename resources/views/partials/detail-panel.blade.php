@@ -70,10 +70,19 @@
 
         <!-- Context -->
         <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
-            <p class="section-header mb-2">Context</p>
-            <pre class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm overflow-x-auto json-highlight"
+            <div class="flex items-center justify-between mb-2">
+                <p class="section-header">Context</p>
+                <button @click="copyContext()"
+                    class="copy-btn p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
+                    title="Copy entire context">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+            </div>
+            <pre class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm overflow-x-auto json-highlight relative"
                 x-ref="jsonContext"
-                @click="handleJsonToggle($event)"
+                @click="handleJsonClick($event)"
                 x-html="renderJsonContext()"></pre>
         </div>
 
