@@ -183,7 +183,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         return [
             '_type' => 'request',
             'method' => $request->method(),
-            'url' => $request->fullUrl(),
+            'url' => $this->sanitizeUrl($request->fullUrl()),
             'path' => $request->path(),
             'query' => $this->redactSensitive($request->query()),
             'input' => $this->redactSensitive($request->except($this->sensitiveKeys)),
@@ -246,6 +246,48 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Sanitize a URL by redacting sensitive query parameters.
+     */
+    public function sanitizeUrl(string $url): string
+    {
+        if (! $this->redactSensitive) {
+            return $url;
+        }
+
+        $parsed = parse_url($url);
+
+        // Return original URL if we can't parse it properly
+        if (! isset($parsed['scheme']) || ! isset($parsed['host'])) {
+            return $url;
+        }
+
+        if (! isset($parsed['query'])) {
+            return $url;
+        }
+
+        parse_str($parsed['query'], $queryParams);
+        $sanitizedQuery = $this->redactSensitive($queryParams);
+
+        // Rebuild the URL with sanitized query string
+        $newQuery = http_build_query($sanitizedQuery);
+        $baseUrl = $parsed['scheme'].'://'.$parsed['host'];
+        if (isset($parsed['port'])) {
+            $baseUrl .= ':'.$parsed['port'];
+        }
+        if (isset($parsed['path'])) {
+            $baseUrl .= $parsed['path'];
+        }
+        if ($newQuery) {
+            $baseUrl .= '?'.$newQuery;
+        }
+        if (isset($parsed['fragment'])) {
+            $baseUrl .= '#'.$parsed['fragment'];
+        }
+
+        return $baseUrl;
     }
 
     /**

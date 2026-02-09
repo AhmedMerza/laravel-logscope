@@ -8,10 +8,15 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
+use LogScope\Contracts\ContextSanitizerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class CaptureRequestContext
 {
+    public function __construct(
+        protected ContextSanitizerInterface $sanitizer
+    ) {}
+
     /**
      * Handle an incoming request.
      */
@@ -28,7 +33,7 @@ class CaptureRequestContext
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'http_method' => $request->method(),
-            'url' => $request->fullUrl(),
+            'url' => $this->sanitizer->sanitizeUrl($request->fullUrl()),
         ]);
 
         return $next($request);

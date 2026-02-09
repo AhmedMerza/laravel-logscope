@@ -25,4 +25,9 @@ interface ContextSanitizerInterface
      * Extract source line from context.
      */
     public function extractSourceLine(array $context): ?int;
+
+    /**
+     * Sanitize a URL by redacting sensitive query parameters.
+     */
+    public function sanitizeUrl(string $url): string;
 }
