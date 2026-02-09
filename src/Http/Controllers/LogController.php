@@ -79,6 +79,7 @@ class LogController extends Controller
         if ($request->filled('searches')) {
             // Advanced search with structured conditions (from UI dropdowns)
             $searches = $request->input('searches');
+            $validFields = $this->getSearchableFields();
 
             if (is_array($searches) && count($searches) > 0) {
                 $terms = [];
@@ -90,6 +91,11 @@ class LogController extends Controller
                     $field = $search['field'] ?? 'any';
                     $value = $search['value'];
                     $exclude = ! empty($search['exclude']) && $search['exclude'] !== '0';
+
+                    // Validate field to prevent SQL injection - only allow known fields
+                    if ($field !== 'any' && ! in_array($field, $validFields, true)) {
+                        $field = 'any';
+                    }
 
                     // Parse syntax if field is 'any' and syntax feature is enabled
                     if ($field === 'any' && $useSearchSyntax && str_contains($value, ':')) {
@@ -589,6 +595,12 @@ class LogController extends Controller
      */
     protected function applyLikeSearch($q, string $field, string $value, bool $exclude, int $index): void
     {
+        // Defense in depth: validate field is allowed
+        $validFields = array_merge(['any'], $this->getSearchableFields());
+        if (! in_array($field, $validFields, true)) {
+            $field = 'any';
+        }
+
         $likeValue = '%'.$value.'%';
         $boolean = $index === 0 ? 'and' : 'and';
 
@@ -626,6 +638,12 @@ class LogController extends Controller
      */
     protected function applyRegexSearch($q, string $field, string $value, bool $exclude, int $index): void
     {
+        // Defense in depth: validate field is allowed to prevent SQL injection
+        $validFields = array_merge(['any'], $this->getSearchableFields());
+        if (! in_array($field, $validFields, true)) {
+            $field = 'any';
+        }
+
         $boolean = $index === 0 ? 'and' : 'and';
         $driver = $q->getConnection()->getDriverName();
 
