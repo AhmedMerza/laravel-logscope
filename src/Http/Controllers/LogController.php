@@ -206,6 +206,8 @@ class LogController extends Controller
         $log = LogEntry::findOrFail($id);
         $log->delete();
 
+        $this->clearFilterCaches();
+
         return response()->json(['message' => 'Log entry deleted']);
     }
 
@@ -310,6 +312,8 @@ class LogController extends Controller
 
         $deleted = LogEntry::whereIn('id', $request->input('ids'))->delete();
 
+        $this->clearFilterCaches();
+
         return response()->json(['message' => "{$deleted} log entries deleted"]);
     }
 
@@ -335,7 +339,20 @@ class LogController extends Controller
 
         $deleted = $query->delete();
 
+        $this->clearFilterCaches();
+
         return response()->json(['message' => "{$deleted} log entries cleared"]);
+    }
+
+    /**
+     * Clear cached filters and stats after delete operations.
+     */
+    protected function clearFilterCaches(): void
+    {
+        Cache::forget('logscope:stats');
+        Cache::forget('logscope:filters:levels');
+        Cache::forget('logscope:filters:channels');
+        Cache::forget('logscope:filters:http_methods');
     }
 
     /**
