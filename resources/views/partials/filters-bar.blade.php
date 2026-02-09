@@ -39,6 +39,20 @@
                 <button @click="clearHttpMethodFilter(method)" class="hover:text-white">&times;</button>
             </span>
         </template>
+        <template x-if="filters.from">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30">
+                <span>From:</span>
+                <span x-text="filters.from"></span>
+                <button @click="filters.from = ''; fetchLogs()" class="hover:text-white">&times;</button>
+            </span>
+        </template>
+        <template x-if="filters.to">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30">
+                <span>To:</span>
+                <span x-text="filters.to"></span>
+                <button @click="filters.to = ''; fetchLogs()" class="hover:text-white">&times;</button>
+            </span>
+        </template>
         <template x-for="(search, idx) in searches.filter(s => s.value)" :key="'search-' + idx">
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium font-mono"
                 :class="search.exclude
