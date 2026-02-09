@@ -44,7 +44,7 @@ Visit `/logscope` in your browser. That's it!
 | **Request Context** | Trace ID, user ID, IP, URL, and user agent for every log |
 | **Advanced Search** | Search syntax (`field:value`), regex support, NOT toggle |
 | **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
-| **JSON Viewer** | Syntax-highlighted, collapsible JSON with smart defaults |
+| **JSON Viewer** | Syntax-highlighted, collapsible JSON with copy support |
 | **Smart Context** | Auto-expand Request/Model objects, redact sensitive data |
 | **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
 | **Log Notes** | Add investigation notes to any log entry |
@@ -224,6 +224,7 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 | `Enter` | Open detail panel |
 | `Esc` | Close panel |
 | `/` | Focus search |
+| `y` | Copy context (yank) |
 | `n` | Focus note field |
 | `c` | Clear all filters |
 | `d` | Toggle dark mode |
