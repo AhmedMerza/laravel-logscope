@@ -151,18 +151,24 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected function sanitizeObject(object $value, int $depth = 0): mixed
     {
         // Handle objects that can convert themselves to arrays
-        if ($value instanceof JsonSerializable) {
-            return $this->sanitizeArray((array) $value->jsonSerialize(), $depth + 1);
-        }
+        // Wrap in try-catch to handle objects that throw when serializing
+        // (e.g., Sanctum's TransientToken which has no $id property)
+        try {
+            if ($value instanceof JsonSerializable) {
+                return $this->sanitizeArray((array) $value->jsonSerialize(), $depth + 1);
+            }
 
-        if ($value instanceof Arrayable) {
-            return $this->sanitizeArray($value->toArray(), $depth + 1);
-        }
+            if ($value instanceof Arrayable) {
+                return $this->sanitizeArray($value->toArray(), $depth + 1);
+            }
 
-        if ($value instanceof Jsonable) {
-            $decoded = json_decode($value->toJson(), true);
+            if ($value instanceof Jsonable) {
+                $decoded = json_decode($value->toJson(), true);
 
-            return is_array($decoded) ? $this->sanitizeArray($decoded, $depth + 1) : $decoded;
+                return is_array($decoded) ? $this->sanitizeArray($decoded, $depth + 1) : $decoded;
+            }
+        } catch (\Throwable) {
+            // Fall through to return class name
         }
 
         // Fallback: just show class name
