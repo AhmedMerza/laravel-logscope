@@ -44,14 +44,17 @@ Visit `/logscope` in your browser. That's it!
 | **Request Context** | Trace ID, user ID, IP, URL, and user agent for every log |
 | **Advanced Search** | Search syntax (`field:value`), regex support, NOT toggle |
 | **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
+| **Active Filters Bar** | See all active filters at a glance, clear individually |
+| **Channel Search** | Search and filter channels when you have many |
 | **JSON Viewer** | Syntax-highlighted, collapsible JSON with copy support |
 | **Smart Context** | Auto-expand Request/Model objects, redact sensitive data |
 | **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
 | **Log Notes** | Add investigation notes to any log entry |
 | **Quick Filters** | One-click filters for common queries |
-| **Keyboard Shortcuts** | 13 shortcuts for navigation, status changes, and actions |
+| **Keyboard Shortcuts** | 14 shortcuts for navigation, status changes, and actions |
 | **Dark Mode** | Full dark mode support with persistence |
 | **Shareable URLs** | Current filters reflected in URL for sharing |
+| **Deep Linking** | Link directly to specific log entries |
 | **Performance** | Batch writes, queue support, proper indexing |
 
 ---
@@ -247,7 +250,9 @@ Type directly in the search box using `field:value` syntax:
 
 **Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`
 
-> **Tip:** The dedicated URL and trace ID inputs in the sidebar only support inclusive filtering. Use the search syntax to exclude values, e.g., `-url:/health` or `-trace_id:abc123`.
+> **Tip:** Request context filters (trace ID, user ID, IP, URL) support partial matching. Type `192.168` to find all IPs starting with that prefix, or `42` to find user IDs containing "42".
+
+> **Tip:** Click on trace ID, user ID, or IP address in the detail panel to quickly filter by that value.
 
 **Examples:**
 
