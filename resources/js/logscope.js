@@ -63,6 +63,11 @@ function logScope() {
             httpMethods: JSON.parse(localStorage.getItem('logscope-section-httpMethods') ?? 'true'),
             request: JSON.parse(localStorage.getItem('logscope-section-request') ?? 'false'),
         },
+        // Channel filtering
+        channelSearch: '',
+        showAllChannels: false,
+        allChannels: config.channels || [],
+        channelsVisibleLimit: 8,
         page: 1,
 
         // === INITIALIZATION ===
@@ -320,6 +325,40 @@ function logScope() {
             if (inInclude !== -1) this.filters.channels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeChannels.splice(inExclude, 1);
             this.fetchLogs();
+        },
+
+        getFilteredChannels() {
+            let channels = this.allChannels;
+
+            // Filter by search term
+            if (this.channelSearch.trim()) {
+                const search = this.channelSearch.toLowerCase().trim();
+                channels = channels.filter(c => c.toLowerCase().includes(search));
+            }
+
+            return channels;
+        },
+
+        getVisibleChannels() {
+            const filtered = this.getFilteredChannels();
+
+            // If searching, show all matches
+            if (this.channelSearch.trim()) {
+                return filtered;
+            }
+
+            // Otherwise respect the limit unless showAllChannels is true
+            if (this.showAllChannels) {
+                return filtered;
+            }
+
+            return filtered.slice(0, this.channelsVisibleLimit);
+        },
+
+        getHiddenChannelsCount() {
+            if (this.channelSearch.trim()) return 0;
+            const total = this.getFilteredChannels().length;
+            return Math.max(0, total - this.channelsVisibleLimit);
         },
 
         // === API CALLS ===

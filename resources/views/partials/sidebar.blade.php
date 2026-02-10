@@ -83,37 +83,75 @@
             </div>
         </div>
 
-        @if(count($channels) > 0)
         <!-- Channels Section -->
-        <div class="border-b border-[var(--border)]">
+        <div class="border-b border-[var(--border)]" x-show="allChannels.length > 0">
             <button @click="sections.channels = !sections.channels"
                 class="section-header w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-2)] transition-colors">
                 <span>Channels</span>
-                <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                </svg>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-[var(--text-muted)] tabular-nums" x-text="allChannels.length"></span>
+                    <svg class="w-4 h-4 transition-transform text-[var(--text-muted)]" :class="{ 'rotate-180': !sections.channels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
             </button>
             <div x-show="sections.channels" x-collapse class="px-4 pb-4">
-                <div class="space-y-1">
-                    @foreach($channels as $channel)
-                    <button @click="toggleChannel('{{ $channel }}')"
-                        class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
-                        :class="{
-                            'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]': filters.channels.includes('{{ $channel }}'),
-                            'bg-red-500/10 text-red-400 ring-1 ring-red-500/30 line-through': filters.excludeChannels.includes('{{ $channel }}'),
-                            'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]': !filters.channels.includes('{{ $channel }}') && !filters.excludeChannels.includes('{{ $channel }}')
-                        }">
-                        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            :class="filters.excludeChannels.includes('{{ $channel }}') ? 'text-red-400' : 'text-[var(--text-muted)]'">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                <!-- Search Input -->
+                <div class="mb-2" x-show="allChannels.length > channelsVisibleLimit">
+                    <div class="relative">
+                        <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                        <span class="flex-1 text-left truncate font-mono text-xs" title="{{ $channel }}">{{ $channel }}</span>
+                        <input type="text"
+                            x-model="channelSearch"
+                            placeholder="Search channels..."
+                            class="w-full h-7 pl-7 pr-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
+                        <button x-show="channelSearch"
+                            @click="channelSearch = ''"
+                            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Channel List -->
+                <div class="space-y-1">
+                    <template x-for="channel in getVisibleChannels()" :key="channel">
+                        <button @click="toggleChannel(channel)"
+                            class="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors"
+                            :class="{
+                                'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)] ring-1 ring-[rgba(var(--accent-rgb),0.3)]': filters.channels.includes(channel),
+                                'bg-red-500/10 text-red-400 ring-1 ring-red-500/30 line-through': filters.excludeChannels.includes(channel),
+                                'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]': !filters.channels.includes(channel) && !filters.excludeChannels.includes(channel)
+                            }">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                :class="filters.excludeChannels.includes(channel) ? 'text-red-400' : 'text-[var(--text-muted)]'">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                            <span class="flex-1 text-left truncate font-mono text-xs" :title="channel" x-text="channel"></span>
+                        </button>
+                    </template>
+                </div>
+
+                <!-- Show More / Show Less -->
+                <div x-show="!channelSearch && getHiddenChannelsCount() > 0" class="mt-2">
+                    <button @click="showAllChannels = !showAllChannels"
+                        class="w-full flex items-center justify-center gap-1 px-2 py-1 rounded text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors">
+                        <span x-text="showAllChannels ? 'Show less' : 'Show ' + getHiddenChannelsCount() + ' more'"></span>
+                        <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showAllChannels }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
                     </button>
-                    @endforeach
+                </div>
+
+                <!-- No Results -->
+                <div x-show="channelSearch && getFilteredChannels().length === 0" class="py-2 text-center text-xs text-[var(--text-muted)]">
+                    No channels match "<span x-text="channelSearch"></span>"
                 </div>
             </div>
         </div>
-        @endif
 
         @if(count($httpMethods) > 0)
         <!-- HTTP Method Section -->
