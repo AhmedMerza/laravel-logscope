@@ -141,27 +141,27 @@ class LogEntry extends Model
     }
 
     /**
-     * Scope: Filter by trace ID (group logs from same request).
+     * Scope: Filter by trace ID (partial match).
      */
     public function scopeTraceId(Builder $query, string $traceId): Builder
     {
-        return $query->where('trace_id', $traceId);
+        return $query->where('trace_id', 'like', "%{$traceId}%");
     }
 
     /**
-     * Scope: Filter by user ID.
+     * Scope: Filter by user ID (partial match).
      */
     public function scopeUserId(Builder $query, int|string $userId): Builder
     {
-        return $query->where('user_id', $userId);
+        return $query->where('user_id', 'like', "%{$userId}%");
     }
 
     /**
-     * Scope: Filter by IP address.
+     * Scope: Filter by IP address (partial match).
      */
     public function scopeIpAddress(Builder $query, string $ipAddress): Builder
     {
-        return $query->where('ip_address', $ipAddress);
+        return $query->where('ip_address', 'like', "%{$ipAddress}%");
     }
 
     /**

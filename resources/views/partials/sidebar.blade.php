@@ -195,25 +195,25 @@
             <div x-show="sections.request" x-collapse class="px-4 pb-4 space-y-3">
                 <div>
                     <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">Trace ID</label>
-                    <input type="text" x-model="filters.trace_id" @input.debounce.300ms="fetchLogs()"
+                    <input type="text" x-model="filters.trace_id" @input.debounce.300ms="page = 1; fetchLogs()"
                         placeholder="Filter by trace..."
                         class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                 </div>
                 <div>
                     <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">User ID</label>
-                    <input type="text" x-model="filters.user_id" @input.debounce.300ms="fetchLogs()"
+                    <input type="text" x-model="filters.user_id" @input.debounce.300ms="page = 1; fetchLogs()"
                         placeholder="Filter by user..."
                         class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                 </div>
                 <div>
                     <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">IP Address</label>
-                    <input type="text" x-model="filters.ip_address" @input.debounce.300ms="fetchLogs()"
+                    <input type="text" x-model="filters.ip_address" @input.debounce.300ms="page = 1; fetchLogs()"
                         placeholder="Filter by IP..."
                         class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                 </div>
                 <div>
                     <label class="block text-xs text-[var(--text-muted)] mb-1 font-mono uppercase tracking-wider">URL</label>
-                    <input type="text" x-model="filters.url" @input.debounce.300ms="fetchLogs()"
+                    <input type="text" x-model="filters.url" @input.debounce.300ms="page = 1; fetchLogs()"
                         placeholder="Filter by URL..."
                         class="search-input w-full h-8 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                 </div>

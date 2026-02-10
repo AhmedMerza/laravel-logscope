@@ -209,6 +209,7 @@ function logScope() {
 
         removeSearch(index) {
             this.searches.splice(index, 1);
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -243,6 +244,7 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeHttpMethods.splice(inExclude, 1);
             }
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -251,6 +253,7 @@ function logScope() {
             const inExclude = this.filters.excludeHttpMethods.indexOf(method);
             if (inInclude !== -1) this.filters.httpMethods.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeHttpMethods.splice(inExclude, 1);
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -258,6 +261,7 @@ function logScope() {
             this.filters.trace_id = traceId;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -265,6 +269,7 @@ function logScope() {
             this.filters.user_id = userId;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -272,6 +277,7 @@ function logScope() {
             this.filters.ip_address = ip;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -290,6 +296,7 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeLevels.splice(inExclude, 1);
             }
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -298,6 +305,7 @@ function logScope() {
             const inExclude = this.filters.excludeLevels.indexOf(level);
             if (inInclude !== -1) this.filters.levels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeLevels.splice(inExclude, 1);
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -316,6 +324,7 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeChannels.splice(inExclude, 1);
             }
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -324,6 +333,7 @@ function logScope() {
             const inExclude = this.filters.excludeChannels.indexOf(channel);
             if (inInclude !== -1) this.filters.channels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeChannels.splice(inExclude, 1);
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -605,6 +615,7 @@ function logScope() {
             } else {
                 this.filters.statuses.splice(index, 1);
             }
+            this.page = 1;
             this.fetchLogs();
         },
 
@@ -616,6 +627,7 @@ function logScope() {
                 // Select all
                 this.filters.statuses = this.statuses.map(s => s.value);
             }
+            this.page = 1;
             this.fetchLogs();
         },
 

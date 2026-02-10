@@ -21,7 +21,7 @@
                     <option value="context">Context</option>
                     <option value="source">Source</option>
                 </select>
-                <button @click="searches[0].exclude = !searches[0].exclude; fetchLogs()"
+                <button @click="searches[0].exclude = !searches[0].exclude; page = 1; fetchLogs()"
                     class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
                     :class="searches[0].exclude
                         ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
@@ -29,7 +29,7 @@
                     title="Toggle NOT (exclude matching)">
                     NOT
                 </button>
-                <button x-show="features.regex" @click="useRegex = !useRegex; fetchLogs()"
+                <button x-show="features.regex" @click="useRegex = !useRegex; page = 1; fetchLogs()"
                     class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
                     :class="useRegex
                         ? 'bg-violet-500/20 text-violet-400 border-violet-500/50 shadow-[0_0_10px_rgba(139,92,246,0.2)]'
@@ -42,7 +42,7 @@
                         :class="searches[0].exclude ? 'text-red-400' : 'text-[var(--text-muted)]'">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" x-model="searches[0].value" @input.debounce.300ms="fetchLogs()"
+                    <input type="text" x-model="searches[0].value" @input.debounce.300ms="page = 1; fetchLogs()"
                         x-ref="searchInput"
                         :placeholder="useRegex ? 'Regex pattern...' : (searches[0].exclude ? 'Exclude logs containing...' : (features.search_syntax ? 'Search... (try field:value)' : 'Search logs...'))"
                         class="search-input w-full h-9 pl-9 pr-4 border rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
@@ -103,7 +103,7 @@
                             <div>
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs text-[var(--text-secondary)]">From</span>
-                                    <button x-show="filters.from" @click.stop="filters.from = ''; fetchLogs()"
+                                    <button x-show="filters.from" @click.stop="filters.from = ''; page = 1; fetchLogs()"
                                         class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         type="button">
                                         clear
@@ -112,13 +112,13 @@
                                 <input type="datetime-local"
                                     x-model="filters.from"
                                     :max="filters.to"
-                                    @change="if (filters.to && filters.from > filters.to) filters.to = filters.from; fetchLogs()"
+                                    @change="if (filters.to && filters.from > filters.to) filters.to = filters.from; page = 1; fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
                             <div>
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs text-[var(--text-secondary)]">To</span>
-                                    <button x-show="filters.to" @click.stop="filters.to = ''; fetchLogs()"
+                                    <button x-show="filters.to" @click.stop="filters.to = ''; page = 1; fetchLogs()"
                                         class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         type="button">
                                         clear
@@ -127,11 +127,11 @@
                                 <input type="datetime-local"
                                     x-model="filters.to"
                                     :min="filters.from"
-                                    @change="if (filters.from && filters.to < filters.from) filters.from = filters.to; fetchLogs()"
+                                    @change="if (filters.from && filters.to < filters.from) filters.from = filters.to; page = 1; fetchLogs()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
                         </div>
-                        <button @click.stop="filters.from = ''; filters.to = ''; fetchLogs(); dateOpen = false"
+                        <button @click.stop="filters.from = ''; filters.to = ''; page = 1; fetchLogs(); dateOpen = false"
                             type="button"
                             class="w-full h-8 rounded-lg text-xs font-medium transition-colors text-[var(--text-secondary)] hover:bg-red-500/10 hover:text-red-400">
                             Clear all dates
@@ -159,7 +159,7 @@
                     <div x-show="statusFilterOpen" @click.away="statusFilterOpen = false" x-transition
                         class="absolute top-full right-0 mt-1 w-48 glass-panel rounded-lg shadow-xl overflow-hidden z-50">
                         <!-- Default: Open only -->
-                        <button @click="filters.statuses = []; fetchLogs(); statusFilterOpen = false"
+                        <button @click="filters.statuses = []; page = 1; fetchLogs(); statusFilterOpen = false"
                             class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
                             :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': filters.statuses.length === 0 }">
                             <span class="w-2 h-2 rounded-full bg-[var(--text-muted)]"></span>
@@ -167,7 +167,7 @@
                             <span class="ml-auto text-xs text-[var(--text-muted)]">(default)</span>
                         </button>
                         <!-- Needs Attention: All non-closed statuses -->
-                        <button @click="filters.statuses = getNeedsAttentionStatuses(); fetchLogs(); statusFilterOpen = false"
+                        <button @click="filters.statuses = getNeedsAttentionStatuses(); page = 1; fetchLogs(); statusFilterOpen = false"
                             class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
                             :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': isNeedsAttentionFilter() }">
                             <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
@@ -232,7 +232,7 @@
                 <option value="context">Context</option>
                 <option value="source">Source</option>
             </select>
-            <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; fetchLogs()"
+            <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; page = 1; fetchLogs()"
                 class="h-8 px-2 rounded-md text-xs font-bold font-mono transition-colors border"
                 :class="searches[index + 1].exclude
                     ? 'bg-red-500/20 text-red-400 border-red-500/50'
@@ -240,7 +240,7 @@
                 title="Toggle NOT (exclude matching)">
                 NOT
             </button>
-            <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="fetchLogs()"
+            <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="page = 1; fetchLogs()"
                 :placeholder="searches[index + 1].exclude ? 'Exclude...' : 'Search...'"
                 class="search-input flex-1 h-8 px-3 border rounded-md text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
                 :class="searches[index + 1].exclude
