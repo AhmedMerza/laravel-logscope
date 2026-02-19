@@ -102,9 +102,7 @@ class LogBuffer implements LogBufferInterface
                 LogEntry::createEntry($data);
             }
         } catch (Throwable $e) {
-            if (config('app.debug')) {
-                error_log('LogScope: Failed to flush log buffer: '.$e->getMessage());
-            }
+            error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
         }
     }
 

@@ -97,4 +97,22 @@ describe('flushStatic', function () {
 
         expect(LogBuffer::getBuffer())->toBe([]);
     });
+
+    it('does not crash when container is unavailable during shutdown', function () {
+        $buffer = new LogBuffer(app());
+        $buffer->add(['message' => 'test']);
+
+        // Destroy the container to simulate PHP shutdown state
+        // where Laravel facades are no longer available
+        app()->flush();
+
+        // flushStatic should handle the error gracefully via error_log()
+        // instead of crashing when config() is unavailable
+        LogBuffer::flushStatic();
+
+        expect(LogBuffer::getBuffer())->toBe([]);
+
+        // Restore the application so Pest's teardown can run
+        $this->refreshApplication();
+    });
 });
