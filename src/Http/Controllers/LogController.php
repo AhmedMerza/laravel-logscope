@@ -413,13 +413,23 @@ class LogController extends Controller
         $cacheTtl = config('logscope.cache_ttl', 60);
 
         $stats = Cache::remember($cacheKey, $cacheTtl, function () {
+            $startOfDay = now()->startOfDay();
+            $startOfHour = now()->startOfHour();
+
+            // Single query replacing 4 separate counts. Groups by level and uses
+            // conditional aggregates for the time-scoped counts.
+            $rows = LogEntry::selectRaw(
+                'level, count(*) as total,' .
+                ' sum(case when occurred_at >= ? then 1 else 0 end) as today,' .
+                ' sum(case when occurred_at >= ? then 1 else 0 end) as this_hour',
+                [$startOfDay, $startOfHour]
+            )->groupBy('level')->get();
+
             return [
-                'total' => LogEntry::count(),
-                'by_level' => LogEntry::selectRaw('level, count(*) as count')
-                    ->groupBy('level')
-                    ->pluck('count', 'level'),
-                'today' => LogEntry::where('occurred_at', '>=', now()->startOfDay())->count(),
-                'this_hour' => LogEntry::where('occurred_at', '>=', now()->startOfHour())->count(),
+                'total'     => (int) $rows->sum('total'),
+                'by_level'  => $rows->pluck('total', 'level'),
+                'today'     => (int) $rows->sum('today'),
+                'this_hour' => (int) $rows->sum('this_hour'),
             ];
         });
 
