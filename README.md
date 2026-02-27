@@ -55,7 +55,7 @@ Visit `/logscope` in your browser. That's it!
 | **Dark Mode** | Full dark mode support with persistence |
 | **Shareable URLs** | Current filters reflected in URL for sharing |
 | **Deep Linking** | Link directly to specific log entries |
-| **Performance** | Batch writes, queue support, proper indexing |
+| **Performance** | Keyset pagination, batch writes, query optimization, proper indexing |
 
 ---
 
@@ -160,6 +160,14 @@ LOGSCOPE_IGNORE_NULL_CHANNEL=false # Skip logs without a channel (default: false
 
 > **Note:** `null_channel` defaults to `false` because `Log::build()` (dynamic loggers) produce logs without a channel. Setting this to `true` would filter out those logs.
 
+### Cache TTL
+
+```env
+# How long (in seconds) to cache stats and filter options (levels, channels, etc.)
+# Set to 0 to disable caching
+LOGSCOPE_CACHE_TTL=60
+```
+
 ### JSON Viewer
 
 Configure collapsible JSON behavior in `config/logscope.php`:
@@ -224,6 +232,8 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 | Key | Action |
 |-----|--------|
 | `j` / `k` | Navigate down / up |
+| `h` / `l` | Previous / next page |
+| `r` | Refresh data |
 | `Enter` | Open detail panel |
 | `Esc` | Close panel |
 | `/` | Focus search |
@@ -233,8 +243,10 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 | `d` | Toggle dark mode |
 | `?` | Show keyboard help |
 
-**Status shortcuts** (configurable, filter by status):
-| `o` | Open | `i` | Investigating | `r` | Resolved | `x` | Ignored |
+**Status shortcuts** (require Shift, filter by status):
+| `O` | Open | `I` | Investigating | `R` | Resolved | `X` | Ignored |
+
+Action shortcuts (`r`, `h`, `l`) and status shortcuts are configurable — see [Keyboard Shortcuts](#keyboard-shortcuts).
 
 ### Search Syntax
 
@@ -371,7 +383,7 @@ Available options: `label`, `icon` (calendar/clock/alert/filter), `levels`, `sta
 
 ### Status Shortcuts
 
-Each status has a default keyboard shortcut. Customize in `config/logscope.php`:
+Each status has a default keyboard shortcut (uppercase, requires Shift). Customize in `config/logscope.php`:
 
 ```php
 'statuses' => [
@@ -379,6 +391,27 @@ Each status has a default keyboard shortcut. Customize in `config/logscope.php`:
     'ignored' => ['shortcut' => null],
     // Custom status with shortcut
     'waiting' => ['label' => 'Waiting', 'color' => 'orange', 'shortcut' => 'w'],
+],
+```
+
+### Keyboard Shortcuts
+
+Action shortcuts (refresh, pagination) are configurable or can be disabled:
+
+```php
+'keyboard_shortcuts' => [
+    'refresh'   => 'r',  // Refresh logs and stats
+    'prev_page' => 'h',  // Previous page
+    'next_page' => 'l',  // Next page
+],
+```
+
+Set any shortcut to `null` to disable it:
+
+```php
+'keyboard_shortcuts' => [
+    'prev_page' => null,  // Disable previous page shortcut
+    'next_page' => null,
 ],
 ```
 
@@ -560,8 +593,10 @@ LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
 
 # Features
-LOGSCOPE_FEATURE_RESOLVABLE=true
+LOGSCOPE_FEATURE_STATUS=true
 LOGSCOPE_FEATURE_NOTES=true
+LOGSCOPE_FEATURE_SEARCH_SYNTAX=true
+LOGSCOPE_FEATURE_REGEX=true
 LOGSCOPE_IGNORE_DEPRECATIONS=true
 LOGSCOPE_IGNORE_NULL_CHANNEL=false
 
@@ -581,6 +616,9 @@ LOGSCOPE_UNAUTHENTICATED_REDIRECT=/login
 
 # Search
 LOGSCOPE_SEARCH_DRIVER=database
+
+# Cache
+LOGSCOPE_CACHE_TTL=60
 
 # Context Sanitization
 LOGSCOPE_EXPAND_OBJECTS=true
