@@ -7,7 +7,7 @@
 A beautiful, database-backed log viewer for Laravel applications. Production-ready.
 
 <!-- TODO: Add screenshot here -->
-![LogScope Screenshot](art/screenshot.png)
+![LogScope Screenshot](art/logscope-preview.png)
 
 ## Quick Start
 
