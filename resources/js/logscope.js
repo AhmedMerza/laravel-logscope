@@ -70,54 +70,74 @@ function logScope() {
         channelsVisibleLimit: 8,
         cursor: null,
         cursorStack: [],
+        _initPromise: null,
+        _initialized: false,
         _fetchLogsDebounceTimer: null,
         _fetchLogsController: null,
 
         // === INITIALIZATION ===
         async init() {
-            // Validate saved panel width against current max
-            if (this.detailPanelWidth) {
-                const maxWidth = this.getMaxPanelWidth();
-                if (this.detailPanelWidth > maxWidth) {
-                    this.detailPanelWidth = maxWidth;
-                    localStorage.setItem('logscope_panel_width', maxWidth);
-                }
+            if (this._initialized) {
+                return;
             }
 
-            // Watch section states and persist to localStorage
-            this.$watch('sections.quickFilters', val => localStorage.setItem('logscope-section-quickFilters', JSON.stringify(val)));
-            this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
-            this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
-            this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
-            this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
+            if (this._initPromise) {
+                return this._initPromise;
+            }
 
-            // Responsive: update screenWidth on resize, manage sidebar and panel
-            const onResize = () => {
-                this.screenWidth = window.innerWidth;
-                if (window.innerWidth >= 1024 && !this.sidebarOpen) {
-                    this.sidebarOpen = true;
-                }
-                if (window.innerWidth < 768 && this.sidebarOpen) {
-                    this.sidebarOpen = false;
-                }
+            this._initPromise = (async () => {
+            // Validate saved panel width against current max
                 if (this.detailPanelWidth) {
-                    const max = this.getMaxPanelWidth();
-                    if (this.detailPanelWidth > max) {
-                        this.detailPanelWidth = max;
-                        localStorage.setItem('logscope_panel_width', max);
+                    const maxWidth = this.getMaxPanelWidth();
+                    if (this.detailPanelWidth > maxWidth) {
+                        this.detailPanelWidth = maxWidth;
+                        localStorage.setItem('logscope_panel_width', maxWidth);
                     }
                 }
-            };
-            window.addEventListener('resize', onResize);
 
-            // Load filters from URL on init
-            const pendingLogId = this.loadFiltersFromUrl();
+                // Watch section states and persist to localStorage
+                this.$watch('sections.quickFilters', val => localStorage.setItem('logscope-section-quickFilters', JSON.stringify(val)));
+                this.$watch('sections.severity', val => localStorage.setItem('logscope-section-severity', JSON.stringify(val)));
+                this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
+                this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
+                this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
-            await Promise.all([this.fetchLogs(), this.fetchStats()]);
+                // Responsive: update screenWidth on resize, manage sidebar and panel
+                const onResize = () => {
+                    this.screenWidth = window.innerWidth;
+                    if (window.innerWidth >= 1024 && !this.sidebarOpen) {
+                        this.sidebarOpen = true;
+                    }
+                    if (window.innerWidth < 768 && this.sidebarOpen) {
+                        this.sidebarOpen = false;
+                    }
+                    if (this.detailPanelWidth) {
+                        const max = this.getMaxPanelWidth();
+                        if (this.detailPanelWidth > max) {
+                            this.detailPanelWidth = max;
+                            localStorage.setItem('logscope_panel_width', max);
+                        }
+                    }
+                };
+                window.addEventListener('resize', onResize);
 
-            // Deep link: load specific log if ID in URL
-            if (pendingLogId) {
-                await this.fetchLogById(pendingLogId);
+                // Load filters from URL on init
+                const pendingLogId = this.loadFiltersFromUrl();
+
+                await Promise.all([this.fetchLogs(), this.fetchStats()]);
+
+                // Deep link: load specific log if ID in URL
+                if (pendingLogId) {
+                    await this.fetchLogById(pendingLogId);
+                }
+
+                this._initialized = true;
+            })();
+
+            try {
+                await this._initPromise;
+            } finally {
+                this._initPromise = null;
             }
         },
 
@@ -1306,6 +1326,18 @@ function logScope() {
                 case 'c':
                     event.preventDefault();
                     this.clearFilters();
+                    break;
+                case 'r':
+                    event.preventDefault();
+                    Promise.all([this.fetchLogs(), this.fetchStats()]);
+                    break;
+                case 'h':
+                    event.preventDefault();
+                    this.prevPage();
+                    break;
+                case 'l':
+                    event.preventDefault();
+                    this.nextPage();
                     break;
                 case 'n':
                     event.preventDefault();
