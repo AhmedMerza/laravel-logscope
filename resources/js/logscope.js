@@ -69,6 +69,8 @@ function logScope() {
         allChannels: config.channels || [],
         channelsVisibleLimit: 8,
         page: 1,
+        _fetchLogsDebounceTimer: null,
+        _fetchLogsController: null,
 
         // === INITIALIZATION ===
         async init() {
@@ -210,7 +212,12 @@ function logScope() {
         removeSearch(index) {
             this.searches.splice(index, 1);
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
+        },
+
+        debouncedFetchLogs() {
+            clearTimeout(this._fetchLogsDebounceTimer);
+            this._fetchLogsDebounceTimer = setTimeout(() => this.fetchLogs(), 150);
         },
 
         hasActiveFilters() {
@@ -245,7 +252,7 @@ function logScope() {
                 this.filters.excludeHttpMethods.splice(inExclude, 1);
             }
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         clearHttpMethodFilter(method) {
@@ -254,7 +261,7 @@ function logScope() {
             if (inInclude !== -1) this.filters.httpMethods.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeHttpMethods.splice(inExclude, 1);
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         filterByTraceId(traceId) {
@@ -262,7 +269,7 @@ function logScope() {
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         filterByUserId(userId) {
@@ -270,7 +277,7 @@ function logScope() {
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         filterByIpAddress(ip) {
@@ -278,7 +285,7 @@ function logScope() {
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         toggleLevel(level) {
@@ -297,7 +304,7 @@ function logScope() {
                 this.filters.excludeLevels.splice(inExclude, 1);
             }
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         clearLevelFilter(level) {
@@ -306,7 +313,7 @@ function logScope() {
             if (inInclude !== -1) this.filters.levels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeLevels.splice(inExclude, 1);
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         toggleChannel(channel) {
@@ -325,7 +332,7 @@ function logScope() {
                 this.filters.excludeChannels.splice(inExclude, 1);
             }
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         clearChannelFilter(channel) {
@@ -334,7 +341,7 @@ function logScope() {
             if (inInclude !== -1) this.filters.channels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeChannels.splice(inExclude, 1);
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         getFilteredChannels() {
@@ -373,6 +380,12 @@ function logScope() {
 
         // === API CALLS ===
         async fetchLogs() {
+            if (this._fetchLogsController) {
+                this._fetchLogsController.abort();
+            }
+            this._fetchLogsController = new AbortController();
+            const signal = this._fetchLogsController.signal;
+
             this.loading = true;
             this.error = null;
             try {
@@ -410,7 +423,8 @@ function logScope() {
                 }
 
                 const response = await fetch(`${this.routes.logs}?${params}`, {
-                    headers: { 'Accept': 'application/json' }
+                    headers: { 'Accept': 'application/json' },
+                    signal
                 });
 
                 if (!response.ok) {
@@ -426,9 +440,10 @@ function logScope() {
                 this.error = null;
                 this.syncFiltersToUrl();
             } catch (error) {
+                if (error.name === 'AbortError') return;
                 this.handleNetworkError(error, 'fetching logs');
             } finally {
-                this.loading = false;
+                if (!signal.aborted) this.loading = false;
             }
         },
 
@@ -616,7 +631,7 @@ function logScope() {
                 this.filters.statuses.splice(index, 1);
             }
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         toggleShowAll() {
@@ -628,7 +643,7 @@ function logScope() {
                 this.filters.statuses = this.statuses.map(s => s.value);
             }
             this.page = 1;
-            this.fetchLogs();
+            this.debouncedFetchLogs();
         },
 
         // === JSON RENDERING ===
@@ -1224,7 +1239,7 @@ function logScope() {
                     if (this.shortcuts[event.key]) {
                         event.preventDefault();
                         this.filters.statuses = [this.shortcuts[event.key]];
-                        this.fetchLogs();
+                        this.debouncedFetchLogs();
                     }
                     break;
             }
