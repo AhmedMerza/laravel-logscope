@@ -170,20 +170,52 @@ class LogController extends Controller
             $query->url($request->input('url'));
         }
 
-        $perPage = min(
+        $perPage = max(1, min(
             (int) $request->input('per_page', config('logscope.pagination.per_page', 50)),
             config('logscope.pagination.max_per_page', 100)
-        );
+        ));
 
-        $logs = $query->paginate($perPage);
+        // Decode and apply cursor for keyset pagination
+        if ($request->filled('cursor')) {
+            $cursor = json_decode(base64_decode($request->input('cursor'), true) ?: '', true);
+            if (isset($cursor['occurred_at'], $cursor['id'])) {
+                $query->where(function ($q) use ($cursor) {
+                    $q->where('occurred_at', '<', $cursor['occurred_at'])
+                      ->orWhere(function ($q2) use ($cursor) {
+                          $q2->where('occurred_at', $cursor['occurred_at'])
+                             ->where('id', '<', $cursor['id']);
+                      });
+                });
+            }
+        }
+
+        // Capped count for display. Compute it after applying the cursor so the
+        // footer metadata reflects the same remaining slice as the current page.
+        // reorder() drops ORDER BY so the DB can early-exit at LIMIT without sorting.
+        $countResult = (clone $query)->reorder()->limit(1001)->get(['id'])->count();
+
+        // Fetch one extra to detect has_next
+        $items = $query->limit($perPage + 1)->get();
+        $hasNext = $items->count() > $perPage;
+        $items = $items->take($perPage);
+
+        // Build next_cursor from last item
+        $nextCursor = null;
+        if ($hasNext && $last = $items->last()) {
+            $nextCursor = base64_encode(json_encode([
+                'occurred_at' => $last->occurred_at->format('Y-m-d H:i:s'),
+                'id' => $last->id,
+            ]));
+        }
 
         return response()->json([
-            'data' => $logs->items(),
+            'data' => $items->values(),
             'meta' => [
-                'current_page' => $logs->currentPage(),
-                'last_page' => $logs->lastPage(),
-                'per_page' => $logs->perPage(),
-                'total' => $logs->total(),
+                'has_next'       => $hasNext,
+                'next_cursor'    => $nextCursor,
+                'per_page'       => $perPage,
+                'count'          => min($countResult, 1000),
+                'has_next_count' => $countResult > 1000,
             ],
         ]);
     }

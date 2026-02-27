@@ -103,25 +103,29 @@
     <div x-show="!loading && logs.length > 0" x-cloak
         class="flex items-center justify-between px-3 sm:px-4 py-3 surface-1 border-t border-[var(--border)]">
         <p class="text-sm text-[var(--text-muted)] font-mono hidden sm:block">
-            Showing <span class="font-medium text-[var(--text-primary)]" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
-            to <span class="font-medium text-[var(--text-primary)]" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
-            of <span class="font-medium text-[var(--accent)]" x-text="meta.total?.toLocaleString()"></span>
+            <template x-if="shouldShowGlobalTotal()">
+                <span>
+                    <span class="font-medium text-[var(--accent)]" x-text="stats.total?.toLocaleString()"></span> total logs
+                </span>
+            </template>
+            <template x-if="!shouldShowGlobalTotal()">
+                <span>
+                    <span class="font-medium text-[var(--text-primary)]" x-text="meta.has_next_count ? meta.count.toLocaleString() + '+' : meta.count.toLocaleString()"></span> logs
+                </span>
+            </template>
         </p>
-        <p class="text-sm text-[var(--text-muted)] font-mono sm:hidden">
-            <span class="text-[var(--accent)]" x-text="meta.current_page"></span>/<span x-text="meta.last_page"></span>
+        <p class="text-sm text-[var(--text-muted)] font-mono sm:hidden"
+           x-text="shouldShowGlobalTotal() ? stats.total?.toLocaleString() : (meta.has_next_count ? meta.count.toLocaleString() + '+' : meta.count.toLocaleString())">
         </p>
         <div class="flex items-center gap-1">
-            <button @click="prevPage()" :disabled="meta.current_page <= 1"
+            <button @click="prevPage()" :disabled="cursorStack.length === 0"
                 class="btn-ghost h-8 px-2 sm:px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
                 <svg class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
                 <span class="hidden sm:inline">Previous</span>
             </button>
-            <span class="px-2 sm:px-3 text-sm text-[var(--text-muted)] font-mono hidden sm:inline">
-                <span x-text="meta.current_page" class="text-[var(--accent)]"></span> / <span x-text="meta.last_page"></span>
-            </span>
-            <button @click="nextPage()" :disabled="meta.current_page >= meta.last_page"
+            <button @click="nextPage()" :disabled="!meta.has_next"
                 class="btn-ghost h-8 px-2 sm:px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
                 <svg class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>

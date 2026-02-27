@@ -12,7 +12,7 @@ function logScope() {
         sidebarOpen: window.innerWidth >= 1024,
         screenWidth: window.innerWidth,
         logs: [],
-        meta: { current_page: 1, last_page: 1, per_page: 50, total: 0 },
+        meta: { has_next: false, next_cursor: null, per_page: 50, count: 0, has_next_count: false },
         stats: {},
         loading: true,
         error: null,
@@ -68,7 +68,8 @@ function logScope() {
         showAllChannels: false,
         allChannels: config.channels || [],
         channelsVisibleLimit: 8,
-        page: 1,
+        cursor: null,
+        cursorStack: [],
         _fetchLogsDebounceTimer: null,
         _fetchLogsController: null,
 
@@ -144,6 +145,10 @@ function logScope() {
             const excludeHttpMethods = params.getAll('exclude_http_method[]');
             if (excludeHttpMethods.length > 0) this.filters.excludeHttpMethods = excludeHttpMethods;
 
+            // Load statuses
+            const statuses = params.getAll('statuses[]');
+            if (statuses.length > 0) this.filters.statuses = statuses;
+
             // Load date range
             if (params.get('from')) this.filters.from = params.get('from');
             if (params.get('to')) this.filters.to = params.get('to');
@@ -165,10 +170,13 @@ function logScope() {
                 this.searches[0].exclude = true;
             }
 
-            // Load page
-            if (params.get('page')) {
-                this.page = parseInt(params.get('page')) || 1;
-            }
+            // Load cursor.
+            // Note: cursorStack cannot be restored from the URL — it only exists
+            // in memory for the current session. A deep-linked cursor URL will
+            // show the correct records but the Previous button will be disabled
+            // because there is no stack to pop. This is an intentional tradeoff
+            // of stateless cursor URLs.
+            if (params.get('cursor')) this.cursor = params.get('cursor');
 
             // Return log ID for deep linking (handled after init)
             return params.get('log') || null;
@@ -188,6 +196,9 @@ function logScope() {
             // Add HTTP methods
             this.filters.httpMethods.forEach(m => params.append('http_method[]', m));
             this.filters.excludeHttpMethods.forEach(m => params.append('exclude_http_method[]', m));
+
+            // Add statuses
+            this.filters.statuses.forEach(s => params.append('statuses[]', s));
 
             // Add date range
             if (this.filters.from) params.set('from', this.filters.from);
@@ -210,8 +221,8 @@ function logScope() {
                 }
             }
 
-            // Add page if not first
-            if (this.page > 1) params.set('page', this.page);
+            // Add cursor if navigated beyond first page
+            if (this.cursor) params.set('cursor', this.cursor);
 
             // Add selected log ID for deep linking
             if (this.selectedLog?.id) params.set('log', this.selectedLog.id);
@@ -230,7 +241,8 @@ function logScope() {
 
         removeSearch(index) {
             this.searches.splice(index, 1);
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -239,7 +251,7 @@ function logScope() {
             this._fetchLogsDebounceTimer = setTimeout(() => this.fetchLogs(), 150);
         },
 
-        hasActiveFilters() {
+        hasNonStatusFilters() {
             return this.filters.levels.length > 0 ||
                 this.filters.excludeLevels.length > 0 ||
                 this.filters.channels.length > 0 ||
@@ -253,6 +265,13 @@ function logScope() {
                 this.filters.user_id ||
                 this.filters.ip_address ||
                 this.filters.url;
+        },
+
+        shouldShowGlobalTotal() {
+            return !this.cursor &&
+                !this.hasNonStatusFilters() &&
+                this.filters.statuses.length === 0 &&
+                typeof this.stats.total === 'number';
         },
 
         toggleHttpMethod(method) {
@@ -270,7 +289,8 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeHttpMethods.splice(inExclude, 1);
             }
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -279,7 +299,8 @@ function logScope() {
             const inExclude = this.filters.excludeHttpMethods.indexOf(method);
             if (inInclude !== -1) this.filters.httpMethods.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeHttpMethods.splice(inExclude, 1);
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -322,7 +343,8 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeLevels.splice(inExclude, 1);
             }
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -331,7 +353,8 @@ function logScope() {
             const inExclude = this.filters.excludeLevels.indexOf(level);
             if (inInclude !== -1) this.filters.levels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeLevels.splice(inExclude, 1);
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -350,7 +373,8 @@ function logScope() {
                 // Exclude → Neutral
                 this.filters.excludeChannels.splice(inExclude, 1);
             }
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -359,7 +383,8 @@ function logScope() {
             const inExclude = this.filters.excludeChannels.indexOf(channel);
             if (inInclude !== -1) this.filters.channels.splice(inInclude, 1);
             if (inExclude !== -1) this.filters.excludeChannels.splice(inExclude, 1);
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -409,7 +434,7 @@ function logScope() {
             this.error = null;
             try {
                 const params = new URLSearchParams();
-                params.append('page', this.page);
+                if (this.cursor) params.append('cursor', this.cursor);
                 this.filters.statuses.forEach(s => params.append('statuses[]', s));
                 if (this.filters.from) params.append('from', this.filters.from);
                 if (this.filters.to) params.append('to', this.filters.to);
@@ -449,7 +474,7 @@ function logScope() {
                 if (!response.ok) {
                     this.handleApiError(response, 'fetching logs');
                     this.logs = [];
-                    this.meta = { current_page: 1, last_page: 1, per_page: 50, total: 0 };
+                    this.meta = { has_next: false, next_cursor: null, per_page: 50, count: 0, has_next_count: false };
                     return;
                 }
 
@@ -649,7 +674,8 @@ function logScope() {
             } else {
                 this.filters.statuses.splice(index, 1);
             }
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -661,7 +687,8 @@ function logScope() {
                 // Select all
                 this.filters.statuses = this.statuses.map(s => s.value);
             }
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
             this.debouncedFetchLogs();
         },
 
@@ -1134,7 +1161,8 @@ function logScope() {
                 ip_address: '',
                 url: ''
             };
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
         },
 
         resetFiltersForPivot() {
@@ -1153,7 +1181,8 @@ function logScope() {
             this.filters.ip_address = '';
             this.filters.url = '';
             // from/to preserved intentionally
-            this.page = 1;
+            this.cursor = null;
+            this.cursorStack = [];
         },
 
         clearFilters() {
@@ -1219,15 +1248,16 @@ function logScope() {
         },
 
         prevPage() {
-            if (this.meta.current_page > 1) {
-                this.page = this.meta.current_page - 1;
+            if (this.cursorStack.length > 0) {
+                this.cursor = this.cursorStack.pop();
                 this.fetchLogs();
             }
         },
 
         nextPage() {
-            if (this.meta.current_page < this.meta.last_page) {
-                this.page = this.meta.current_page + 1;
+            if (this.meta.has_next) {
+                this.cursorStack.push(this.cursor);
+                this.cursor = this.meta.next_cursor;
                 this.fetchLogs();
             }
         },
@@ -1294,6 +1324,8 @@ function logScope() {
                     if (this.shortcuts[event.key]) {
                         event.preventDefault();
                         this.filters.statuses = [this.shortcuts[event.key]];
+                        this.cursor = null;
+                        this.cursorStack = [];
                         this.debouncedFetchLogs();
                     }
                     break;
