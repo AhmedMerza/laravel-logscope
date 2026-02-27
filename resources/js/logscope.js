@@ -265,26 +265,26 @@ function logScope() {
         },
 
         filterByTraceId(traceId) {
+            this.resetFiltersForPivot();
             this.filters.trace_id = traceId;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
-            this.page = 1;
             this.debouncedFetchLogs();
         },
 
         filterByUserId(userId) {
+            this.resetFiltersForPivot();
             this.filters.user_id = userId;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
-            this.page = 1;
             this.debouncedFetchLogs();
         },
 
         filterByIpAddress(ip) {
+            this.resetFiltersForPivot();
             this.filters.ip_address = ip;
             this.sections.request = true;
             localStorage.setItem('logscope-section-request', 'true');
-            this.page = 1;
             this.debouncedFetchLogs();
         },
 
@@ -1098,6 +1098,25 @@ function logScope() {
                 ip_address: '',
                 url: ''
             };
+            this.page = 1;
+        },
+
+        resetFiltersForPivot() {
+            this.searches = [{ field: 'any', value: '', exclude: false }];
+            this.searchMode = 'and';
+            this.useRegex = false;
+            this.filters.levels = [];
+            this.filters.excludeLevels = [];
+            this.filters.channels = [];
+            this.filters.excludeChannels = [];
+            this.filters.httpMethods = [];
+            this.filters.excludeHttpMethods = [];
+            this.filters.statuses = [];
+            this.filters.trace_id = '';
+            this.filters.user_id = '';
+            this.filters.ip_address = '';
+            this.filters.url = '';
+            // from/to preserved intentionally
             this.page = 1;
         },
 
