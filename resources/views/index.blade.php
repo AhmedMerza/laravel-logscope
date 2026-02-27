@@ -42,6 +42,7 @@ window.logScopeConfig = {
     jsonViewer: @json($jsonViewer),
     statuses: @json($statuses),
     shortcuts: @json($shortcuts),
+    actionShortcuts: @json(config('logscope.keyboard_shortcuts', [])),
     channels: @json($channels),
     forbiddenRedirect: @json(config('logscope.routes.forbidden_redirect', '/')),
     unauthenticatedRedirect: @json(config('logscope.routes.unauthenticated_redirect', '/login')),

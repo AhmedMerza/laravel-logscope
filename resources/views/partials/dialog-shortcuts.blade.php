@@ -45,6 +45,14 @@
                 <span class="text-sm text-[var(--text-secondary)]">Close panel</span>
                 <kbd>Esc</kbd>
             </div>
+            <div x-show="actionShortcuts.prev_page" class="flex items-center justify-between">
+                <span class="text-sm text-[var(--text-secondary)]">Previous page</span>
+                <kbd x-text="actionShortcuts.prev_page"></kbd>
+            </div>
+            <div x-show="actionShortcuts.next_page" class="flex items-center justify-between">
+                <span class="text-sm text-[var(--text-secondary)]">Next page</span>
+                <kbd x-text="actionShortcuts.next_page"></kbd>
+            </div>
 
             <template x-if="Object.keys(shortcuts).length > 0">
                 <div>
@@ -74,6 +82,10 @@
             <div class="flex items-center justify-between">
                 <span class="text-sm text-[var(--text-secondary)]">Clear filters</span>
                 <kbd>c</kbd>
+            </div>
+            <div x-show="actionShortcuts.refresh" class="flex items-center justify-between">
+                <span class="text-sm text-[var(--text-secondary)]">Refresh data</span>
+                <kbd x-text="actionShortcuts.refresh"></kbd>
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-sm text-[var(--text-secondary)]">Toggle dark mode</span>

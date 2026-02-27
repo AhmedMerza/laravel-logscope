@@ -29,6 +29,12 @@ function logScope() {
         _lastJsonLogId: null,
         statuses: config.statuses || [],
         shortcuts: config.shortcuts || {},
+        actionShortcuts: {
+            refresh: 'r',
+            prev_page: 'h',
+            next_page: 'l',
+            ...(config.actionShortcuts || {})
+        },
         searches: [{ field: 'any', value: '', exclude: false }],
         searchMode: 'and',
         useRegex: false,
@@ -1295,6 +1301,27 @@ function logScope() {
                 return;
             }
 
+            const actionShortcut = [
+                {
+                    key: this.actionShortcuts.refresh,
+                    run: () => Promise.all([this.fetchLogs(), this.fetchStats()])
+                },
+                {
+                    key: this.actionShortcuts.prev_page,
+                    run: () => this.prevPage()
+                },
+                {
+                    key: this.actionShortcuts.next_page,
+                    run: () => this.nextPage()
+                }
+            ].find(shortcut => shortcut.key && shortcut.key === event.key);
+
+            if (actionShortcut) {
+                event.preventDefault();
+                actionShortcut.run();
+                return;
+            }
+
             switch (event.key) {
                 case '/':
                     event.preventDefault();
@@ -1326,18 +1353,6 @@ function logScope() {
                 case 'c':
                     event.preventDefault();
                     this.clearFilters();
-                    break;
-                case 'r':
-                    event.preventDefault();
-                    Promise.all([this.fetchLogs(), this.fetchStats()]);
-                    break;
-                case 'h':
-                    event.preventDefault();
-                    this.prevPage();
-                    break;
-                case 'l':
-                    event.preventDefault();
-                    this.nextPage();
                     break;
                 case 'n':
                     event.preventDefault();

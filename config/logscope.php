@@ -149,10 +149,10 @@ return [
     | - shortcut: Single key for keyboard shortcut to filter by this status
     |
     | Built-in defaults:
-    |   open:          { label: 'Open',          color: 'gray',   closed: false, shortcut: 'o' }
-    |   investigating: { label: 'Investigating', color: 'yellow', closed: false, shortcut: 'i' }
-    |   resolved:      { label: 'Resolved',      color: 'green',  closed: true,  shortcut: 'r' }
-    |   ignored:       { label: 'Ignored',       color: 'slate',  closed: true,  shortcut: 'x' }
+    |   open:          { label: 'Open',          color: 'gray',   closed: false, shortcut: 'O' }
+    |   investigating: { label: 'Investigating', color: 'yellow', closed: false, shortcut: 'I' }
+    |   resolved:      { label: 'Resolved',      color: 'green',  closed: true,  shortcut: 'R' }
+    |   ignored:       { label: 'Ignored',       color: 'slate',  closed: true,  shortcut: 'X' }
     |
     | Example - override built-in + add custom:
     |
@@ -178,6 +178,22 @@ return [
     */
 
     'statuses' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Keyboard Shortcuts
+    |--------------------------------------------------------------------------
+    |
+    | Configure high-frequency keyboard shortcuts for common actions.
+    | Set any shortcut to null to disable it.
+    |
+    */
+
+    'keyboard_shortcuts' => [
+        'refresh' => 'r',
+        'prev_page' => 'h',
+        'next_page' => 'l',
+    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -51,10 +51,10 @@ enum LogStatus: string
     public function shortcut(): string
     {
         return match ($this) {
-            self::Open => 'o',
-            self::Investigating => 'i',
-            self::Resolved => 'r',
-            self::Ignored => 'x',
+            self::Open => 'O',
+            self::Investigating => 'I',
+            self::Resolved => 'R',
+            self::Ignored => 'X',
         };
     }
 
