@@ -252,7 +252,7 @@ Type directly in the search box using `field:value` syntax:
 
 > **Tip:** Request context filters (trace ID, user ID, IP, URL) support partial matching. Type `192.168` to find all IPs starting with that prefix, or `42` to find user IDs containing "42".
 
-> **Tip:** Click on trace ID, user ID, or IP address in the detail panel to quickly filter by that value.
+> **Tip:** Click on trace ID, user ID, or IP address in the detail panel to pivot your investigation — severity, channel, status, and search filters are cleared so nothing is hidden. Your date range is preserved.
 
 **Examples:**
 
