@@ -194,8 +194,25 @@ class LogController extends Controller
         // reorder() drops ORDER BY so the DB can early-exit at LIMIT without sorting.
         $countResult = (clone $query)->reorder()->limit(1001)->get(['id'])->count();
 
-        // Fetch one extra to detect has_next
-        $items = $query->limit($perPage + 1)->get();
+        // Fetch one extra to detect has_next. Select only columns the list
+        // view needs — message/context/etc are fetched separately by show().
+        $items = $query->select([
+            'id',
+            'level',
+            'message_preview',
+            'context_preview',
+            'channel',
+            'source',
+            'source_line',
+            'occurred_at',
+            'status',
+            'trace_id',
+            'user_id',
+            'ip_address',
+            'http_method',
+            'url',
+            'is_truncated',
+        ])->limit($perPage + 1)->get();
         $hasNext = $items->count() > $perPage;
         $items = $items->take($perPage);
 
