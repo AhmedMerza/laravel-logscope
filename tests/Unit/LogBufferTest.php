@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use LogScope\Services\LogBuffer;
 
 beforeEach(function () {
@@ -114,5 +117,65 @@ describe('flushStatic', function () {
 
         // Restore the application so Pest's teardown can run
         $this->refreshApplication();
+    });
+
+    it('normalizes mixed-shape rows to a shared column set before bulk insert', function () {
+        $method = new ReflectionMethod(LogBuffer::class, 'normalizeChunk');
+        $method->setAccessible(true);
+
+        $rows = $method->invoke(null, [
+            [
+                'message' => 'With context',
+                'context' => '{"foo":"bar"}',
+                'channel' => 'stack',
+                'is_truncated' => true,
+            ],
+            [
+                'message' => 'Without context',
+            ],
+        ]);
+
+        expect($rows)->toHaveCount(2);
+        expect(array_keys($rows[0]))->toBe(array_keys($rows[1]));
+        expect($rows[0]['context'])->toBe('{"foo":"bar"}');
+        expect($rows[0]['channel'])->toBe('stack');
+        expect($rows[0]['is_truncated'])->toBeTrue();
+        expect($rows[1]['context'])->toBeNull();
+        expect($rows[1]['channel'])->toBeNull();
+        expect($rows[1]['is_truncated'])->toBeFalse();
+    });
+
+    it('keeps earlier chunks when a later chunk fails to insert', function () {
+        Schema::create(config('logscope.table', 'log_entries'), function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('level')->nullable();
+            $table->text('message');
+            $table->text('message_preview')->nullable();
+            $table->timestamp('occurred_at');
+            $table->string('status');
+            $table->boolean('is_truncated')->default(false);
+            $table->timestamp('created_at')->nullable();
+        });
+
+        $buffer = new LogBuffer(app());
+
+        for ($i = 0; $i < 500; $i++) {
+            $buffer->add([
+                'level' => 'info',
+                'message' => "Valid {$i}",
+            ]);
+        }
+
+        // Missing message makes this row invalid when inserted by itself.
+        $buffer->add([
+            'level' => 'info',
+        ]);
+
+        LogBuffer::flushStatic();
+
+        $count = DB::table(config('logscope.table', 'log_entries'))->count();
+
+        expect($count)->toBe(500);
+        expect(LogBuffer::getBuffer())->toBe([]);
     });
 });

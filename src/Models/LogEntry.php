@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use LogScope\Database\Factories\LogEntryFactory;
 use LogScope\Enums\LogStatus;
 
@@ -317,6 +318,73 @@ class LogEntry extends Model
         }
 
         return substr($content, 0, $maxLength - 3).'...';
+    }
+
+    /**
+     * Prepare raw insert-ready data for a log entry without persisting it.
+     *
+     * Performs the same preview generation and truncation as createEntry(),
+     * but also sets id (ULID), created_at, and JSON-encodes context so the
+     * result can be passed directly to LogEntry::insert() for batch writes.
+     *
+     * NOTE: Keep in sync with createEntry() — any new field defaults or
+     * transforms added there must be mirrored here.
+     */
+    public static function prepareData(array $attributes): array
+    {
+        $limits = config('logscope.limits', []);
+
+        // Generate message preview and handle truncation
+        if (isset($attributes['message'])) {
+            $maxPreview = $limits['message_preview_length'] ?? 500;
+            $maxInline  = $limits['message_inline_max'] ?? 16000;
+            $truncateAt = $limits['truncate_at'] ?? 1000000;
+
+            $attributes['message_preview'] = static::createPreview($attributes['message'], $maxPreview);
+
+            if (strlen($attributes['message']) > $truncateAt) {
+                $attributes['message'] = substr($attributes['message'], 0, $truncateAt);
+                $attributes['is_truncated'] = true;
+            } elseif (strlen($attributes['message']) > $maxInline) {
+                $attributes['is_truncated'] = true;
+            }
+        }
+
+        // Generate context preview, handle truncation, then JSON-encode for insert()
+        if (isset($attributes['context']) && is_array($attributes['context'])) {
+            $contextJson = json_encode($attributes['context']);
+            $maxPreview = $limits['context_preview_length'] ?? 500;
+            $truncateAt = $limits['truncate_at'] ?? 1000000;
+
+            $attributes['context_preview'] = static::createPreview($contextJson, $maxPreview);
+
+            if (strlen($contextJson) > $truncateAt) {
+                $attributes['context'] = json_encode(['_truncated' => true, '_original_size' => strlen($contextJson)]);
+                $attributes['is_truncated'] = true;
+            } else {
+                $attributes['context'] = $contextJson;
+            }
+        }
+
+        // Normalise occurred_at to a DB-safe string
+        if (! isset($attributes['occurred_at'])) {
+            $attributes['occurred_at'] = now()->format('Y-m-d H:i:s');
+        } elseif ($attributes['occurred_at'] instanceof \DateTimeInterface) {
+            $attributes['occurred_at'] = $attributes['occurred_at']->format('Y-m-d H:i:s');
+        }
+
+        // Default status
+        if (! isset($attributes['status'])) {
+            $attributes['status'] = LogStatus::Open->value;
+        }
+
+        // insert() bypasses HasUlids model boot — generate ULID explicitly
+        $attributes['id'] = strtolower((string) Str::ulid());
+
+        // insert() bypasses Eloquent; created_at has DB default but set explicitly for clarity
+        $attributes['created_at'] = now()->format('Y-m-d H:i:s');
+
+        return $attributes;
     }
 
     /**

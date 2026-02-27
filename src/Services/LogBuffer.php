@@ -98,8 +98,14 @@ class LogBuffer implements LogBufferInterface
         self::$buffer = [];
 
         try {
-            foreach ($logsToFlush as $data) {
-                LogEntry::createEntry($data);
+            $rows = array_map(fn ($data) => LogEntry::prepareData($data), $logsToFlush);
+
+            foreach (array_chunk($rows, 500) as $chunk) {
+                try {
+                    LogEntry::insert(self::normalizeChunk($chunk));
+                } catch (Throwable $e) {
+                    error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                }
             }
         } catch (Throwable $e) {
             error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
@@ -122,5 +128,53 @@ class LogBuffer implements LogBufferInterface
     public static function getBuffer(): array
     {
         return self::$buffer;
+    }
+
+    /**
+     * Ensure every row in a bulk insert chunk shares the same column set.
+     *
+     * Multi-row insert statements require identical columns per row; buffered
+     * logs are sparse because optional fields are omitted when absent.
+     *
+     * @param  array<int, array<string, mixed>>  $chunk
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function normalizeChunk(array $chunk): array
+    {
+        $columns = [];
+
+        foreach ($chunk as $row) {
+            foreach (array_keys($row) as $column) {
+                $columns[$column] = true;
+            }
+        }
+
+        $normalized = [];
+
+        foreach ($chunk as $row) {
+            $normalizedRow = [];
+
+            foreach (array_keys($columns) as $column) {
+                $normalizedRow[$column] = array_key_exists($column, $row)
+                    ? $row[$column]
+                    : self::defaultValueForMissingColumn($column);
+            }
+
+            $normalized[] = $normalizedRow;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Preserve insert-safe defaults for sparse rows when a chunk introduces
+     * optional columns that are non-nullable in the schema.
+     */
+    protected static function defaultValueForMissingColumn(string $column): mixed
+    {
+        return match ($column) {
+            'is_truncated' => false,
+            default => null,
+        };
     }
 }
