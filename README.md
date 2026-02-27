@@ -21,6 +21,43 @@ Visit `/logscope` in your browser. That's it!
 
 ---
 
+## What's New
+
+### v1.5.0 — Performance Overhaul
+
+To understand how LogScope holds up at scale, we stress-tested against a SQLite database with **1,000,052 log entries** — significantly more than a typical production deployment (weekly pruning keeps most installs around 400k). The results exposed three fixable bottlenecks.
+
+| Scenario | Before | After | Improvement |
+|----------|--------|-------|-------------|
+| First page load | 20.6 ms | 0.6 ms | **34× faster** |
+| Page 100 | 29.4 ms | 1.2 ms | **25× faster** |
+| Page 1,000 | 95.3 ms | 6.4 ms | **15× faster** |
+| Filtered query | 461.4 ms | 0.7 ms | **659× faster** |
+| Response payload | 47.7 KB | 29.4 KB | **38% smaller** |
+
+**What changed and why:**
+
+**1. Narrow SELECT on the list query**
+The list was running `SELECT *`, fetching full `message` and `context` columns (up to 48 KB per row × 50 rows) that the list view never renders — it only shows short previews. Full content still loads, but only when you open a specific entry.
+
+**2. Keyset (cursor) pagination instead of OFFSET**
+`LIMIT 50 OFFSET 49950` tells the database to scan and throw away 49,950 rows before returning your 50. Cursor pagination stores a `(occurred_at, id)` bookmark and jumps directly — O(1) regardless of depth. In practice most users find what they need on page 1, but it means deep pagination no longer degrades.
+
+**3. No COUNT on filtered queries**
+Laravel's paginator ran a `COUNT(*)` with all active filters on every page change to compute total pages. On large filtered result sets this was the dominant cost — most of the 461 ms on filtered queries.
+
+**The trade-off:** when filters are active, the count is capped at 1,000 and shows "1,000+" beyond that. The real unfiltered total is still shown with no extra cost (it comes from the cached stats). When you're actively filtering you're in *find mode* — "1,000+ errors in the last hour" tells you everything actionable. Knowing the exact number beyond that doesn't change what you do next.
+
+---
+
+### v1.4.2 — Responsive Design & Stability
+
+Full responsive layout for mobile, tablet, and desktop. The sidebar, log table, detail panel, and filters all adapt to screen size. LogScope is now usable from a phone.
+
+Also in v1.4.x: fixed a filter race condition with debounce + AbortController, pivot filtering from the detail panel (trace ID / user ID / IP), and several stability fixes.
+
+---
+
 ## Table of Contents
 
 - [Features](#-features)

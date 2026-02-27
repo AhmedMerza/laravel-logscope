@@ -946,11 +946,17 @@ function logScope() {
 
         // === UI HELPERS ===
         selectLog(log) {
-            this.selectedLog = this.selectedLog?.id === log.id ? null : log;
+            if (this.selectedLog?.id === log.id) {
+                this.selectedLog = null;
+                this.syncFiltersToUrl();
+                return;
+            }
+            this.selectedLog = log;
             this.syncFiltersToUrl();
-            if (this.selectedLog && this.screenWidth < 1024) {
+            if (this.screenWidth < 1024) {
                 this.sidebarOpen = false;
             }
+            this.fetchLogById(log.id);
         },
 
         closeSidebarOnBackdrop() {
@@ -962,7 +968,7 @@ function logScope() {
             this.syncFiltersToUrl();
         },
 
-        // Fetch a single log by ID (for deep linking)
+        // Fetch a single log by ID (for deep linking and detail view)
         async fetchLogById(id) {
             try {
                 const response = await fetch(`${this.routes.apiBase}/logs/${id}`, {
@@ -977,6 +983,8 @@ function logScope() {
                     return;
                 }
                 const data = await response.json();
+                // Discard stale responses — user may have navigated away
+                if (this.selectedLog?.id !== id) return;
                 this.selectedLog = data.data;
                 this.syncFiltersToUrl();
             } catch (error) {
@@ -1382,6 +1390,7 @@ function logScope() {
         selectNextLog() {
             if (this.logs.length === 0) return;
 
+            const prevId = this.selectedLog?.id;
             if (!this.selectedLog) {
                 this.selectedLog = this.logs[0];
             } else {
@@ -1391,11 +1400,13 @@ function logScope() {
                 }
             }
             this.scrollToSelectedLog();
+            if (this.selectedLog?.id !== prevId) this.fetchLogById(this.selectedLog.id);
         },
 
         selectPrevLog() {
             if (this.logs.length === 0) return;
 
+            const prevId = this.selectedLog?.id;
             if (!this.selectedLog) {
                 this.selectedLog = this.logs[0];
             } else {
@@ -1405,6 +1416,7 @@ function logScope() {
                 }
             }
             this.scrollToSelectedLog();
+            if (this.selectedLog?.id !== prevId) this.fetchLogById(this.selectedLog.id);
         },
 
         scrollToSelectedLog() {
