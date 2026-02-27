@@ -1,15 +1,15 @@
 <!-- Detail Panel -->
 <div x-show="selectedLog" x-cloak
-    class="flex-shrink-0 surface-1 border-l border-[var(--border)] flex flex-col overflow-hidden relative"
-    :style="{ width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' }"
-    x-transition:enter="transition ease-out duration-150"
-    x-transition:enter-start="translate-x-4"
-    x-transition:enter-end="translate-x-0"
-    x-transition:leave="transition ease-in duration-100"
-    x-transition:leave-start="translate-x-0"
-    x-transition:leave-end="translate-x-4">
+    class="logscope-detail-panel flex-shrink-0 surface-1 border-l border-[var(--border)] flex flex-col overflow-hidden relative"
+    :style="screenWidth >= 768 ? { width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' } : {}"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 scale-[0.98]"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-[0.98]">
     <!-- Resize Handle -->
-    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10"
+    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden md:block"
         :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"
         @mousedown.prevent="startResize($event)"></div>
     <!-- Panel Header -->
@@ -17,7 +17,7 @@
         <h3 class="font-semibold text-[var(--text-primary)]">Log Details</h3>
         <div class="flex items-center gap-1">
             <button x-show="detailPanelWidth" @click="resetPanelWidth()"
-                class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
+                class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors hidden md:flex items-center justify-center"
                 title="Reset panel width">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
@@ -197,7 +197,7 @@
     </div>
 
     <!-- Panel Footer -->
-    <div class="flex items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
         <template x-if="features.status">
             <div class="flex-1 relative" x-data="{ statusOpen: false }">
                 <button @click="statusOpen = !statusOpen"

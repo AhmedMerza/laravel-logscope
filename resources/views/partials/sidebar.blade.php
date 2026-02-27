@@ -1,6 +1,7 @@
 <!-- Sidebar -->
-<aside class="w-64 flex-shrink-0 surface-1 border-r border-[var(--border)] flex flex-col"
-    :class="{ 'hidden': !sidebarOpen }" x-cloak>
+<aside class="logscope-sidebar w-64 flex-shrink-0 surface-1 border-r border-[var(--border)] flex flex-col"
+    :class="sidebarOpen ? 'sidebar-open' : 'sidebar-closed'"
+    x-cloak>
     <!-- Logo -->
     <div class="h-14 flex items-center gap-3 px-4 border-b border-[var(--border)]">
         <div class="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent-glow)]">

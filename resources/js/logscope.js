@@ -9,7 +9,8 @@ function logScope() {
 
     return {
         // === STATE ===
-        sidebarOpen: true,
+        sidebarOpen: window.innerWidth >= 1024,
+        screenWidth: window.innerWidth,
         logs: [],
         meta: { current_page: 1, last_page: 1, per_page: 50, total: 0 },
         stats: {},
@@ -20,7 +21,6 @@ function logScope() {
         showKeyboardHelp: false,
         detailPanelWidth: parseInt(localStorage.getItem('logscope_panel_width')) || 0,
         isResizing: false,
-        minPanelWidth: 360,
         quickFilters: config.quickFilters || [],
         features: config.features || {},
         jsonViewer: config.jsonViewer || { collapseThreshold: 5, autoCollapseKeys: [] },
@@ -89,6 +89,25 @@ function logScope() {
             this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
             this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
             this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
+
+            // Responsive: update screenWidth on resize, manage sidebar and panel
+            const onResize = () => {
+                this.screenWidth = window.innerWidth;
+                if (window.innerWidth >= 1024 && !this.sidebarOpen) {
+                    this.sidebarOpen = true;
+                }
+                if (window.innerWidth < 768 && this.sidebarOpen) {
+                    this.sidebarOpen = false;
+                }
+                if (this.detailPanelWidth) {
+                    const max = this.getMaxPanelWidth();
+                    if (this.detailPanelWidth > max) {
+                        this.detailPanelWidth = max;
+                        localStorage.setItem('logscope_panel_width', max);
+                    }
+                }
+            };
+            window.addEventListener('resize', onResize);
 
             // Load filters from URL on init
             const pendingLogId = this.loadFiltersFromUrl();
@@ -876,6 +895,13 @@ function logScope() {
         selectLog(log) {
             this.selectedLog = this.selectedLog?.id === log.id ? null : log;
             this.syncFiltersToUrl();
+            if (this.selectedLog && this.screenWidth < 1024) {
+                this.sidebarOpen = false;
+            }
+        },
+
+        closeSidebarOnBackdrop() {
+            if (this.screenWidth < 1024) this.sidebarOpen = false;
         },
 
         closePanel() {
@@ -907,29 +933,39 @@ function logScope() {
 
         getDefaultPanelWidth() {
             const width = window.innerWidth;
-            if (width >= 1920) return 640; // Ultra-wide / 2xl
-            if (width >= 1536) return 560; // xl
-            if (width >= 1280) return 480; // lg
+            if (width < 768)  return 0;
+            if (width < 1024) return Math.floor(width * 0.88);
+            if (width >= 1920) return 640;
+            if (width >= 1536) return 560;
+            if (width >= 1280) return 480;
             return 400;
         },
 
         getMessagePreviewWidth() {
-            const sidebarWidth = this.sidebarOpen ? 256 : 0;
-            const panelWidth = this.selectedLog ? (this.detailPanelWidth || this.getDefaultPanelWidth()) : 0;
-            const tableOverhead = 350; // Approximate space for other columns (time, level, channel, padding)
-            const availableWidth = window.innerWidth - sidebarWidth - panelWidth - tableOverhead;
-            // Clamp between 200px min and available space
-            return Math.max(200, availableWidth);
+            const sidebarWidth = this.isDesktop() ? (this.sidebarOpen ? 256 : 0) : 0;
+            const panelWidth = (this.selectedLog && !this.isMobile())
+                ? (this.detailPanelWidth || this.getDefaultPanelWidth()) : 0;
+            const tableOverhead = this.isMobile() ? 180 : 350;
+            return Math.max(120, window.innerWidth - sidebarWidth - panelWidth - tableOverhead);
         },
 
         getMaxPanelWidth() {
-            // Max 50% of screen width, but at least 400px for usability
-            const sidebarWidth = this.sidebarOpen ? 256 : 0; // w-64 = 256px
+            if (this.screenWidth < 768) return 0;
+            // Tablet: sidebar is overlay (not in flow), so don't subtract it
+            const sidebarWidth = this.isDesktop() ? (this.sidebarOpen ? 256 : 0) : 0;
             const availableWidth = window.innerWidth - sidebarWidth;
             return Math.max(400, Math.min(900, Math.floor(availableWidth * 0.5)));
         },
 
+        isMobile()  { return this.screenWidth < 768; },
+        isDesktop() { return this.screenWidth >= 1024; },
+
+        getMinPanelWidth() {
+            return this.screenWidth < 768 ? 0 : 280;
+        },
+
         startResize(event) {
+            if (this.screenWidth < 768) return;
             this.isResizing = true;
             const startX = event.clientX;
             const startWidth = this.detailPanelWidth || this.getDefaultPanelWidth();
@@ -937,7 +973,7 @@ function logScope() {
 
             const onMouseMove = (e) => {
                 const delta = startX - e.clientX;
-                const newWidth = Math.min(maxWidth, Math.max(this.minPanelWidth, startWidth + delta));
+                const newWidth = Math.min(maxWidth, Math.max(this.getMinPanelWidth(), startWidth + delta));
                 this.detailPanelWidth = newWidth;
             };
 

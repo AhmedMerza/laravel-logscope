@@ -478,3 +478,61 @@ kbd {
     font-family: var(--font-mono);
     opacity: 0.5;
 }
+
+/* ============================================
+   RESPONSIVE LAYOUT
+   ============================================ */
+
+/* --- Sidebar: desktop (≥1024px) --- */
+.logscope-sidebar.sidebar-closed { display: none; }
+.logscope-sidebar.sidebar-open  { display: flex; }
+
+/* --- Sidebar: mobile/tablet (<1024px) --- */
+@media (max-width: 1023px) {
+    .logscope-sidebar {
+        position: fixed !important;
+        top: 0; left: 0; bottom: 0;
+        z-index: 50;
+        width: 280px;
+        display: flex !important;
+        transform: translateX(-100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 32px rgba(0, 0, 0, 0.5);
+    }
+    .logscope-sidebar.sidebar-open  { transform: translateX(0); }
+    .logscope-sidebar.sidebar-closed { transform: translateX(-100%); }
+}
+
+/* --- Sidebar backdrop --- */
+.logscope-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+}
+@media (max-width: 1023px) {
+    .logscope-backdrop { display: block; }
+}
+
+/* --- Detail panel: mobile full-screen overlay --- */
+@media (max-width: 767px) {
+    .logscope-detail-panel {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100% !important;
+        z-index: 60;
+        border-left: none !important;
+    }
+}
+
+/* --- Table: compact on mobile --- */
+@media (max-width: 767px) {
+    .log-table thead th,
+    .log-table tbody td { padding: 8px 8px; }
+}
+
+/* --- Touch-friendly row height --- */
+@media (max-width: 1023px) {
+    .log-row { min-height: 52px; }
+}

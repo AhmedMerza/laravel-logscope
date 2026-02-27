@@ -15,14 +15,14 @@
             <!-- Search input group -->
             <div class="flex-1 flex items-center gap-2 min-w-0">
                 <select x-model="searches[0].field"
-                    class="h-9 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)] flex-shrink-0 font-mono">
+                    class="h-9 px-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)] flex-shrink-0 font-mono hidden md:block">
                     <option value="any">Any field</option>
                     <option value="message">Message</option>
                     <option value="context">Context</option>
                     <option value="source">Source</option>
                 </select>
                 <button @click="searches[0].exclude = !searches[0].exclude; page = 1; fetchLogs()"
-                    class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
+                    class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0 hidden md:flex items-center"
                     :class="searches[0].exclude
                         ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
                         : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)]'"
@@ -30,14 +30,14 @@
                     NOT
                 </button>
                 <button x-show="features.regex" @click="useRegex = !useRegex; page = 1; fetchLogs()"
-                    class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0"
+                    class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0 hidden md:flex items-center"
                     :class="useRegex
                         ? 'bg-violet-500/20 text-violet-400 border-violet-500/50 shadow-[0_0_10px_rgba(139,92,246,0.2)]'
                         : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)]'"
                     title="Toggle regex mode">
                     .*
                 </button>
-                <div class="flex-1 relative min-w-[200px]">
+                <div class="flex-1 relative">
                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                         :class="searches[0].exclude ? 'text-red-400' : 'text-[var(--text-muted)]'">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -52,7 +52,7 @@
                 </div>
                 <!-- Add search button -->
                 <button @click="addSearch()"
-                    class="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] flex-shrink-0 transition-colors"
+                    class="h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] flex-shrink-0 transition-colors hidden md:flex"
                     title="Add search condition (Ctrl+Shift+F)">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -144,15 +144,15 @@
             <template x-if="features.status">
                 <div class="relative" x-data="{ statusFilterOpen: false }">
                     <button @click="statusFilterOpen = !statusFilterOpen"
-                        class="h-9 px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
+                        class="h-9 w-9 md:w-auto md:px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
                         :class="filters.statuses.length > 0
                             ? 'bg-[rgba(var(--accent-rgb),0.2)] text-[var(--accent)] shadow-[0_0_10px_rgba(16,185,129,0.2)]'
                             : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]'">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span x-text="getStatusFilterLabel()" class="font-medium"></span>
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <span x-text="getStatusFilterLabel()" class="font-medium hidden md:inline"></span>
+                        <svg class="w-4 h-4 hidden md:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
@@ -205,18 +205,18 @@
 
             <!-- Clear -->
             <button @click="clearFilters()"
-                class="btn-ghost h-9 px-3 rounded-lg text-sm font-medium"
+                class="btn-ghost h-9 px-3 rounded-lg text-sm font-medium hidden md:flex items-center"
                 title="Clear all filters">
                 Clear
             </button>
 
             <!-- Refresh -->
             <button @click="fetchLogs(); fetchStats()"
-                class="btn-primary h-9 px-4 rounded-lg text-sm flex items-center gap-2">
+                class="btn-primary h-9 px-3 md:px-4 rounded-lg text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                 </svg>
-                Refresh
+                <span class="hidden md:inline">Refresh</span>
             </button>
         </div>
     </div>

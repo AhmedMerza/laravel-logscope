@@ -1,11 +1,22 @@
 @extends('logscope::layout')
 
 @section('content')
-<div x-data="logScope()" x-init="init()" class="h-full flex"
+<div x-data="logScope()" x-init="init()" class="h-full flex overflow-hidden"
     @keydown.escape.window="closePanel()"
     @keydown.window="handleKeydown($event)">
 
     @include('logscope::partials.sidebar')
+
+    <div class="logscope-backdrop"
+        x-show="sidebarOpen && screenWidth < 1024"
+        @click="closeSidebarOnBackdrop()"
+        x-transition:enter="transition-opacity ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        x-cloak></div>
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0">

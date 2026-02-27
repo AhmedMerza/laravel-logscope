@@ -43,10 +43,10 @@
             <thead>
                 <tr>
                     <th class="w-[3px] p-0"></th>
-                    <th class="px-4 py-3 text-left w-40">Time</th>
-                    <th class="px-4 py-3 text-left w-24">Level</th>
-                    <th class="px-4 py-3 text-left">Message</th>
-                    <th class="px-4 py-3 text-left w-28">Channel</th>
+                    <th class="px-2 py-3 text-left w-28 sm:px-4 sm:w-40">Time</th>
+                    <th class="px-2 py-3 text-left w-20 sm:px-4 sm:w-24">Level</th>
+                    <th class="px-2 py-3 text-left sm:px-4">Message</th>
+                    <th class="px-4 py-3 text-left w-28 hidden sm:table-cell">Channel</th>
                 </tr>
             </thead>
             <tbody>
@@ -77,20 +77,20 @@
                                 </template>
                             </div>
                         </td>
-                        <td class="px-4 py-3 relative group">
+                        <td class="px-2 py-3 sm:px-4 relative group">
                             <span class="text-sm text-[var(--text-muted)] tabular-nums whitespace-nowrap cursor-help font-mono"
                                 x-text="formatRelativeTime(log.occurred_at)"></span>
                             <div class="absolute left-0 bottom-full mb-1 px-2 py-1 text-xs bg-[var(--surface-3)] text-[var(--text-primary)] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 font-mono"
                                 x-text="formatFullDateTime(log.occurred_at)"></div>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-2 py-3 sm:px-4">
                             <span class="level-badge" :class="'level-' + log.level" x-text="log.level"></span>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-2 py-3 sm:px-4">
                             <p class="text-sm text-[var(--text-primary)] truncate" :style="{ maxWidth: getMessagePreviewWidth() + 'px' }" x-text="log.message_preview || log.message"></p>
                             <p x-show="log.source" class="mt-0.5 text-xs text-[var(--text-muted)] truncate font-mono" x-text="formatSource(log.source, log.source_line)"></p>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="text-xs text-[var(--text-muted)] truncate block max-w-[120px] font-mono" :title="log.channel" x-text="log.channel"></span>
                         </td>
                     </tr>
@@ -101,23 +101,32 @@
 
     <!-- Pagination -->
     <div x-show="!loading && logs.length > 0" x-cloak
-        class="flex items-center justify-between px-4 py-3 surface-1 border-t border-[var(--border)]">
-        <p class="text-sm text-[var(--text-muted)] font-mono">
+        class="flex items-center justify-between px-3 sm:px-4 py-3 surface-1 border-t border-[var(--border)]">
+        <p class="text-sm text-[var(--text-muted)] font-mono hidden sm:block">
             Showing <span class="font-medium text-[var(--text-primary)]" x-text="((meta.current_page - 1) * meta.per_page) + 1"></span>
             to <span class="font-medium text-[var(--text-primary)]" x-text="Math.min(meta.current_page * meta.per_page, meta.total)"></span>
             of <span class="font-medium text-[var(--accent)]" x-text="meta.total?.toLocaleString()"></span>
         </p>
+        <p class="text-sm text-[var(--text-muted)] font-mono sm:hidden">
+            <span class="text-[var(--accent)]" x-text="meta.current_page"></span>/<span x-text="meta.last_page"></span>
+        </p>
         <div class="flex items-center gap-1">
             <button @click="prevPage()" :disabled="meta.current_page <= 1"
-                class="btn-ghost h-8 px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
-                Previous
+                class="btn-ghost h-8 px-2 sm:px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+                <svg class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                <span class="hidden sm:inline">Previous</span>
             </button>
-            <span class="px-3 text-sm text-[var(--text-muted)] font-mono">
+            <span class="px-2 sm:px-3 text-sm text-[var(--text-muted)] font-mono hidden sm:inline">
                 <span x-text="meta.current_page" class="text-[var(--accent)]"></span> / <span x-text="meta.last_page"></span>
             </span>
             <button @click="nextPage()" :disabled="meta.current_page >= meta.last_page"
-                class="btn-ghost h-8 px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed">
-                Next
+                class="btn-ghost h-8 px-2 sm:px-3 rounded text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1">
+                <svg class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <span class="hidden sm:inline">Next</span>
             </button>
         </div>
     </div>
