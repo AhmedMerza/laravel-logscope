@@ -393,7 +393,7 @@ class LogController extends Controller
     public function stats(): JsonResponse
     {
         $cacheKey = 'logscope:stats';
-        $cacheTtl = 60; // 60 seconds
+        $cacheTtl = config('logscope.cache_ttl', 60);
 
         $stats = Cache::remember($cacheKey, $cacheTtl, function () {
             return [
@@ -414,7 +414,7 @@ class LogController extends Controller
      */
     protected function getAvailableLevels(): array
     {
-        return Cache::remember('logscope:filters:levels', 60, function () {
+        return Cache::remember('logscope:filters:levels', config('logscope.cache_ttl', 60), function () {
             return LogEntry::distinct()
                 ->pluck('level')
                 ->sort()
@@ -428,7 +428,7 @@ class LogController extends Controller
      */
     protected function getAvailableChannels(): array
     {
-        return Cache::remember('logscope:filters:channels', 60, function () {
+        return Cache::remember('logscope:filters:channels', config('logscope.cache_ttl', 60), function () {
             return LogEntry::distinct()
                 ->whereNotNull('channel')
                 ->pluck('channel')
@@ -443,7 +443,7 @@ class LogController extends Controller
      */
     protected function getAvailableHttpMethods(): array
     {
-        return Cache::remember('logscope:filters:http_methods', 60, function () {
+        return Cache::remember('logscope:filters:http_methods', config('logscope.cache_ttl', 60), function () {
             return LogEntry::distinct()
                 ->whereNotNull('http_method')
                 ->pluck('http_method')

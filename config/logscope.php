@@ -351,6 +351,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cache TTL
+    |--------------------------------------------------------------------------
+    |
+    | How long (in seconds) to cache read-only dashboard data: total log
+    | counts, level/channel/method filter options. Lower values mean fresher
+    | data at the cost of more database queries. Set to 0 to disable caching.
+    |
+    */
+
+    'cache_ttl' => env('LOGSCOPE_CACHE_TTL', 60),
+
+    /*
+    |--------------------------------------------------------------------------
     | Theme
     |--------------------------------------------------------------------------
     |
