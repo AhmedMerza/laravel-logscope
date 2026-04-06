@@ -196,6 +196,8 @@
         </div>
     </div>
 
+    @includeIf('logscope-guard::partials.ip-actions', [])
+
     <!-- Panel Footer -->
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
         <template x-if="features.status">

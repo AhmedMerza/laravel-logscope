@@ -956,6 +956,7 @@ function logScope() {
             if (this.screenWidth < 1024) {
                 this.sidebarOpen = false;
             }
+            this.$dispatch('logscope:log-selected', { log: this.selectedLog });
             this.fetchLogById(log.id);
         },
 
@@ -987,6 +988,7 @@ function logScope() {
                 if (this.selectedLog?.id !== id) return;
                 this.selectedLog = data.data;
                 this.syncFiltersToUrl();
+                this.$dispatch('logscope:log-selected', { log: this.selectedLog });
             } catch (error) {
                 this.handleNetworkError(error, 'loading log');
             }
