@@ -99,7 +99,7 @@ Also in v1.4.x: fixed a filter race condition with debounce + AbortController, p
 ## 📋 Requirements
 
 - PHP 8.2+
-- Laravel 10, 11, or 12
+- Laravel 10+
 - SQLite, MySQL, or PostgreSQL
 
 ---
@@ -661,6 +661,21 @@ LOGSCOPE_CACHE_TTL=60
 LOGSCOPE_EXPAND_OBJECTS=true
 LOGSCOPE_REDACT_SENSITIVE=true
 ```
+
+---
+
+## 🛡️ Extensions
+
+### LogScope Guard
+
+Block malicious IPs directly from the LogScope UI and sync the blacklist across all your environments automatically.
+
+```bash
+composer require ahmedmerza/logscope-guard
+php artisan guard:install
+```
+
+[View LogScope Guard →](https://github.com/AhmedMerza/laravel-logscope-guard)
 
 ---
 
