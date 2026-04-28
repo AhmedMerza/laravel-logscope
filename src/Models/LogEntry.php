@@ -46,7 +46,11 @@ class LogEntry extends Model
 
     public function getTable(): string
     {
-        return config('logscope.table', 'log_entries');
+        try {
+            return config('logscope.table', 'log_entries');
+        } catch (\Throwable) {
+            return 'log_entries';
+        }
     }
 
     /**
@@ -330,14 +334,21 @@ class LogEntry extends Model
      * NOTE: Keep in sync with createEntry() — any new field defaults or
      * transforms added there must be mirrored here.
      */
-    public static function prepareData(array $attributes): array
+    public static function prepareData(array $attributes, array $limits = []): array
     {
-        $limits = config('logscope.limits', []);
+        // Use provided limits (from LogBuffer cache) or fall back to config().
+        // The fallback is safe during normal request lifecycle but will fail
+        // during shutdown — callers in batch mode should always pass $limits.
+        if (empty($limits)) {
+            $limits = config('logscope.limits', []);
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
 
         // Generate message preview and handle truncation
         if (isset($attributes['message'])) {
             $maxPreview = $limits['message_preview_length'] ?? 500;
-            $maxInline  = $limits['message_inline_max'] ?? 16000;
+            $maxInline = $limits['message_inline_max'] ?? 16000;
             $truncateAt = $limits['truncate_at'] ?? 1000000;
 
             $attributes['message_preview'] = static::createPreview($attributes['message'], $maxPreview);
@@ -368,7 +379,7 @@ class LogEntry extends Model
 
         // Normalise occurred_at to a DB-safe string
         if (! isset($attributes['occurred_at'])) {
-            $attributes['occurred_at'] = now()->format('Y-m-d H:i:s');
+            $attributes['occurred_at'] = $timestamp;
         } elseif ($attributes['occurred_at'] instanceof \DateTimeInterface) {
             $attributes['occurred_at'] = $attributes['occurred_at']->format('Y-m-d H:i:s');
         }
@@ -382,7 +393,7 @@ class LogEntry extends Model
         $attributes['id'] = strtolower((string) Str::ulid());
 
         // insert() bypasses Eloquent; created_at has DB default but set explicitly for clarity
-        $attributes['created_at'] = now()->format('Y-m-d H:i:s');
+        $attributes['created_at'] = $timestamp;
 
         return $attributes;
     }

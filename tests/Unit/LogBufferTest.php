@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use LogScope\Services\LogBuffer;
 
 beforeEach(function () {
@@ -109,8 +109,24 @@ describe('flushStatic', function () {
         // where Laravel facades are no longer available
         app()->flush();
 
-        // flushStatic should handle the error gracefully via error_log()
+        // flushStatic should handle the error gracefully
         // instead of crashing when config() is unavailable
+        LogBuffer::flushStatic();
+
+        expect(LogBuffer::getBuffer())->toBe([]);
+
+        // Restore the application so Pest's teardown can run
+        $this->refreshApplication();
+    });
+
+    it('bails out gracefully when db binding is missing', function () {
+        $buffer = new LogBuffer(app());
+        $buffer->add(['message' => 'test']);
+
+        // Unbind db to simulate a partially torn-down container
+        app()->forgetInstance('db');
+        app()->offsetUnset('db');
+
         LogBuffer::flushStatic();
 
         expect(LogBuffer::getBuffer())->toBe([]);

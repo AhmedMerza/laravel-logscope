@@ -23,6 +23,11 @@ class LogBuffer implements LogBufferInterface
     protected static array $buffer = [];
 
     /**
+     * Cached config limits so flushStatic() works after container teardown.
+     */
+    protected static array $cachedLimits = [];
+
+    /**
      * Whether terminating callback is registered.
      */
     protected static bool $terminatingRegistered = false;
@@ -41,6 +46,9 @@ class LogBuffer implements LogBufferInterface
      */
     public function add(array $data): void
     {
+        // Cache config limits while the container is still alive
+        self::$cachedLimits = config('logscope.limits', []);
+
         self::$buffer[] = $data;
 
         $this->registerCallbacks();
@@ -92,13 +100,29 @@ class LogBuffer implements LogBufferInterface
             return;
         }
 
+        // If the Laravel container is gone (e.g. after test teardown or during
+        // PHP shutdown), we cannot resolve DB connections or config — bail out
+        // gracefully instead of emitting confusing error messages.
+        try {
+            if (! app()->bound('db')) {
+                self::$buffer = [];
+
+                return;
+            }
+        } catch (Throwable) {
+            self::$buffer = [];
+
+            return;
+        }
+
         // Take the current buffer and clear it immediately
         // This prevents re-processing the same logs if flush is called again
         $logsToFlush = self::$buffer;
         self::$buffer = [];
 
         try {
-            $rows = array_map(fn ($data) => LogEntry::prepareData($data), $logsToFlush);
+            $limits = self::$cachedLimits ?: config('logscope.limits', []);
+            $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
 
             foreach (array_chunk($rows, 500) as $chunk) {
                 try {
@@ -118,6 +142,7 @@ class LogBuffer implements LogBufferInterface
     public static function reset(): void
     {
         self::$buffer = [];
+        self::$cachedLimits = [];
         self::$terminatingRegistered = false;
         self::$shutdownRegistered = false;
     }
