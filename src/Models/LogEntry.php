@@ -146,27 +146,67 @@ class LogEntry extends Model
     }
 
     /**
-     * Scope: Filter by trace ID (partial match).
+     * Scope: Filter by trace ID. Uses exact match for full UUIDs (index seek)
+     * and prefix LIKE for partial input. Empty input is a no-op so callers
+     * that skip the request->filled() guard don't accidentally match all rows.
+     * Suffix-substring search is no longer supported.
      */
     public function scopeTraceId(Builder $query, string $traceId): Builder
     {
-        return $query->where('trace_id', 'like', "%{$traceId}%");
+        $traceId = trim($traceId);
+
+        if ($traceId === '') {
+            return $query;
+        }
+
+        $isFullUuid = preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $traceId)
+            || preg_match('/^[0-9a-f]{32}$/i', $traceId);
+
+        if ($isFullUuid) {
+            return $query->where('trace_id', $traceId);
+        }
+
+        return $query->where('trace_id', 'like', $traceId.'%');
     }
 
     /**
-     * Scope: Filter by user ID (partial match).
+     * Scope: Filter by user ID. Numeric input → exact match (index seek);
+     * non-numeric → prefix LIKE. Empty input is a no-op.
      */
     public function scopeUserId(Builder $query, int|string $userId): Builder
     {
-        return $query->where('user_id', 'like', "%{$userId}%");
+        $userId = trim((string) $userId);
+
+        if ($userId === '') {
+            return $query;
+        }
+
+        if (ctype_digit($userId)) {
+            return $query->where('user_id', (int) $userId);
+        }
+
+        return $query->where('user_id', 'like', $userId.'%');
     }
 
     /**
-     * Scope: Filter by IP address (partial match).
+     * Scope: Filter by IP address. Full IPv4 / IPv6 → exact match (index seek);
+     * partial input → prefix LIKE. Empty input is a no-op.
      */
     public function scopeIpAddress(Builder $query, string $ipAddress): Builder
     {
-        return $query->where('ip_address', 'like', "%{$ipAddress}%");
+        $ipAddress = trim($ipAddress);
+
+        if ($ipAddress === '') {
+            return $query;
+        }
+
+        $isFullIp = filter_var($ipAddress, FILTER_VALIDATE_IP) !== false;
+
+        if ($isFullIp) {
+            return $query->where('ip_address', $ipAddress);
+        }
+
+        return $query->where('ip_address', 'like', $ipAddress.'%');
     }
 
     /**

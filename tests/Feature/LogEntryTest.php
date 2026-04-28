@@ -39,7 +39,7 @@ it('generates preview for long messages', function () {
     expect($entry->message_preview)->toEndWith('...');
 });
 
-it('filters by trace_id', function () {
+it('filters by trace_id (full UUID uses exact match)', function () {
     $traceId = \Illuminate\Support\Str::uuid()->toString();
 
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'trace_id' => $traceId]);
@@ -47,22 +47,84 @@ it('filters by trace_id', function () {
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'trace_id' => \Illuminate\Support\Str::uuid()->toString()]);
 
     expect(LogEntry::traceId($traceId)->count())->toBe(2);
+
+    // Full UUID should produce an exact-match SQL clause, no LIKE.
+    $sql = LogEntry::query()->traceId($traceId)->toSql();
+    expect($sql)->toContain('= ?')->and($sql)->not->toContain('like');
 });
 
-it('filters by user_id', function () {
+it('filters by trace_id with partial input using prefix LIKE', function () {
+    $traceId = '550e8400-e29b-41d4-a716-446655440000';
+
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'trace_id' => $traceId]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'trace_id' => '660f9500-e29b-41d4-a716-446655440000']);
+
+    // 8-char prefix matches only the first row.
+    expect(LogEntry::traceId('550e8400')->count())->toBe(1);
+
+    // Partial input must produce a prefix LIKE (no leading wildcard).
+    $bindings = LogEntry::query()->traceId('550e8400')->getBindings();
+    expect($bindings[0])->toBe('550e8400%');
+});
+
+it('filters by user_id (numeric uses exact match)', function () {
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'user_id' => 1]);
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'user_id' => 1]);
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'user_id' => 2]);
 
     expect(LogEntry::userId(1)->count())->toBe(2);
+
+    // Numeric input should produce an exact-match clause.
+    $sql = LogEntry::query()->userId(1)->toSql();
+    expect($sql)->toContain('= ?')->and($sql)->not->toContain('like');
 });
 
-it('filters by ip_address', function () {
+it('filters by ip_address (full IPv4 uses exact match)', function () {
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'ip_address' => '127.0.0.1']);
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'ip_address' => '127.0.0.1']);
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'ip_address' => '192.168.1.1']);
 
     expect(LogEntry::ipAddress('127.0.0.1')->count())->toBe(2);
+
+    // Full IPv4 should produce an exact-match clause.
+    $sql = LogEntry::query()->ipAddress('127.0.0.1')->toSql();
+    expect($sql)->toContain('= ?')->and($sql)->not->toContain('like');
+});
+
+it('filters by ip_address with partial input using prefix LIKE', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'A', 'ip_address' => '127.0.0.1']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'B', 'ip_address' => '127.0.5.10']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'C', 'ip_address' => '10.0.0.1']);
+
+    expect(LogEntry::ipAddress('127.')->count())->toBe(2);
+
+    // Partial IP must produce a prefix LIKE (no leading wildcard).
+    $bindings = LogEntry::query()->ipAddress('127.')->getBindings();
+    expect($bindings[0])->toBe('127.%');
+});
+
+it('filters by ip_address (full IPv6 uses exact match)', function () {
+    $sql = LogEntry::query()->ipAddress('::1')->toSql();
+    expect($sql)->toContain('= ?')->and($sql)->not->toContain('like');
+});
+
+it('treats empty input as a no-op for trace_id, user_id, and ip_address', function () {
+    LogEntry::createEntry(['level' => 'info', 'message' => 'A', 'trace_id' => 'abc']);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'B', 'user_id' => 1]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'C', 'ip_address' => '127.0.0.1']);
+
+    // Each scope should add no clause and return the unfiltered count.
+    $total = LogEntry::query()->count();
+
+    expect(LogEntry::query()->traceId('')->count())->toBe($total);
+    expect(LogEntry::query()->traceId('   ')->count())->toBe($total);
+    expect(LogEntry::query()->userId('')->count())->toBe($total);
+    expect(LogEntry::query()->ipAddress('')->count())->toBe($total);
+
+    // SQL should not contain trace_id / user_id / ip_address predicates.
+    expect(LogEntry::query()->traceId('')->toSql())->not->toContain('trace_id');
+    expect(LogEntry::query()->userId('')->toSql())->not->toContain('user_id');
+    expect(LogEntry::query()->ipAddress('')->toSql())->not->toContain('ip_address');
 });
 
 it('filters by http_method', function () {

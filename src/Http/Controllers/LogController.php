@@ -181,10 +181,10 @@ class LogController extends Controller
             if (isset($cursor['occurred_at'], $cursor['id'])) {
                 $query->where(function ($q) use ($cursor) {
                     $q->where('occurred_at', '<', $cursor['occurred_at'])
-                      ->orWhere(function ($q2) use ($cursor) {
-                          $q2->where('occurred_at', $cursor['occurred_at'])
-                             ->where('id', '<', $cursor['id']);
-                      });
+                        ->orWhere(function ($q2) use ($cursor) {
+                            $q2->where('occurred_at', $cursor['occurred_at'])
+                                ->where('id', '<', $cursor['id']);
+                        });
                 });
             }
         }
@@ -228,10 +228,10 @@ class LogController extends Controller
         return response()->json([
             'data' => $items->values(),
             'meta' => [
-                'has_next'       => $hasNext,
-                'next_cursor'    => $nextCursor,
-                'per_page'       => $perPage,
-                'count'          => min($countResult, 1000),
+                'has_next' => $hasNext,
+                'next_cursor' => $nextCursor,
+                'per_page' => $perPage,
+                'count' => min($countResult, 1000),
                 'has_next_count' => $countResult > 1000,
             ],
         ]);
@@ -419,16 +419,16 @@ class LogController extends Controller
             // Single query replacing 4 separate counts. Groups by level and uses
             // conditional aggregates for the time-scoped counts.
             $rows = LogEntry::selectRaw(
-                'level, count(*) as total,' .
-                ' sum(case when occurred_at >= ? then 1 else 0 end) as today,' .
+                'level, count(*) as total,'.
+                ' sum(case when occurred_at >= ? then 1 else 0 end) as today,'.
                 ' sum(case when occurred_at >= ? then 1 else 0 end) as this_hour',
                 [$startOfDay, $startOfHour]
             )->groupBy('level')->get();
 
             return [
-                'total'     => (int) $rows->sum('total'),
-                'by_level'  => $rows->pluck('total', 'level'),
-                'today'     => (int) $rows->sum('today'),
+                'total' => (int) $rows->sum('total'),
+                'by_level' => $rows->pluck('total', 'level'),
+                'today' => (int) $rows->sum('today'),
                 'this_hour' => (int) $rows->sum('this_hour'),
             ];
         });

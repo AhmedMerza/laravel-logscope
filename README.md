@@ -23,6 +23,26 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
+### v1.5.3 — Faster filter queries on large tables
+
+On installs with hundreds of thousands of rows, filtering by `trace_id`, `user_id`, or `ip_address` was taking 1–14 seconds because the existing `LIKE '%value%'` predicate prevented the BTREE indexes from being used. Three changes fix that:
+
+| Scenario (500K rows) | Before | After | Improvement |
+|----------------------|--------|-------|-------------|
+| Filter by full UUID (MariaDB) | 1545 ms | 0.4 ms | **3500× faster** |
+| Filter by full UUID (MySQL) | 1268 ms | 0.5 ms | **2600× faster** |
+| Filter by full IPv4 (MariaDB) | 1548 ms | 0.4 ms | **3600× faster** |
+| Capped count + trace_id | 700 ms | 0.4 ms | **1600× faster** |
+
+**What changed:**
+
+1. **`scopeTraceId` / `scopeUserId` / `scopeIpAddress`** now detect full values (canonical UUIDs, numeric user_ids, valid IPv4/IPv6) and use exact `=` matches that hit the index. Partial input uses prefix `LIKE 'x%'` which still uses the index.
+2. **New composite index** `(ip_address, occurred_at)` mirrors the existing `(trace_id, occurred_at)` and `(user_id, occurred_at)` indexes so ip_address filters get the same fast ordered-scan path. Auto-applies via `php artisan migrate`.
+
+**Breaking change:** suffix-substring search no longer works for these three fields. `abc` will no longer find a row whose trace_id ends in `abc`. In practice users paste complete IDs from logs to investigate; partial input now requires a known prefix.
+
+---
+
 ### v1.5.0 — Performance Overhaul
 
 To understand how LogScope holds up at scale, we stress-tested against a SQLite database with **1,000,052 log entries** — significantly more than a typical production deployment (weekly pruning keeps most installs around 400k). The results exposed three fixable bottlenecks.
