@@ -194,9 +194,14 @@ class LogController extends Controller
         // reorder() drops ORDER BY so the DB can early-exit at LIMIT without sorting.
         $countResult = (clone $query)->reorder()->limit(1001)->get(['id'])->count();
 
-        // Fetch one extra to detect has_next. Select only columns the list
-        // view needs — message/context/etc are fetched separately by show().
-        $items = $query->select([
+        // Fetch one extra to detect has_next. By default include the full
+        // message/context so the detail panel can render instantly without an
+        // extra round-trip to /logs/{id} — important on high-latency links
+        // where every click costs an RTT. Server-side cost is negligible
+        // (+1ms typical) and the payload roughly doubles, still well under
+        // 200KB for 50 normal rows. Installs with very large messages can
+        // disable via `logscope.pagination.eager_load_detail`.
+        $listColumns = [
             'id',
             'level',
             'message_preview',
@@ -212,7 +217,13 @@ class LogController extends Controller
             'http_method',
             'url',
             'is_truncated',
-        ])->limit($perPage + 1)->get();
+        ];
+
+        if (config('logscope.pagination.eager_load_detail', true)) {
+            array_splice($listColumns, 2, 0, ['message', 'context']);
+        }
+
+        $items = $query->select($listColumns)->limit($perPage + 1)->get();
         $hasNext = $items->count() > $perPage;
         $items = $items->take($perPage);
 

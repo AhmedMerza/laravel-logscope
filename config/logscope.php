@@ -363,6 +363,16 @@ return [
     'pagination' => [
         'per_page' => 50,
         'max_per_page' => 100,
+
+        /*
+         * Include the full `message` and `context` in the list response so the
+         * detail panel can render instantly without a second round-trip. Adds
+         * roughly 1-2KB per row to the payload (typical) and is a clear win on
+         * high-latency links. Disable for installs with very large messages
+         * (multi-MB stack traces, raw HTTP bodies) where the per-page payload
+         * could balloon — the show endpoint will fetch on demand instead.
+         */
+        'eager_load_detail' => env('LOGSCOPE_EAGER_LOAD_DETAIL', true),
     ],
 
     /*

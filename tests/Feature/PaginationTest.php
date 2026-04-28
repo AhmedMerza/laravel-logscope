@@ -367,14 +367,14 @@ it('returns has_next_count true and caps count at 1000 when filtered results exc
     $rows = [];
     for ($i = 0; $i < 1001; $i++) {
         $rows[] = [
-            'id'              => (string) \Illuminate\Support\Str::ulid(),
-            'level'           => 'info',
-            'message'         => "Log {$i}",
+            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'level' => 'info',
+            'message' => "Log {$i}",
             'message_preview' => "Log {$i}",
-            'occurred_at'     => $now->copy()->subSeconds($i)->format('Y-m-d H:i:s'),
-            'created_at'      => $now->format('Y-m-d H:i:s'),
-            'status'          => 'open',
-            'is_truncated'    => 0,
+            'occurred_at' => $now->copy()->subSeconds($i)->format('Y-m-d H:i:s'),
+            'created_at' => $now->format('Y-m-d H:i:s'),
+            'status' => 'open',
+            'is_truncated' => 0,
         ];
     }
 
@@ -391,4 +391,43 @@ it('returns has_next_count true and caps count at 1000 when filtered results exc
     $data = $response->json();
     expect($data['meta']['count'])->toBe(1000);
     expect($data['meta']['has_next_count'])->toBeTrue();
+});
+
+// =============================================================================
+// EAGER-LOADED DETAIL (message + context in list response)
+// =============================================================================
+
+it('eager-loads full message and context in the list response by default', function () {
+    LogEntry::createEntry([
+        'level' => 'info',
+        'message' => 'Hello world from the list response',
+        'context' => ['foo' => 'bar', 'count' => 42],
+    ]);
+
+    $response = $this->getJson('/logscope/api/logs?per_page=10');
+    $response->assertOk();
+
+    $first = $response->json('data.0');
+    expect($first)->toHaveKeys(['message', 'context'])
+        ->and($first['message'])->toBe('Hello world from the list response')
+        ->and($first['context'])->toBe(['foo' => 'bar', 'count' => 42]);
+});
+
+it('omits message and context when eager_load_detail is disabled', function () {
+    config(['logscope.pagination.eager_load_detail' => false]);
+
+    LogEntry::createEntry([
+        'level' => 'info',
+        'message' => 'Hidden in narrow mode',
+        'context' => ['foo' => 'bar'],
+    ]);
+
+    $response = $this->getJson('/logscope/api/logs?per_page=10');
+    $response->assertOk();
+
+    $first = $response->json('data.0');
+    expect($first)->not->toHaveKey('message')
+        ->and($first)->not->toHaveKey('context')
+        // Previews still ship in narrow mode so the list view can render.
+        ->and($first)->toHaveKeys(['message_preview', 'context_preview']);
 });

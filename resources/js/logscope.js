@@ -957,7 +957,17 @@ function logScope() {
                 this.sidebarOpen = false;
             }
             this.$dispatch('logscope:log-selected', { log: this.selectedLog });
-            this.fetchLogById(log.id);
+            this.ensureLogDetailLoaded(log);
+        },
+
+        // The list response includes message + context by default so the
+        // detail panel can render instantly. Only fall back to /logs/{id}
+        // when those fields are missing — e.g. deep-link navigation before
+        // the list has loaded, or installs with eager_load_detail=false.
+        ensureLogDetailLoaded(log) {
+            if (log.message === undefined || log.context === undefined) {
+                this.fetchLogById(log.id);
+            }
         },
 
         closeSidebarOnBackdrop() {
@@ -1402,7 +1412,9 @@ function logScope() {
                 }
             }
             this.scrollToSelectedLog();
-            if (this.selectedLog?.id !== prevId) this.fetchLogById(this.selectedLog.id);
+            if (this.selectedLog?.id !== prevId) {
+                this.ensureLogDetailLoaded(this.selectedLog);
+            }
         },
 
         selectPrevLog() {
@@ -1418,7 +1430,9 @@ function logScope() {
                 }
             }
             this.scrollToSelectedLog();
-            if (this.selectedLog?.id !== prevId) this.fetchLogById(this.selectedLog.id);
+            if (this.selectedLog?.id !== prevId) {
+                this.ensureLogDetailLoaded(this.selectedLog);
+            }
         },
 
         scrollToSelectedLog() {

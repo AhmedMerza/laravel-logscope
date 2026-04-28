@@ -23,9 +23,13 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-### v1.5.3 — Faster filter queries on large tables
+### v1.5.3 — Faster filter queries + zero-RTT detail open
 
-On installs with hundreds of thousands of rows, filtering by `trace_id`, `user_id`, or `ip_address` was taking 1–14 seconds because the existing `LIKE '%value%'` predicate prevented the BTREE indexes from being used. Three changes fix that:
+Two improvements that compound: indexed filters get 1500–3600× faster on large tables, and opening a log detail no longer needs a second round-trip to the server.
+
+#### Filter queries on large tables
+
+On installs with hundreds of thousands of rows, filtering by `trace_id`, `user_id`, or `ip_address` was taking 1–14 seconds because the existing `LIKE '%value%'` predicate prevented the BTREE indexes from being used.
 
 | Scenario (500K rows) | Before | After | Improvement |
 |----------------------|--------|-------|-------------|
@@ -41,32 +45,19 @@ On installs with hundreds of thousands of rows, filtering by `trace_id`, `user_i
 
 **Breaking change:** suffix-substring search no longer works for these three fields. `abc` will no longer find a row whose trace_id ends in `abc`. In practice users paste complete IDs from logs to investigate; partial input now requires a known prefix.
 
----
+#### Zero-RTT detail open
 
-### v1.5.0 — Performance Overhaul
+The list response now includes the full `message` and `context` for each row, so clicking a log opens the detail panel instantly — no second request. On high-latency links (deploys far from your users) every saved round-trip is 100–300 ms back. The previous behavior fetched details lazily from `/logs/{id}` on each click.
 
-To understand how LogScope holds up at scale, we stress-tested against a SQLite database with **1,000,052 log entries** — significantly more than a typical production deployment (weekly pruning keeps most installs around 400k). The results exposed three fixable bottlenecks.
+| | Before | After |
+|---|---|---|
+| List response (50 rows, ~750B avg msg) | 72 KB | 144 KB |
+| Server time per list | 7 ms | 8 ms |
+| RTT per detail click | ~RTT (often 100–300 ms) | **0** |
 
-| Scenario | Before | After | Improvement |
-|----------|--------|-------|-------------|
-| First page load | 20.6 ms | 0.6 ms | **34× faster** |
-| Page 100 | 29.4 ms | 1.2 ms | **25× faster** |
-| Page 1,000 | 95.3 ms | 6.4 ms | **15× faster** |
-| Filtered query | 461.4 ms | 0.7 ms | **659× faster** |
-| Response payload | 47.7 KB | 29.4 KB | **38% smaller** |
+The trade-off pays back on the first click. After that it's pure savings, especially when navigating between logs with the keyboard shortcuts.
 
-**What changed and why:**
-
-**1. Narrow SELECT on the list query**
-The list was running `SELECT *`, fetching full `message` and `context` columns (up to 48 KB per row × 50 rows) that the list view never renders — it only shows short previews. Full content still loads, but only when you open a specific entry.
-
-**2. Keyset (cursor) pagination instead of OFFSET**
-`LIMIT 50 OFFSET 49950` tells the database to scan and throw away 49,950 rows before returning your 50. Cursor pagination stores a `(occurred_at, id)` bookmark and jumps directly — O(1) regardless of depth. In practice most users find what they need on page 1, but it means deep pagination no longer degrades.
-
-**3. No COUNT on filtered queries**
-Laravel's paginator ran a `COUNT(*)` with all active filters on every page change to compute total pages. On large filtered result sets this was the dominant cost — most of the 461 ms on filtered queries.
-
-**The trade-off:** when filters are active, the count is capped at 1,000 and shows "1,000+" beyond that. The real unfiltered total is still shown with no extra cost (it comes from the cached stats). When you're actively filtering you're in *find mode* — "1,000+ errors in the last hour" tells you everything actionable. Knowing the exact number beyond that doesn't change what you do next.
+**Opting out:** set `LOGSCOPE_EAGER_LOAD_DETAIL=false` (or `logscope.pagination.eager_load_detail`) if your install logs very large messages (multi-MB stack traces, raw HTTP bodies) where the per-page payload could balloon — the `show` endpoint will fetch on demand instead.
 
 ---
 
