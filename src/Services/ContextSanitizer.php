@@ -150,10 +150,32 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     protected function sanitizeObject(object $value, int $depth = 0): mixed
     {
-        // Handle objects that can convert themselves to arrays
+        // Handle enums first — they don't implement any serialization interfaces
+        if ($value instanceof \BackedEnum) {
+            return [
+                '_type' => 'enum',
+                'class' => get_class($value),
+                'name' => $value->name,
+                'value' => $value->value,
+            ];
+        }
+
+        if ($value instanceof \UnitEnum) {
+            return [
+                '_type' => 'enum',
+                'class' => get_class($value),
+                'name' => $value->name,
+            ];
+        }
+
+        // Handle objects that can convert themselves to arrays/strings
         // Wrap in try-catch to handle objects that throw when serializing
         // (e.g., Sanctum's TransientToken which has no $id property)
         try {
+            if ($value instanceof \DateTimeInterface) {
+                return $value->format('Y-m-d H:i:s.u');
+            }
+
             if ($value instanceof JsonSerializable) {
                 return $this->sanitizeArray((array) $value->jsonSerialize(), $depth + 1);
             }
@@ -167,11 +189,22 @@ class ContextSanitizer implements ContextSanitizerInterface
 
                 return is_array($decoded) ? $this->sanitizeArray($decoded, $depth + 1) : $decoded;
             }
+
+            if ($value instanceof \Stringable) {
+                return (string) $value;
+            }
+
+            // Public-property fallback — handles stdClass, plain DTOs, etc.
+            return [
+                '_type' => 'object',
+                'class' => get_class($value),
+                'data' => $this->sanitizeArray(get_object_vars($value), $depth + 1),
+            ];
         } catch (\Throwable) {
             // Fall through to return class name
         }
 
-        // Fallback: just show class name
+        // Last resort: just show class name
         return '[Object: '.get_class($value).']';
     }
 

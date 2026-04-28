@@ -4,6 +4,19 @@ declare(strict_types=1);
 
 use LogScope\Services\ContextSanitizer;
 
+enum TestBackedEnum: string
+{
+    case Active = 'active';
+    case Pending = 'pending';
+}
+
+enum TestUnitEnum
+{
+    case Red;
+    case Green;
+    case Blue;
+}
+
 beforeEach(function () {
     $this->sanitizer = new ContextSanitizer;
 });
@@ -49,22 +62,110 @@ describe('sanitize', function () {
             ->and($result['error']['line'])->toBeInt();
     });
 
-    it('converts generic objects to class name string', function () {
+    it('converts stdClass to structured object with data', function () {
+        $object = new stdClass;
+        $object->status = 'ok';
+        $object->total = 12.5;
+        $context = ['obj' => $object];
+
+        $result = $this->sanitizer->sanitize($context);
+
+        expect($result['obj'])->toBeArray()
+            ->and($result['obj']['_type'])->toBe('object')
+            ->and($result['obj']['class'])->toBe('stdClass')
+            ->and($result['obj']['data'])->toBe(['status' => 'ok', 'total' => 12.5]);
+    });
+
+    it('converts empty stdClass to structured object with empty data', function () {
         $object = new stdClass;
         $context = ['obj' => $object];
 
         $result = $this->sanitizer->sanitize($context);
 
-        expect($result['obj'])->toBe('[Object: stdClass]');
+        expect($result['obj'])->toBeArray()
+            ->and($result['obj']['_type'])->toBe('object')
+            ->and($result['obj']['class'])->toBe('stdClass')
+            ->and($result['obj']['data'])->toBe([]);
     });
 
-    it('converts custom objects to class name string', function () {
-        $object = new DateTime;
+    it('converts DateTime to formatted string', function () {
+        $object = new DateTime('2024-01-15 10:30:00');
         $context = ['date' => $object];
 
         $result = $this->sanitizer->sanitize($context);
 
-        expect($result['date'])->toBe('[Object: DateTime]');
+        expect($result['date'])->toBeString()
+            ->and($result['date'])->toContain('2024-01-15 10:30:00');
+    });
+
+    it('converts BackedEnum to structured array with value', function () {
+        $context = ['status' => TestBackedEnum::Active];
+
+        $result = $this->sanitizer->sanitize($context);
+
+        expect($result['status'])->toBeArray()
+            ->and($result['status']['_type'])->toBe('enum')
+            ->and($result['status']['name'])->toBe('Active')
+            ->and($result['status']['value'])->toBe('active');
+    });
+
+    it('converts UnitEnum to structured array without value', function () {
+        $context = ['color' => TestUnitEnum::Red];
+
+        $result = $this->sanitizer->sanitize($context);
+
+        expect($result['color'])->toBeArray()
+            ->and($result['color']['_type'])->toBe('enum')
+            ->and($result['color']['name'])->toBe('Red')
+            ->and($result['color'])->not->toHaveKey('value');
+    });
+
+    it('converts Stringable objects to string', function () {
+        $object = new class implements Stringable
+        {
+            public function __toString(): string
+            {
+                return 'hello world';
+            }
+        };
+        $context = ['label' => $object];
+
+        $result = $this->sanitizer->sanitize($context);
+
+        expect($result['label'])->toBe('hello world');
+    });
+
+    it('prefers JsonSerializable over Stringable', function () {
+        $object = new class implements JsonSerializable, Stringable
+        {
+            public function jsonSerialize(): mixed
+            {
+                return ['key' => 'value'];
+            }
+
+            public function __toString(): string
+            {
+                return 'flat';
+            }
+        };
+
+        $result = $this->sanitizer->sanitize(['obj' => $object]);
+
+        expect($result['obj'])->toBe(['key' => 'value']);
+    });
+
+    it('recursively sanitizes nested objects in fallback', function () {
+        $outer = new stdClass;
+        $inner = new stdClass;
+        $inner->id = 1;
+        $outer->child = $inner;
+
+        $result = $this->sanitizer->sanitize(['data' => $outer]);
+
+        expect($result['data']['data']['child'])->toBeArray()
+            ->and($result['data']['data']['child']['_type'])->toBe('object')
+            ->and($result['data']['data']['child']['class'])->toBe('stdClass')
+            ->and($result['data']['data']['child']['data'])->toBe(['id' => 1]);
     });
 
     it('skips keys starting with double underscore', function () {
@@ -118,7 +219,8 @@ describe('sanitize', function () {
             ->and($result['message'])->toBe('Something happened')
             ->and($result['count'])->toBe(5)
             ->and($result['error']['_type'])->toBe('exception')
-            ->and($result['user'])->toBe('[Object: stdClass]');
+            ->and($result['user']['_type'])->toBe('object')
+            ->and($result['user']['class'])->toBe('stdClass');
     });
 });
 

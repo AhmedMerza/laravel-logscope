@@ -194,16 +194,34 @@ class LogScopeHandler extends AbstractProcessingHandler
             ];
         }
 
+        // Handle enums — they don't implement any serialization interfaces
+        if ($object instanceof \BackedEnum) {
+            return [
+                '_type' => 'enum',
+                'class' => get_class($object),
+                'name' => $object->name,
+                'value' => $object->value,
+            ];
+        }
+
+        if ($object instanceof \UnitEnum) {
+            return [
+                '_type' => 'enum',
+                'class' => get_class($object),
+                'name' => $object->name,
+            ];
+        }
+
         if ($object instanceof \DateTimeInterface) {
             return $object->format('Y-m-d H:i:s.u');
         }
 
-        if ($object instanceof \Stringable) {
-            return (string) $object;
+        if ($object instanceof \JsonSerializable) {
+            return $this->sanitizeArray((array) $object->jsonSerialize());
         }
 
-        if ($object instanceof \JsonSerializable) {
-            return $object->jsonSerialize();
+        if ($object instanceof \Stringable) {
+            return (string) $object;
         }
 
         // For other objects, try to get public properties
@@ -211,7 +229,7 @@ class LogScopeHandler extends AbstractProcessingHandler
             return [
                 '_type' => 'object',
                 'class' => get_class($object),
-                'data' => get_object_vars($object),
+                'data' => $this->sanitizeArray(get_object_vars($object)),
             ];
         } catch (Throwable) {
             return '[Object: '.get_class($object).']';
