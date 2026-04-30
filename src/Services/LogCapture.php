@@ -43,6 +43,15 @@ class LogCapture
      */
     protected function handleLogEvent(MessageLogged $event): void
     {
+        // Consume the channel set by the most recent processor invocation,
+        // BEFORE any early return. consumeLastChannel() returns null unless
+        // a processor invocation happened since the previous consume — so a
+        // Log::build() log (no processor) gets null, and a log from a
+        // configured channel gets that channel. This also prevents stale
+        // state from leaking across requests in long-running workers
+        // (Octane), where static state survives between requests.
+        $channel = ChannelContextProcessor::consumeLastChannel();
+
         // Prevent infinite loops - don't log our own operations
         if ($this->isInternalLog($event)) {
             return;
@@ -53,10 +62,6 @@ class LogCapture
         if (LogScopeHandler::didHandleCurrentLog()) {
             return;
         }
-
-        // Get channel and reset for next log (prevents sticky channel on Log::build())
-        $channel = ChannelContextProcessor::getLastChannel();
-        ChannelContextProcessor::clearLastChannel();
 
         if ($this->shouldIgnoreLog($event, $channel)) {
             return;
