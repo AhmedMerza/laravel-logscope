@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Context;
 use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\WriteGuard;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
@@ -42,6 +43,11 @@ class LogScopeHandler extends AbstractProcessingHandler
      */
     protected function write(LogRecord $record): void
     {
+        // Re-entrant guard: skip logs emitted DURING our own write path.
+        if (WriteGuard::isWriting()) {
+            return;
+        }
+
         // Prevent infinite loops - don't log our own operations
         if ($this->isInternalLog($record)) {
             return;
@@ -50,6 +56,15 @@ class LogScopeHandler extends AbstractProcessingHandler
         // Mark that we're handling this log (prevents duplicate capture by listener)
         static::$handledCurrentLog = true;
 
+        WriteGuard::during(fn () => $this->writeRecord($record));
+    }
+
+    /**
+     * Persist the captured record. Wrapped by write() inside WriteGuard
+     * so a nested log fired during the insert is skipped.
+     */
+    protected function writeRecord(LogRecord $record): void
+    {
         try {
             $this->ensureInitialized();
 
@@ -80,11 +95,12 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'occurred_at' => $record->datetime,
             ]);
         } catch (Throwable $e) {
-            // Silently fail - don't break the application if logging fails
-            // Optionally log to a fallback channel
-            if (config('app.debug')) {
-                error_log('LogScope: Failed to write log entry: '.$e->getMessage());
-            }
+            // Don't break the calling application, but always surface the
+            // failure to PHP's error log. Hiding it behind APP_DEBUG meant
+            // production DB outages caused silent total log loss with zero
+            // observability. WriteFailureLogger dedupes per-process so a
+            // sustained outage doesn't dump thousands of identical lines.
+            \LogScope\Services\WriteFailureLogger::report($e, 'channel-handler');
         }
     }
 
@@ -104,20 +120,14 @@ class LogScopeHandler extends AbstractProcessingHandler
 
     /**
      * Check if this is an internal log that should be skipped.
+     *
+     * Only the structured `_logscope_internal` context key triggers the skip.
+     * Substring matches on the message would silently drop legitimate user
+     * logs that mention the package by name.
      */
     protected function isInternalLog(LogRecord $record): bool
     {
-        // Skip logs from our own namespace
-        if (str_contains($record->message, 'LogScope')) {
-            return true;
-        }
-
-        // Check context for LogScope markers
-        if (isset($record->context['_logscope_internal'])) {
-            return true;
-        }
-
-        return false;
+        return isset($record->context['_logscope_internal']);
     }
 
     /**

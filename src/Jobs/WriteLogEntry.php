@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use LogScope\Models\LogEntry;
+use LogScope\Services\WriteGuard;
 
 class WriteLogEntry implements ShouldQueue
 {
@@ -30,9 +31,16 @@ class WriteLogEntry implements ShouldQueue
 
     /**
      * Execute the job.
+     *
+     * Wrapped in WriteGuard so a re-entrant log fired during the insert
+     * (LogEntry observer, query listener that logs, etc.) is skipped by
+     * the listener instead of recursing back into another job dispatch.
+     * The dispatch-time guard in LogWriter::write only covers the parent
+     * request — by the time the worker runs this job, the guard has been
+     * cleared (or we're in a different process entirely).
      */
     public function handle(): void
     {
-        LogEntry::createEntry($this->data);
+        WriteGuard::during(fn () => LogEntry::createEntry($this->data));
     }
 }

@@ -102,15 +102,23 @@ class LogBuffer implements LogBufferInterface
 
         // If the Laravel container is gone (e.g. after test teardown or during
         // PHP shutdown), we cannot resolve DB connections or config — bail out
-        // gracefully instead of emitting confusing error messages.
+        // gracefully. Surface the discard to error_log so a missing container
+        // at flush time is visible in stderr/php-fpm logs instead of being a
+        // silent data-loss event.
         try {
             if (! app()->bound('db')) {
+                $count = count(self::$buffer);
                 self::$buffer = [];
+                $entryWord = $count === 1 ? 'entry' : 'entries';
+                WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container has no db binding (PHP shutdown or test teardown)");
 
                 return;
             }
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $count = count(self::$buffer);
             self::$buffer = [];
+            $entryWord = $count === 1 ? 'entry' : 'entries';
+            WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container unavailable: [".get_class($e).'] '.$e->getMessage());
 
             return;
         }
@@ -120,6 +128,21 @@ class LogBuffer implements LogBufferInterface
         $logsToFlush = self::$buffer;
         self::$buffer = [];
 
+        // Guard against re-entry: an observer or query listener that fires
+        // a log during the bulk insert would otherwise be re-captured by
+        // LogCapture and added back to the buffer or written sync.
+        WriteGuard::during(fn () => self::performFlush($logsToFlush));
+    }
+
+    /**
+     * Bulk-insert the given rows in chunks of 500, with per-chunk error
+     * isolation so one bad chunk doesn't lose the rest. Called only from
+     * inside flushStatic's WriteGuard frame.
+     *
+     * @param  array<int, array<string, mixed>>  $logsToFlush
+     */
+    protected static function performFlush(array $logsToFlush): void
+    {
         try {
             $limits = self::$cachedLimits ?: config('logscope.limits', []);
             $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
@@ -128,11 +151,11 @@ class LogBuffer implements LogBufferInterface
                 try {
                     LogEntry::insert(self::normalizeChunk($chunk));
                 } catch (Throwable $e) {
-                    error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                    WriteFailureLogger::report($e, 'buffer-flush');
                 }
             }
         } catch (Throwable $e) {
-            error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
+            WriteFailureLogger::report($e, 'buffer-flush');
         }
     }
 

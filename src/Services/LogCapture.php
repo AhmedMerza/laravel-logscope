@@ -43,14 +43,20 @@ class LogCapture
      */
     protected function handleLogEvent(MessageLogged $event): void
     {
-        // Consume the channel set by the most recent processor invocation,
-        // BEFORE any early return. consumeLastChannel() returns null unless
-        // a processor invocation happened since the previous consume — so a
-        // Log::build() log (no processor) gets null, and a log from a
-        // configured channel gets that channel. This also prevents stale
-        // state from leaking across requests in long-running workers
-        // (Octane), where static state survives between requests.
+        // Consume the channel set by the most recent processor invocation
+        // FIRST, before any early return. consumeLastChannel() returns null
+        // unless a processor invocation happened since the previous consume,
+        // and always clears state — so a Log::build() log (no processor)
+        // gets null, and a stale value left from a prior log can never leak
+        // forward, even if any of the early-return paths below fire.
         $channel = ChannelContextProcessor::consumeLastChannel();
+
+        // Re-entrant guard: a write in progress may itself emit a log
+        // (observer on log_entries, query listener with Log::debug, etc.).
+        // Skip those — capturing them would recurse on every insert.
+        if (WriteGuard::isWriting()) {
+            return;
+        }
 
         // Prevent infinite loops - don't log our own operations
         if ($this->isInternalLog($event)) {
@@ -71,10 +77,12 @@ class LogCapture
             $data = $this->buildLogData($event, $channel);
             $this->writer->write($data);
         } catch (Throwable $e) {
-            // Silently fail - don't break the application
-            if (config('app.debug')) {
-                error_log('LogScope: Failed to write log entry: '.$e->getMessage());
-            }
+            // Don't break the calling application, but always surface the
+            // failure to PHP's error log. Hiding it behind APP_DEBUG meant
+            // production DB outages caused silent total log loss with zero
+            // observability. WriteFailureLogger dedupes per-process so a
+            // sustained outage doesn't dump thousands of identical lines.
+            WriteFailureLogger::report($e, 'listener');
         }
     }
 
@@ -113,20 +121,15 @@ class LogCapture
 
     /**
      * Check if this is an internal log that should be skipped.
+     *
+     * Only the structured `_logscope_internal` context key triggers the skip.
+     * Substring matches on the message (e.g. checking for "LogScope") are
+     * unsafe — they silently drop legitimate user logs that happen to mention
+     * the package by name (integration error reports, alerts, etc.).
      */
     protected function isInternalLog(MessageLogged $event): bool
     {
-        // Skip logs from our own namespace
-        if (str_contains($event->message, 'LogScope')) {
-            return true;
-        }
-
-        // Check context for LogScope markers
-        if (isset($event->context['_logscope_internal'])) {
-            return true;
-        }
-
-        return false;
+        return isset($event->context['_logscope_internal']);
     }
 
     /**
@@ -134,9 +137,17 @@ class LogCapture
      */
     protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
     {
-        // Check if we should ignore deprecation messages
-        if (config('logscope.ignore.deprecations', false)) {
-            if (str_contains($event->message, 'is deprecated')) {
+        // Check if we should ignore deprecation messages.
+        //
+        // Scope by CHANNEL — Laravel routes PHP runtime deprecations through
+        // a dedicated channel (default name 'deprecations'). The set of
+        // channels treated as deprecation channels is configurable so apps
+        // that remap the channel name still get the filter. Matching on
+        // the message substring "is deprecated" was unsafe: it silently
+        // dropped legitimate business logs that used the same phrase.
+        if (config('logscope.ignore.deprecations', false) && $channel !== null) {
+            $deprecationChannels = (array) config('logscope.ignore.deprecation_channels', ['deprecations']);
+            if (in_array($channel, $deprecationChannels, true)) {
                 return true;
             }
         }

@@ -39,6 +39,20 @@ class LogScopeServiceProvider extends ServiceProvider
             $this->registerChannelProcessor();
         });
 
+        // Attach the MessageLogged listener as early as possible — in
+        // register() rather than boot() — so logs emitted during another
+        // provider's boot() (or any earlier-running boot phase) are captured.
+        // If the listener were registered in our own boot(), any provider
+        // that boots before us would have its boot-time logs silently dropped.
+        //
+        // Caveat: logs fired during another provider's register() (the phase
+        // we are in right now) ARE captured by the listener, but the channel
+        // name will be null. The Monolog channel processor that records the
+        // channel name is installed in the booting() callback above, which
+        // fires later. Logs from boot() onwards have correct channel
+        // attribution.
+        $this->registerLogCapture();
+
         // In long-running workers (Octane), static state survives across
         // requests. Reset ChannelContextProcessor's slot at each Octane
         // request boundary so a Log::build() log in request N+1 can never
@@ -117,7 +131,6 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerMigrations();
         $this->registerMiddleware();
-        $this->registerLogCapture();
     }
 
     /**
@@ -130,13 +143,36 @@ class LogScopeServiceProvider extends ServiceProvider
 
     /**
      * Register the request context middleware.
+     *
+     * Prepended (not pushed) so CaptureRequestContext runs FIRST in the
+     * global middleware stack. If an earlier middleware were to throw,
+     * the resulting log entry would have no trace_id/ip_address/url —
+     * making it harder to correlate with the failing request.
+     *
+     * Defensive: in apps that don't bind the HTTP kernel (e.g. console-only
+     * applications, or custom kernels that don't extend Foundation's), the
+     * make() call may throw or the resolved object may not implement
+     * prependMiddleware. Skip in those cases rather than crashing during
+     * service-provider boot.
      */
     protected function registerMiddleware(): void
     {
-        if (config('logscope.middleware.enabled', true)) {
-            $kernel = $this->app->make(Kernel::class);
-            $kernel->pushMiddleware(CaptureRequestContext::class);
+        if (! config('logscope.middleware.enabled', true)) {
+            return;
         }
+
+        try {
+            $kernel = $this->app->make(Kernel::class);
+        } catch (\Throwable) {
+            // No HTTP kernel bound — running in a non-HTTP context.
+            return;
+        }
+
+        if (! method_exists($kernel, 'prependMiddleware')) {
+            return;
+        }
+
+        $kernel->prependMiddleware(CaptureRequestContext::class);
     }
 
     /**
@@ -247,9 +283,14 @@ class LogScopeServiceProvider extends ServiceProvider
 
     /**
      * Reset the buffer state (used for testing).
+     *
+     * Also resets WriteGuard's depth counter — if a previous test crashed
+     * mid-`during()` block, the static depth could be left > 0 and silently
+     * skip captures in every subsequent test.
      */
     public static function resetBufferState(): void
     {
         LogBuffer::reset();
+        \LogScope\Services\WriteGuard::reset();
     }
 }
