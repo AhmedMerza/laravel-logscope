@@ -102,15 +102,21 @@ class LogBuffer implements LogBufferInterface
 
         // If the Laravel container is gone (e.g. after test teardown or during
         // PHP shutdown), we cannot resolve DB connections or config — bail out
-        // gracefully instead of emitting confusing error messages.
+        // gracefully. Surface the discard to error_log so a missing container
+        // at flush time is visible in stderr/php-fpm logs instead of being a
+        // silent data-loss event.
         try {
             if (! app()->bound('db')) {
+                $count = count(self::$buffer);
                 self::$buffer = [];
+                error_log("LogScope: Discarded {$count} buffered log entr".($count === 1 ? 'y' : 'ies').' — container has no db binding (PHP shutdown or test teardown)');
 
                 return;
             }
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $count = count(self::$buffer);
             self::$buffer = [];
+            error_log("LogScope: Discarded {$count} buffered log entr".($count === 1 ? 'y' : 'ies').' — container unavailable: ['.get_class($e).'] '.$e->getMessage());
 
             return;
         }

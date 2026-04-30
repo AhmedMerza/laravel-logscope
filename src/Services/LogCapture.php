@@ -66,10 +66,11 @@ class LogCapture
             $data = $this->buildLogData($event, $channel);
             $this->writer->write($data);
         } catch (Throwable $e) {
-            // Silently fail - don't break the application
-            if (config('app.debug')) {
-                error_log('LogScope: Failed to write log entry: '.$e->getMessage());
-            }
+            // Don't break the calling application, but always surface the
+            // failure to PHP's error log. Hiding it behind APP_DEBUG meant
+            // production DB outages caused silent total log loss with zero
+            // observability.
+            error_log('LogScope: Failed to write log entry: ['.get_class($e).'] '.$e->getMessage());
         }
     }
 
