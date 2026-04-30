@@ -1306,7 +1306,22 @@ function logScope() {
 
         parseRelativeTime(timeStr) {
             const now = new Date();
-            const todayDate = now.toISOString().split('T')[0];
+
+            // Format a Date as a YYYY-MM-DDTHH:MM string in the USER'S
+            // local timezone — not UTC. <input type="datetime-local">
+            // expects local time, and so do the user's expectations
+            // ("this hour" should match their wall clock). toISOString()
+            // would format as UTC and shift the value by their offset.
+            const toLocalIsoMinute = (date) => {
+                const pad = (n) => String(n).padStart(2, '0');
+                return date.getFullYear() + '-' +
+                    pad(date.getMonth() + 1) + '-' +
+                    pad(date.getDate()) + 'T' +
+                    pad(date.getHours()) + ':' +
+                    pad(date.getMinutes());
+            };
+
+            const todayDate = toLocalIsoMinute(now).split('T')[0];
 
             // Handle 'today' keyword
             if (timeStr === 'today') {
@@ -1326,7 +1341,7 @@ function logScope() {
                 else if (unit.startsWith('day')) ms = amount * 24 * 60 * 60 * 1000;
                 else if (unit.startsWith('week')) ms = amount * 7 * 24 * 60 * 60 * 1000;
                 else if (unit.startsWith('month')) ms = amount * 30 * 24 * 60 * 60 * 1000;
-                return { from: new Date(now.getTime() - ms).toISOString().slice(0, 16) };
+                return { from: toLocalIsoMinute(new Date(now.getTime() - ms)) };
             }
 
             return { from: timeStr }; // Return as-is if not a relative time
