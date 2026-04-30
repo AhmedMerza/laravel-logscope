@@ -50,33 +50,25 @@ class LogBuffer implements LogBufferInterface
         self::$cachedLimits = config('logscope.limits', []);
 
         self::$buffer[] = $data;
-
-        $this->registerCallbacks();
     }
 
     /**
-     * Register terminating and shutdown callbacks if not already registered.
+     * @internal — called by LogScopeServiceProvider to coordinate eager
+     * shutdown-function registration so it happens at most once per
+     * process even when the provider registers multiple times (e.g. in
+     * test suites that re-instantiate the app).
      */
-    protected function registerCallbacks(): void
+    public static function shutdownFunctionRegistered(): bool
     {
-        // Register terminating callback once (for normal Laravel lifecycle)
-        if (! self::$terminatingRegistered) {
-            self::$terminatingRegistered = true;
+        return self::$shutdownRegistered;
+    }
 
-            $this->app->terminating(function () {
-                $this->flush();
-            });
-        }
-
-        // Register shutdown function as backup (for exit/die scenarios)
-        // This runs at the END of PHP execution, even after exit() or die()
-        if (! self::$shutdownRegistered) {
-            self::$shutdownRegistered = true;
-
-            register_shutdown_function(function () {
-                self::flushStatic();
-            });
-        }
+    /**
+     * @internal — see shutdownFunctionRegistered().
+     */
+    public static function markShutdownFunctionRegistered(): void
+    {
+        self::$shutdownRegistered = true;
     }
 
     /**
