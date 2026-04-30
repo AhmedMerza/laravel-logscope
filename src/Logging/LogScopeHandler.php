@@ -83,8 +83,9 @@ class LogScopeHandler extends AbstractProcessingHandler
             // Don't break the calling application, but always surface the
             // failure to PHP's error log. Hiding it behind APP_DEBUG meant
             // production DB outages caused silent total log loss with zero
-            // observability.
-            error_log('LogScope: Failed to write log entry: ['.get_class($e).'] '.$e->getMessage());
+            // observability. WriteFailureLogger dedupes per-process so a
+            // sustained outage doesn't dump thousands of identical lines.
+            \LogScope\Services\WriteFailureLogger::report($e, 'channel-handler');
         }
     }
 

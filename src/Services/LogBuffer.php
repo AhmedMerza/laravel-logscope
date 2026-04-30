@@ -109,14 +109,16 @@ class LogBuffer implements LogBufferInterface
             if (! app()->bound('db')) {
                 $count = count(self::$buffer);
                 self::$buffer = [];
-                error_log("LogScope: Discarded {$count} buffered log entr".($count === 1 ? 'y' : 'ies').' — container has no db binding (PHP shutdown or test teardown)');
+                $entryWord = $count === 1 ? 'entry' : 'entries';
+                WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container has no db binding (PHP shutdown or test teardown)");
 
                 return;
             }
         } catch (Throwable $e) {
             $count = count(self::$buffer);
             self::$buffer = [];
-            error_log("LogScope: Discarded {$count} buffered log entr".($count === 1 ? 'y' : 'ies').' — container unavailable: ['.get_class($e).'] '.$e->getMessage());
+            $entryWord = $count === 1 ? 'entry' : 'entries';
+            WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container unavailable: [".get_class($e).'] '.$e->getMessage());
 
             return;
         }
@@ -134,11 +136,11 @@ class LogBuffer implements LogBufferInterface
                 try {
                     LogEntry::insert(self::normalizeChunk($chunk));
                 } catch (Throwable $e) {
-                    error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                    WriteFailureLogger::report($e, 'buffer-flush');
                 }
             }
         } catch (Throwable $e) {
-            error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
+            WriteFailureLogger::report($e, 'buffer-flush');
         }
     }
 
