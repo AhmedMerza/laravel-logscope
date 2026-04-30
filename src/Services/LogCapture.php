@@ -139,15 +139,30 @@ class LogCapture
     {
         // Check if we should ignore deprecation messages.
         //
-        // Scope by CHANNEL — Laravel routes PHP runtime deprecations through
-        // a dedicated channel (default name 'deprecations'). The set of
-        // channels treated as deprecation channels is configurable so apps
-        // that remap the channel name still get the filter. Matching on
-        // the message substring "is deprecated" was unsafe: it silently
-        // dropped legitimate business logs that used the same phrase.
-        if (config('logscope.ignore.deprecations', false) && $channel !== null) {
+        // Two-layer match:
+        //
+        // 1) CHANNEL match (preferred) — PHP runtime deprecations route
+        //    through Laravel's `deprecations` channel. If the channel
+        //    processor is registered for it, we match by name.
+        //
+        // 2) MESSAGE-PATTERN fallback — Laravel's HandleExceptions
+        //    synthesizes the `deprecations` channel lazily, AFTER our
+        //    channel processor registration has run, so the processor
+        //    isn't attached and `$channel` is null/empty for these.
+        //    Fall back to matching the precise PHP deprecation format:
+        //    every PHP-runtime deprecation wraps as
+        //      "<actual message> in <file> on line <N>"
+        //    So we look for "is deprecated" + "on line <N>" at the end.
+        //    This is narrow enough that user logs like "Account 42 is
+        //    deprecated for billing" still pass through.
+        if (config('logscope.ignore.deprecations', false)) {
             $deprecationChannels = (array) config('logscope.ignore.deprecation_channels', ['deprecations']);
-            if (in_array($channel, $deprecationChannels, true)) {
+
+            if ($channel !== null && in_array($channel, $deprecationChannels, true)) {
+                return true;
+            }
+
+            if ($this->looksLikePhpDeprecation($event->message)) {
                 return true;
             }
         }
@@ -160,5 +175,30 @@ class LogCapture
         }
 
         return false;
+    }
+
+    /**
+     * Match Laravel's wrapped PHP-deprecation message format precisely.
+     *
+     * Laravel's HandleExceptions::handleDeprecation() formats the message as
+     *   "<original message> in <file> on line <N>"
+     * before logging through the deprecations channel. The original
+     * message itself contains "is deprecated" (the PHP-runtime phrase).
+     *
+     * Requiring BOTH parts (`is deprecated` somewhere + `on line <N>` at
+     * the end) is narrow enough to avoid the false-positives a plain
+     * substring match had:
+     *   - "Account 42 is deprecated for billing"  → no "on line N" → keep
+     *   - "Migration is DEPRECATED"               → no "on line N" → keep
+     *   - "strpos(): ... is deprecated in /path/x.php on line 42" → drop
+     */
+    protected function looksLikePhpDeprecation(string $message): bool
+    {
+        // Cheap pre-check before regex
+        if (! str_contains($message, 'is deprecated')) {
+            return false;
+        }
+
+        return (bool) preg_match('/ on line \d+$/', $message);
     }
 }

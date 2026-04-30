@@ -109,9 +109,9 @@ describe('ignore.deprecations substring false positive', function () {
 
         setChannelAsFresh('application');
 
-        // 'application' isn't in the deprecation_channels list — the log must
-        // be captured even though the message mentions deprecation (the old
-        // substring filter would have dropped it).
+        // 'application' isn't in the deprecation_channels list and the
+        // message lacks the "on line N" suffix that PHP-runtime
+        // deprecations always have — log must be captured.
         event(new \Illuminate\Log\Events\MessageLogged(
             'warning',
             'feature flag x is deprecated',
@@ -119,5 +119,44 @@ describe('ignore.deprecations substring false positive', function () {
         ));
 
         expect(LogEntry::count())->toBe(1);
+    });
+
+    it('catches PHP runtime deprecations even when the channel processor was not attached', function () {
+        // Reproduces the production regression: Laravel's HandleExceptions
+        // synthesizes the `deprecations` channel lazily, AFTER our channel
+        // processor registration has already run. So when the deprecation
+        // fires, the channel processor isn't on it — $channel arrives as
+        // null. The channel-name match misses, but the message-pattern
+        // fallback catches Laravel's standard wrapped format.
+        config(['logscope.ignore.deprecations' => true]);
+
+        // Channel is null/empty (processor wasn't attached at boot time).
+        event(new \Illuminate\Log\Events\MessageLogged(
+            'warning',
+            'strpos(): Passing null to parameter #1 ($haystack) of type string is deprecated in /vendor/pkg/file.php on line 42',
+            []
+        ));
+
+        expect(LogEntry::count())->toBe(0);
+    });
+
+    it('keeps capturing user logs that say "is deprecated" but lack the "on line N" suffix', function () {
+        // Locks in the contract that the message-pattern fallback is
+        // narrow — only matches PHP's wrapped format ending in
+        // "on line <N>". Business logs don't have that suffix.
+        config(['logscope.ignore.deprecations' => true]);
+
+        $messages = [
+            'This account is deprecated for billing',
+            'Migration is DEPRECATED — switch to new endpoint',
+            'API endpoint /v1/users is deprecated, use /v2',
+            'feature flag x is deprecated',
+        ];
+
+        foreach ($messages as $message) {
+            event(new \Illuminate\Log\Events\MessageLogged('warning', $message, []));
+        }
+
+        expect(LogEntry::count())->toBe(count($messages));
     });
 });
