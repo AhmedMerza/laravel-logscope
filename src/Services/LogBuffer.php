@@ -28,12 +28,10 @@ class LogBuffer implements LogBufferInterface
     protected static array $cachedLimits = [];
 
     /**
-     * Whether terminating callback is registered.
-     */
-    protected static bool $terminatingRegistered = false;
-
-    /**
-     * Whether shutdown function is registered.
+     * Whether the PHP shutdown function has been registered for this
+     * process. Stays true once set so re-registering the service provider
+     * (e.g. in test suites that re-instantiate the app) doesn't stack
+     * multiple shutdown functions calling our flush.
      */
     protected static bool $shutdownRegistered = false;
 
@@ -50,33 +48,25 @@ class LogBuffer implements LogBufferInterface
         self::$cachedLimits = config('logscope.limits', []);
 
         self::$buffer[] = $data;
-
-        $this->registerCallbacks();
     }
 
     /**
-     * Register terminating and shutdown callbacks if not already registered.
+     * @internal — called by LogScopeServiceProvider to coordinate eager
+     * shutdown-function registration so it happens at most once per
+     * process even when the provider registers multiple times (e.g. in
+     * test suites that re-instantiate the app).
      */
-    protected function registerCallbacks(): void
+    public static function shutdownFunctionRegistered(): bool
     {
-        // Register terminating callback once (for normal Laravel lifecycle)
-        if (! self::$terminatingRegistered) {
-            self::$terminatingRegistered = true;
+        return self::$shutdownRegistered;
+    }
 
-            $this->app->terminating(function () {
-                $this->flush();
-            });
-        }
-
-        // Register shutdown function as backup (for exit/die scenarios)
-        // This runs at the END of PHP execution, even after exit() or die()
-        if (! self::$shutdownRegistered) {
-            self::$shutdownRegistered = true;
-
-            register_shutdown_function(function () {
-                self::flushStatic();
-            });
-        }
+    /**
+     * @internal — see shutdownFunctionRegistered().
+     */
+    public static function markShutdownFunctionRegistered(): void
+    {
+        self::$shutdownRegistered = true;
     }
 
     /**
@@ -161,12 +151,19 @@ class LogBuffer implements LogBufferInterface
 
     /**
      * Reset the buffer state (used for testing).
+     *
+     * NOTE: clearing $shutdownRegistered means a subsequent service-provider
+     * register() call WILL register a second register_shutdown_function for
+     * this process. PHP shutdown handlers stack — both will fire at exit.
+     * Both call the same flushSafely() closure, so the second is a no-op
+     * (buffer already drained), but the duplicate registration is a small
+     * test-time leak. Acceptable because resetBufferState() is only called
+     * between tests, and the process exits soon after the suite finishes.
      */
     public static function reset(): void
     {
         self::$buffer = [];
         self::$cachedLimits = [];
-        self::$terminatingRegistered = false;
         self::$shutdownRegistered = false;
     }
 

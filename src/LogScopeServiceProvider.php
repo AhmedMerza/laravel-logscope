@@ -60,6 +60,20 @@ class LogScopeServiceProvider extends ServiceProvider
         // Octane is actually installed — guards against pulling Octane
         // as a hard dependency.
         $this->registerOctaneStateReset();
+
+        // Register our buffer-flush callback as early as possible so we're
+        // ahead of most user-provider terminate callbacks in the chain.
+        // Laravel's Application::terminate() runs callbacks in registration
+        // order with NO try/catch around each — if a later-registered
+        // callback throws, our flush would still run; but if a callback
+        // registered before ours throws, we'd be skipped. Registering in
+        // register() (instead of lazily on first add()) puts us as early
+        // in the user-provider phase as possible.
+        //
+        // For Octane specifically, also wire RequestTerminated as an
+        // independent flush trigger that survives even when Laravel's
+        // terminate callback chain is broken by an earlier throw.
+        $this->registerEagerFlushCallbacks();
     }
 
     /**
@@ -199,6 +213,65 @@ class LogScopeServiceProvider extends ServiceProvider
                 \LogScope\Logging\ChannelContextProcessor::clearLastChannel();
             }
         );
+    }
+
+    /**
+     * Register flush callbacks as early as possible.
+     *
+     * - app->terminating(): runs at end of every Laravel request lifecycle.
+     *   Registered eagerly here (not lazily on first log) so we're as early
+     *   in the callback chain as we can be — minimizes the chance an
+     *   earlier-registered callback throws and skips us.
+     * - register_shutdown_function(): backup for CLI/HTTP scenarios where
+     *   the terminate chain didn't reach us. Doesn't help in Octane (only
+     *   fires on worker death).
+     * - Octane RequestTerminated: independent flush trigger that survives
+     *   even if Laravel's terminate callback chain is broken. Octane is an
+     *   optional peer — only registers if installed.
+     *
+     * Note on cost: we register unconditionally regardless of write_mode.
+     * In sync/queue modes the buffer is always empty, so flushStatic
+     * early-returns — the per-request cost is one closure call returning
+     * `if (empty($buffer)) return;`. Negligible. Gating on write_mode at
+     * register time would miss runtime config changes (`config([...])`)
+     * and add a footgun for marginal benefit.
+     *
+     * Note on Octane double-flush: in Octane, a request fires BOTH
+     * Application::terminate() (running our `terminating` callback) AND
+     * Octane's RequestTerminated event (running our second listener).
+     * Step 2 is intentionally redundant — the buffer is already drained
+     * by step 1, so the second call is a no-op. The redundancy gives us
+     * a recovery path if the terminate chain is broken by an earlier
+     * throwing callback (the original bug this fix addresses).
+     */
+    protected function registerEagerFlushCallbacks(): void
+    {
+        // Internal try/catch wraps our own flush so an exception inside it
+        // can't propagate out and break OTHER terminate callbacks downstream.
+        // Exceptions surface via error_log only — tests asserting flush
+        // success should inspect error_log content (see WriteFailureLogger
+        // test pattern) rather than expecting the exception to bubble.
+        $flushSafely = static function (): void {
+            try {
+                LogBuffer::flushStatic();
+            } catch (\Throwable $e) {
+                error_log('LogScope: Failed to flush buffer at terminate: ['.get_class($e).'] '.$e->getMessage());
+            }
+        };
+
+        $this->app->terminating($flushSafely);
+
+        if (! LogBuffer::shutdownFunctionRegistered()) {
+            register_shutdown_function($flushSafely);
+            LogBuffer::markShutdownFunctionRegistered();
+        }
+
+        if (class_exists(\Laravel\Octane\Events\RequestTerminated::class)) {
+            $this->app['events']->listen(
+                \Laravel\Octane\Events\RequestTerminated::class,
+                $flushSafely
+            );
+        }
     }
 
     /**
