@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Logging;
 
 use Illuminate\Support\Facades\Context;
+use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use Monolog\Handler\AbstractProcessingHandler;
@@ -14,6 +15,8 @@ use Throwable;
 
 class LogScopeHandler extends AbstractProcessingHandler
 {
+    use ResolvesExceptionSource;
+
     protected bool $initialized = false;
 
     protected string $channel;
@@ -183,14 +186,16 @@ class LogScopeHandler extends AbstractProcessingHandler
     protected function sanitizeObject(object $object): mixed
     {
         if ($object instanceof Throwable) {
+            $callerFrame = $this->callerFrameForException($object);
+
             return [
                 '_type' => 'exception',
                 'class' => get_class($object),
                 'message' => $object->getMessage(),
                 'code' => $object->getCode(),
-                'file' => $object->getFile(),
-                'line' => $object->getLine(),
-                'trace' => array_slice($object->getTrace(), 0, 10),
+                'file' => $callerFrame['file'] ?? $object->getFile(),
+                'line' => $callerFrame['line'] ?? $object->getLine(),
+                'trace' => $this->sanitizeTrace($object),
             ];
         }
 
@@ -243,7 +248,10 @@ class LogScopeHandler extends AbstractProcessingHandler
     {
         // Check if exception is in context
         if (isset($record->context['exception']) && $record->context['exception'] instanceof Throwable) {
-            return $record->context['exception']->getFile();
+            $exception = $record->context['exception'];
+            $callerFrame = $this->callerFrameForException($exception);
+
+            return $callerFrame['file'] ?? $exception->getFile();
         }
 
         // Try to find the caller from the backtrace
@@ -276,7 +284,10 @@ class LogScopeHandler extends AbstractProcessingHandler
     {
         // Check if exception is in context
         if (isset($record->context['exception']) && $record->context['exception'] instanceof Throwable) {
-            return $record->context['exception']->getLine();
+            $exception = $record->context['exception'];
+            $callerFrame = $this->callerFrameForException($exception);
+
+            return $callerFrame['line'] ?? $exception->getLine();
         }
 
         // Try to find the caller from the backtrace
@@ -300,5 +311,29 @@ class LogScopeHandler extends AbstractProcessingHandler
         }
 
         return null;
+    }
+
+    /**
+     * Return up to 10 frames of the trace with `args` stripped to avoid
+     * leaking sensitive arguments (passwords, tokens) into stored logs.
+     *
+     * @return list<array{file?: string, line?: int, function?: string, class?: string, type?: string}>
+     */
+    protected function sanitizeTrace(Throwable $exception): array
+    {
+        $frames = array_slice($exception->getTrace(), 0, 10);
+        $sanitized = [];
+
+        foreach ($frames as $frame) {
+            $clean = [];
+            foreach (['file', 'line', 'function', 'class', 'type'] as $key) {
+                if (isset($frame[$key])) {
+                    $clean[$key] = $frame[$key];
+                }
+            }
+            $sanitized[] = $clean;
+        }
+
+        return $sanitized;
     }
 }

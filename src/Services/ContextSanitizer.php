@@ -8,6 +8,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Http\Request;
 use JsonSerializable;
+use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\Contracts\ContextSanitizerInterface;
 use Throwable;
 
@@ -16,6 +17,8 @@ use Throwable;
  */
 class ContextSanitizer implements ContextSanitizerInterface
 {
+    use ResolvesExceptionSource;
+
     /**
      * Whether to expand objects to arrays.
      */
@@ -325,17 +328,50 @@ class ContextSanitizer implements ContextSanitizerInterface
 
     /**
      * Convert an exception to a safe array representation.
+     *
+     * Includes a slice of the stack trace (with `args` stripped to avoid
+     * leaking secrets such as passwords passed to a constructor). For
+     * argument-validation errors (ArgumentCountError / arg-validation
+     * TypeError), `file`/`line` are remapped to the caller's call site so
+     * the detail panel matches the list view's `source` column.
      */
     protected function sanitizeException(Throwable $exception): array
     {
+        $callerFrame = $this->callerFrameForException($exception);
+
         return [
             '_type' => 'exception',
             'class' => get_class($exception),
             'message' => $exception->getMessage(),
             'code' => $exception->getCode(),
-            'file' => $exception->getFile(),
-            'line' => $exception->getLine(),
+            'file' => $callerFrame['file'] ?? $exception->getFile(),
+            'line' => $callerFrame['line'] ?? $exception->getLine(),
+            'trace' => $this->sanitizeTrace($exception),
         ];
+    }
+
+    /**
+     * Return up to 10 frames of the trace with `args` stripped (to avoid
+     * leaking sensitive arguments) and only safe scalar metadata kept.
+     *
+     * @return list<array{file?: string, line?: int, function?: string, class?: string, type?: string}>
+     */
+    protected function sanitizeTrace(Throwable $exception): array
+    {
+        $frames = array_slice($exception->getTrace(), 0, 10);
+        $sanitized = [];
+
+        foreach ($frames as $frame) {
+            $clean = [];
+            foreach (['file', 'line', 'function', 'class', 'type'] as $key) {
+                if (isset($frame[$key])) {
+                    $clean[$key] = $frame[$key];
+                }
+            }
+            $sanitized[] = $clean;
+        }
+
+        return $sanitized;
     }
 
     /**
@@ -343,11 +379,14 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     public function extractSource(array $context): ?string
     {
-        if (isset($context['exception']) && $context['exception'] instanceof Throwable) {
-            return $context['exception']->getFile();
+        if (! isset($context['exception']) || ! ($context['exception'] instanceof Throwable)) {
+            return null;
         }
 
-        return null;
+        $exception = $context['exception'];
+        $callerFrame = $this->callerFrameForException($exception);
+
+        return $callerFrame['file'] ?? $exception->getFile();
     }
 
     /**
@@ -355,10 +394,13 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     public function extractSourceLine(array $context): ?int
     {
-        if (isset($context['exception']) && $context['exception'] instanceof Throwable) {
-            return $context['exception']->getLine();
+        if (! isset($context['exception']) || ! ($context['exception'] instanceof Throwable)) {
+            return null;
         }
 
-        return null;
+        $exception = $context['exception'];
+        $callerFrame = $this->callerFrameForException($exception);
+
+        return $callerFrame['line'] ?? $exception->getLine();
     }
 }

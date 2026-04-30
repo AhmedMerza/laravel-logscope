@@ -59,7 +59,39 @@ describe('sanitize', function () {
             ->and($result['error']['message'])->toBe('Test error')
             ->and($result['error']['code'])->toBe(123)
             ->and($result['error']['file'])->toContain('ContextSanitizerTest.php')
-            ->and($result['error']['line'])->toBeInt();
+            ->and($result['error']['line'])->toBeInt()
+            ->and($result['error']['trace'])->toBeArray();
+    });
+
+    it('strips args from the trace slice to avoid leaking sensitive arguments', function () {
+        $exception = new RuntimeException('boom');
+        $context = ['error' => $exception];
+
+        $result = $this->sanitizer->sanitize($context);
+
+        expect($result['error']['trace'])->toBeArray();
+        foreach ($result['error']['trace'] as $frame) {
+            expect($frame)->not->toHaveKey('args');
+        }
+    });
+
+    it('remaps file/line in sanitized exception for ArgumentCountError', function () {
+        // Throw via a closure so we can ask reflection where the `new` lives.
+        // Robust under formatter reflows — line is read from the closure itself.
+        $thrower = fn () => new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
+        $callerLine = (new ReflectionFunction($thrower))->getStartLine();
+
+        try {
+            $thrower();
+        } catch (\ArgumentCountError $e) {
+            $exception = $e;
+        }
+
+        $result = $this->sanitizer->sanitize(['error' => $exception]);
+
+        expect($result['error']['file'])->toContain('ContextSanitizerTest.php')
+            ->and($result['error']['line'])->toBe($callerLine)
+            ->and($result['error']['trace'])->toBeArray()->not->toBeEmpty();
     });
 
     it('converts stdClass to structured object with data', function () {
@@ -249,6 +281,67 @@ describe('extractSource', function () {
 
         expect($result)->toContain('ContextSanitizerTest.php');
     });
+
+    it('uses caller file for ArgumentCountError instead of constructor declaration', function () {
+        try {
+            new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
+        } catch (\ArgumentCountError $e) {
+            $exception = $e;
+        }
+
+        $result = $this->sanitizer->extractSource(['exception' => $exception]);
+
+        // PHP's getFile() points at ServiceWithRequiredArg.php (constructor declaration).
+        // We want the user-code call site (this test file) instead.
+        expect($result)->toContain('ContextSanitizerTest.php')
+            ->and($result)->not->toContain('ServiceWithRequiredArg.php');
+    });
+
+    it('uses caller file for argument-validation TypeError', function () {
+        try {
+            new \LogScope\Tests\Fixtures\ServiceWithRequiredArg(123); // strict_types=1 → TypeError
+        } catch (\TypeError $e) {
+            $exception = $e;
+        }
+
+        // Sanity: this is PHP's "Argument #N must be of type ..." flavor.
+        expect($exception->getMessage())->toContain('Argument #');
+
+        $result = $this->sanitizer->extractSource(['exception' => $exception]);
+
+        expect($result)->toContain('ContextSanitizerTest.php')
+            ->and($result)->not->toContain('ServiceWithRequiredArg.php');
+    });
+
+    it('does NOT remap return-type TypeError to caller (getFile() is already correct)', function () {
+        try {
+            \LogScope\Tests\Fixtures\ServiceWithRequiredArg::returnsBadType();
+        } catch (\TypeError $e) {
+            $exception = $e;
+        }
+
+        // Sanity: PHP says "Return value must be of type ..." — no "Argument #".
+        expect($exception->getMessage())->not->toContain('Argument #');
+
+        $result = $this->sanitizer->extractSource(['exception' => $exception]);
+
+        // The bad `return` lives in the fixture file. We must not silently
+        // remap it to the caller (this test file).
+        expect($result)->toContain('ServiceWithRequiredArg.php');
+    });
+
+    it('does NOT remap user-thrown TypeError to caller', function () {
+        try {
+            \LogScope\Tests\Fixtures\ServiceWithRequiredArg::userThrowsTypeError();
+        } catch (\TypeError $e) {
+            $exception = $e;
+        }
+
+        $result = $this->sanitizer->extractSource(['exception' => $exception]);
+
+        // The `throw` site is in the fixture; it's the right location.
+        expect($result)->toContain('ServiceWithRequiredArg.php');
+    });
 });
 
 describe('extractSourceLine', function () {
@@ -275,5 +368,22 @@ describe('extractSourceLine', function () {
         $result = $this->sanitizer->extractSourceLine($context);
 
         expect($result)->toBeInt()->toBeGreaterThan(0);
+    });
+
+    it('uses caller line for ArgumentCountError instead of constructor declaration', function () {
+        // Throw via a closure so reflection can tell us the line of `new`,
+        // independent of any formatter reflows in the surrounding test body.
+        $thrower = fn () => new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
+        $callerLine = (new ReflectionFunction($thrower))->getStartLine();
+
+        try {
+            $thrower();
+        } catch (\ArgumentCountError $e) {
+            $exception = $e;
+        }
+
+        $result = $this->sanitizer->extractSourceLine(['exception' => $exception]);
+
+        expect($result)->toBe($callerLine);
     });
 });

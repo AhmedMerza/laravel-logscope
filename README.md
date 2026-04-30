@@ -23,6 +23,16 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
+### v1.5.4 — Correct source location for argument-validation errors
+
+When you call `new SomeClass()` with the wrong number or type of arguments, PHP throws an `ArgumentCountError` (or `TypeError` for type mismatches). For these errors PHP's `$e->getFile()`/`$e->getLine()` point at the **callee's declaration** (the constructor's signature), not the **caller** (where `new` was actually written). Previously this meant the `source` column in the log list would show e.g. `app/Services/UserService.php:11` (the constructor) instead of `app/Http/Controllers/UserController.php:42` (the broken `new`) — making it look like the bug was somewhere it wasn't.
+
+LogScope now detects argument-validation errors (`ArgumentCountError` and `TypeError` whose message contains `"Argument #"`) and uses the first stack-trace frame as the source. Other exceptions — including return-type `TypeError` and user-thrown `throw new TypeError(...)` — keep `getFile()`/`getLine()` because those are already correct.
+
+The exception detail panel and the stored stack-trace slice are aligned with the same logic, so the location you see in the list matches the location you see when you open the entry. The trace slice now strips frame `args` to avoid leaking sensitive arguments (passwords, tokens) that might have been passed into the failing call.
+
+---
+
 ### v1.5.3 — Faster filter queries + zero-RTT detail open
 
 Two improvements that compound: indexed filters get 1500–3600× faster on large tables, and opening a log detail no longer needs a second round-trip to the server.
