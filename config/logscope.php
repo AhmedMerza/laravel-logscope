@@ -128,6 +128,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Failure Banner
+    |--------------------------------------------------------------------------
+    |
+    | When LogScope's own write path fails (e.g. transient DB outage),
+    | the failure is always emitted to PHP's error_log. This config
+    | additionally writes a breadcrumb to the cache so the LogScope UI
+    | can show an in-banner warning to operators who don't routinely
+    | check server logs.
+    |
+    | 'enabled'      - Toggle the cache-backed banner. error_log emission
+    |                  is unaffected and always fires.
+    |
+    | 'ttl_seconds'  - How long the breadcrumb stays in cache.
+    |                  null (default) = persist until the user dismisses.
+    |                                    A Saturday-night failure stays
+    |                                    visible Monday morning.
+    |                  int             = auto-expire after N seconds
+    |                                    (e.g. 3600 for 1 hour).
+    |
+    | Caveats (cache is best-effort, NOT persistent storage):
+    |   * `php artisan cache:clear` wipes the breadcrumb.
+    |   * If your cache uses the `database` driver and the DB itself is
+    |     the failure (the most common case for transient outages), the
+    |     cache write fails silently. The error_log line still fires —
+    |     it's the reliable signal. Use Redis or file cache if you want
+    |     the banner to survive DB outages.
+    |   * Hard process kills (SIGKILL, OOM) skip both error_log and
+    |     cache writes — there's no userland recovery for those.
+    |
+    */
+
+    'failure_banner' => [
+        'enabled' => env('LOGSCOPE_FAILURE_BANNER_ENABLED', true),
+        'ttl_seconds' => env('LOGSCOPE_FAILURE_BANNER_TTL'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Features
     |--------------------------------------------------------------------------
     |

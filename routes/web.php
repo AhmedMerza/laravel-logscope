@@ -30,4 +30,7 @@ Route::group([
 
     // Notes API
     Route::patch('/api/logs/{id}/note', [LogController::class, 'updateNote'])->name('logs.update-note');
+
+    // Write-failure banner: dismiss cached breadcrumb
+    Route::post('/api/failures/dismiss', [LogController::class, 'dismissFailures'])->name('failures.dismiss');
 });
