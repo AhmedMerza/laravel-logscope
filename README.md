@@ -23,15 +23,37 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-### v1.5.5 — Correct channel attribution for `Log::build()` and Octane
+### v1.5.5 — Six silent log-loss bugs fixed; production observability
 
-The Monolog channel processor stored the last log's channel in static state. Logs that bypassed the processor (`Log::build()` at runtime, or any log on a channel without the processor installed) inherited whatever was left over from a prior log — wrong attribution. In long-running workers (**Laravel Octane**), the static state survived across requests, so a `Log::build()` log in request N+1 could get tagged with the channel from the last log of request N.
+A reliability-focused release. After auditing the codebase for paths where logs could be silently dropped, six distinct issues were found and fixed. Each lands as its own PR (#8–#13) with failing-test-first verification.
 
-LogScope now uses an `$isFresh` flag set by every processor invocation. The new `consumeLastChannel()` returns the channel only when a processor invocation has happened since the last consume, and clears state in one operation. The listener consumes at the very top of its handler so even early-return paths (`isInternalLog`, `didHandleCurrentLog`, `WriteGuard`, ignored logs) leave clean state.
+#### What was broken
 
-For Octane users specifically, LogScope also registers a listener on `Laravel\Octane\Events\RequestReceived` that clears the channel slot at every request boundary — defense in depth against orphaned state from rare edge cases (Monolog handler exceptions, etc.). The listener only registers when Octane is actually installed.
+| # | Bug | Symptom |
+|---|---|---|
+| 1 | **Substring filters** dropped real user logs | `Log::error('LogScope client returned 503')` vanished — anything containing the substring "LogScope" was treated as internal. `ignore.deprecations` (default on) similarly dropped any business log containing "is deprecated". |
+| 2 | **`MessageLogged` listener registered too late** | Logs fired during another provider's `boot()` were lost if that provider booted before LogScope (~position 16 in a typical Laravel 12 app — every framework provider boots before us). |
+| 3 | **Write failures hidden behind `APP_DEBUG`** | In production with debug off, a transient DB outage caused silent total log loss. `error_log()` was only called when debug was on — the exact opposite of useful. |
+| 4 | **Re-entrant `MessageLogged` recursion** | A `LogEntry` observer that itself logs, or a query listener with `Log::debug`, could trigger infinite recursion or runaway entry counts. |
+| 5 | **Trace ID missing on early middleware errors** | `CaptureRequestContext` was pushed to the END of the global stack — if CORS, Sanctum, or rate limiting threw, the resulting log lacked `trace_id`/`ip_address`/`url`. |
+| 6 | **Channel attribution leaked across `Log::build()` and Octane** | Runtime channels (no processor) inherited the previous log's channel. In long-running workers, state survived across requests. |
 
-**Backwards compatibility:** the existing `ChannelContextProcessor::getLastChannel()` returns the raw value (its original semantics); it's now `@deprecated` (removed in 2.0) in favor of `consumeLastChannel()`. Existing test helpers that call `getLastChannel()` continue to work unchanged.
+#### What changed
+
+- **Filter false positives (#8):** `isInternalLog` now only checks the structured `_logscope_internal` context key. `ignore.deprecations` scopes by **channel** (`logscope.ignore.deprecation_channels`, default `['deprecations']`).
+- **Early listener (#9):** `MessageLogged` listener now registers in `register()`, before any provider's `boot()` runs.
+- **Observability (#10):** `error_log()` always fires on write failures, regardless of `APP_DEBUG`. New `WriteFailureLogger` dedupes per-process so a sustained outage emits once + a summary every 100th occurrence — not thousands of identical lines.
+- **Recursion guard (#11):** New `WriteGuard` static counter wraps every write path (sync, queue, batch, channel handler). The listener checks it at entry and skips re-entrant logs. Also wired into `WriteLogEntry::handle()` so queue-mode writes are protected too.
+- **Middleware order (#12):** `prependMiddleware` instead of `pushMiddleware` so trace_id is set before any other middleware can throw. Defensive guards skip registration on console-only kernels.
+- **Channel attribution (#13):** New `$isFresh` flag distinguishes "just set by a processor" from "stale state". `consumeLastChannel()` returns null unless a processor invocation has happened since the last consume. Octane users get a `RequestReceived` listener that clears the slot per-request as defense in depth.
+
+#### ⚠️ Behavior changes
+
+- **`ignore.deprecations`** is now channel-scoped, not message-scoped. Most users on default Laravel configs are unaffected. If your app emits PHP deprecations through a custom-named channel, add it to `logscope.ignore.deprecation_channels`. Logs containing "is deprecated" outside the deprecations channel are now captured.
+- **Logs containing "LogScope"** are now captured. Use `Log::*('msg', ['_logscope_internal' => true])` to suppress specific lines.
+- **`error_log()` will be louder during DB outages** — first occurrence + every 100th. Production users should already have log rotation; if not, the noise is your signal.
+- **`trace_id` now appears on early-pipeline logs** (CORS, auth, etc.). If your downstream tooling treated a null trace_id as a "pre-LogScope" marker, adjust accordingly.
+- **`ChannelContextProcessor::getLastChannel()`** is `@deprecated since 1.5.5, removed in 2.0` — kept with original semantics (returns raw value) for backwards compat. New code should use `consumeLastChannel()`.
 
 ---
 
