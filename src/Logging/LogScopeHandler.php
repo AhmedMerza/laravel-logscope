@@ -104,20 +104,14 @@ class LogScopeHandler extends AbstractProcessingHandler
 
     /**
      * Check if this is an internal log that should be skipped.
+     *
+     * Only the structured `_logscope_internal` context key triggers the skip.
+     * Substring matches on the message would silently drop legitimate user
+     * logs that mention the package by name.
      */
     protected function isInternalLog(LogRecord $record): bool
     {
-        // Skip logs from our own namespace
-        if (str_contains($record->message, 'LogScope')) {
-            return true;
-        }
-
-        // Check context for LogScope markers
-        if (isset($record->context['_logscope_internal'])) {
-            return true;
-        }
-
-        return false;
+        return isset($record->context['_logscope_internal']);
     }
 
     /**

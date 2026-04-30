@@ -108,20 +108,15 @@ class LogCapture
 
     /**
      * Check if this is an internal log that should be skipped.
+     *
+     * Only the structured `_logscope_internal` context key triggers the skip.
+     * Substring matches on the message (e.g. checking for "LogScope") are
+     * unsafe — they silently drop legitimate user logs that happen to mention
+     * the package by name (integration error reports, alerts, etc.).
      */
     protected function isInternalLog(MessageLogged $event): bool
     {
-        // Skip logs from our own namespace
-        if (str_contains($event->message, 'LogScope')) {
-            return true;
-        }
-
-        // Check context for LogScope markers
-        if (isset($event->context['_logscope_internal'])) {
-            return true;
-        }
-
-        return false;
+        return isset($event->context['_logscope_internal']);
     }
 
     /**
@@ -129,9 +124,17 @@ class LogCapture
      */
     protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
     {
-        // Check if we should ignore deprecation messages
-        if (config('logscope.ignore.deprecations', false)) {
-            if (str_contains($event->message, 'is deprecated')) {
+        // Check if we should ignore deprecation messages.
+        //
+        // Scope by CHANNEL — Laravel routes PHP runtime deprecations through
+        // a dedicated channel (default name 'deprecations'). The set of
+        // channels treated as deprecation channels is configurable so apps
+        // that remap the channel name still get the filter. Matching on
+        // the message substring "is deprecated" was unsafe: it silently
+        // dropped legitimate business logs that used the same phrase.
+        if (config('logscope.ignore.deprecations', false) && $channel !== null) {
+            $deprecationChannels = (array) config('logscope.ignore.deprecation_channels', ['deprecations']);
+            if (in_array($channel, $deprecationChannels, true)) {
                 return true;
             }
         }
