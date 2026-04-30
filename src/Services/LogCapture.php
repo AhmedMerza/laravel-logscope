@@ -108,20 +108,15 @@ class LogCapture
 
     /**
      * Check if this is an internal log that should be skipped.
+     *
+     * Only the structured `_logscope_internal` context key triggers the skip.
+     * Substring matches on the message (e.g. checking for "LogScope") are
+     * unsafe — they silently drop legitimate user logs that happen to mention
+     * the package by name (integration error reports, alerts, etc.).
      */
     protected function isInternalLog(MessageLogged $event): bool
     {
-        // Skip logs from our own namespace
-        if (str_contains($event->message, 'LogScope')) {
-            return true;
-        }
-
-        // Check context for LogScope markers
-        if (isset($event->context['_logscope_internal'])) {
-            return true;
-        }
-
-        return false;
+        return isset($event->context['_logscope_internal']);
     }
 
     /**
@@ -129,9 +124,14 @@ class LogCapture
      */
     protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
     {
-        // Check if we should ignore deprecation messages
+        // Check if we should ignore deprecation messages.
+        //
+        // Scope to the `deprecations` channel only — Laravel routes PHP
+        // runtime deprecations there (config('logging.deprecations.channel')).
+        // Matching on the message substring "is deprecated" was unsafe: it
+        // silently dropped legitimate business logs that used the same phrase.
         if (config('logscope.ignore.deprecations', false)) {
-            if (str_contains($event->message, 'is deprecated')) {
+            if ($channel === 'deprecations') {
                 return true;
             }
         }
