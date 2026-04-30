@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `WriteFailureLogger` truncates cached error messages at 500 chars before storing — keeps cache writes cheap and the index page payload bounded.
 
+### Fixed
+
+- **Quick-filter dates wrong for non-UTC timezones** (#16) — `parseRelativeTime()` formatted "now minus N hours" via `toISOString()`, which always returns UTC. For users east of UTC (Saudi, UAE, India, etc.) the `from` field showed a time that lagged behind their wall clock by their offset. Now formats relative-time strings using local clock components. Backend already accepted a `timezone` URL param and parsed values correctly — only the JS formatting was wrong.
+
 ## [1.5.5] — 2026-04-30
 
 ### Summary
