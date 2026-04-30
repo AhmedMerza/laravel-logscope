@@ -126,12 +126,15 @@ class LogCapture
     {
         // Check if we should ignore deprecation messages.
         //
-        // Scope to the `deprecations` channel only — Laravel routes PHP
-        // runtime deprecations there (config('logging.deprecations.channel')).
-        // Matching on the message substring "is deprecated" was unsafe: it
-        // silently dropped legitimate business logs that used the same phrase.
-        if (config('logscope.ignore.deprecations', false)) {
-            if ($channel === 'deprecations') {
+        // Scope by CHANNEL — Laravel routes PHP runtime deprecations through
+        // a dedicated channel (default name 'deprecations'). The set of
+        // channels treated as deprecation channels is configurable so apps
+        // that remap the channel name still get the filter. Matching on
+        // the message substring "is deprecated" was unsafe: it silently
+        // dropped legitimate business logs that used the same phrase.
+        if (config('logscope.ignore.deprecations', false) && $channel !== null) {
+            $deprecationChannels = (array) config('logscope.ignore.deprecation_channels', ['deprecations']);
+            if (in_array($channel, $deprecationChannels, true)) {
                 return true;
             }
         }

@@ -98,9 +98,14 @@ return [
     |
     | Configure which logs should be ignored and not captured by LogScope.
     |
-    | 'deprecations' - Ignore PHP deprecation warnings (messages containing
-    |                  "is deprecated"). These typically come from third-party
-    |                  packages and can be noisy.
+    | 'deprecations' - Ignore PHP deprecation warnings. Filters by CHANNEL
+    |                  (default: 'deprecations', Laravel's standard channel
+    |                  for routing E_DEPRECATED). If your app routes
+    |                  deprecations through a differently-named channel,
+    |                  add it to `deprecation_channels`.
+    |
+    | 'deprecation_channels' - Channels treated as PHP-deprecation channels
+    |                  for the filter above. Default ['deprecations'].
     |
     | 'null_channel' - Ignore logs without a channel. These are usually PHP
     |                  errors/warnings captured by Laravel's error handler
@@ -110,6 +115,7 @@ return [
 
     'ignore' => [
         'deprecations' => env('LOGSCOPE_IGNORE_DEPRECATIONS', true),
+        'deprecation_channels' => ['deprecations'],
         'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', false),
     ],
 

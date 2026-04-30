@@ -53,22 +53,17 @@ describe('ignore.deprecations substring false positive', function () {
         expect(LogEntry::count())->toBe(1);
     });
 
-    it('still ignores PHP runtime deprecation warnings (channel="deprecations")', function () {
+    it('still ignores PHP runtime deprecation warnings on the default deprecations channel', function () {
         config(['logscope.ignore.deprecations' => true]);
 
         // The post-fix filter ignores deprecations only when the LAST channel
-        // captured by the processor is "deprecations" — Laravel's standard
-        // routing for E_DEPRECATED warnings. Simulate that by setting the
-        // channel directly (the processor would normally do this if the
-        // channel were in config at boot time).
+        // captured by the processor is in the configured deprecation_channels
+        // list (default: ['deprecations']).
         $prop = (new ReflectionClass(ChannelContextProcessor::class))
             ->getProperty('lastChannel');
         $prop->setAccessible(true);
         $prop->setValue(null, 'deprecations');
 
-        // Bypass Log::channel() (which would re-resolve the channel and reset
-        // the processor) — fire the event directly with the channel context
-        // already in place.
         event(new \Illuminate\Log\Events\MessageLogged(
             'warning',
             'strpos(): Passing null to parameter #1 is deprecated',
@@ -76,5 +71,46 @@ describe('ignore.deprecations substring false positive', function () {
         ));
 
         expect(LogEntry::count())->toBe(0);
+    });
+
+    it('honors a custom deprecation_channels list for apps that remap the channel name', function () {
+        config([
+            'logscope.ignore.deprecations' => true,
+            'logscope.ignore.deprecation_channels' => ['php-deprecations', 'legacy-warnings'],
+        ]);
+
+        $prop = (new ReflectionClass(ChannelContextProcessor::class))
+            ->getProperty('lastChannel');
+        $prop->setAccessible(true);
+        $prop->setValue(null, 'php-deprecations');
+
+        event(new \Illuminate\Log\Events\MessageLogged('warning', 'a deprecation', []));
+
+        // The default 'deprecations' name is no longer in the list, but our
+        // custom name is — log should be ignored.
+        expect(LogEntry::count())->toBe(0);
+    });
+
+    it('does not ignore logs from channels NOT in the deprecation_channels list', function () {
+        config([
+            'logscope.ignore.deprecations' => true,
+            'logscope.ignore.deprecation_channels' => ['deprecations'],
+        ]);
+
+        $prop = (new ReflectionClass(ChannelContextProcessor::class))
+            ->getProperty('lastChannel');
+        $prop->setAccessible(true);
+        $prop->setValue(null, 'application');
+
+        // 'application' isn't in the deprecation_channels list — the log must
+        // be captured even though the message mentions deprecation (the old
+        // substring filter would have dropped it).
+        event(new \Illuminate\Log\Events\MessageLogged(
+            'warning',
+            'feature flag x is deprecated',
+            []
+        ));
+
+        expect(LogEntry::count())->toBe(1);
     });
 });
