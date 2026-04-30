@@ -226,9 +226,14 @@ class LogScopeServiceProvider extends ServiceProvider
 
     /**
      * Reset the buffer state (used for testing).
+     *
+     * Also resets WriteGuard's depth counter — if a previous test crashed
+     * mid-`during()` block, the static depth could be left > 0 and silently
+     * skip captures in every subsequent test.
      */
     public static function resetBufferState(): void
     {
         LogBuffer::reset();
+        \LogScope\Services\WriteGuard::reset();
     }
 }

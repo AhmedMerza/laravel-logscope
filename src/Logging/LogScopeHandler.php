@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Context;
 use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\WriteGuard;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
@@ -42,6 +43,11 @@ class LogScopeHandler extends AbstractProcessingHandler
      */
     protected function write(LogRecord $record): void
     {
+        // Re-entrant guard: skip logs emitted DURING our own write path.
+        if (WriteGuard::isWriting()) {
+            return;
+        }
+
         // Prevent infinite loops - don't log our own operations
         if ($this->isInternalLog($record)) {
             return;
@@ -50,6 +56,15 @@ class LogScopeHandler extends AbstractProcessingHandler
         // Mark that we're handling this log (prevents duplicate capture by listener)
         static::$handledCurrentLog = true;
 
+        WriteGuard::during(fn () => $this->writeRecord($record));
+    }
+
+    /**
+     * Persist the captured record. Wrapped by write() inside WriteGuard
+     * so a nested log fired during the insert is skipped.
+     */
+    protected function writeRecord(LogRecord $record): void
+    {
         try {
             $this->ensureInitialized();
 

@@ -128,6 +128,21 @@ class LogBuffer implements LogBufferInterface
         $logsToFlush = self::$buffer;
         self::$buffer = [];
 
+        // Guard against re-entry: an observer or query listener that fires
+        // a log during the bulk insert would otherwise be re-captured by
+        // LogCapture and added back to the buffer or written sync.
+        WriteGuard::during(fn () => self::performFlush($logsToFlush));
+    }
+
+    /**
+     * Bulk-insert the given rows in chunks of 500, with per-chunk error
+     * isolation so one bad chunk doesn't lose the rest. Called only from
+     * inside flushStatic's WriteGuard frame.
+     *
+     * @param  array<int, array<string, mixed>>  $logsToFlush
+     */
+    protected static function performFlush(array $logsToFlush): void
+    {
         try {
             $limits = self::$cachedLimits ?: config('logscope.limits', []);
             $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
