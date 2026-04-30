@@ -12,6 +12,7 @@ use Illuminate\View\View;
 use LogScope\Enums\LogStatus;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\WriteFailureLogger;
 
 class LogController extends Controller
 {
@@ -37,7 +38,20 @@ class LogController extends Controller
                 'autoCollapseKeys' => config('logscope.json_viewer.auto_collapse_keys', ['trace', 'stack_trace', 'stacktrace', 'backtrace']),
             ],
             'shortcuts' => $this->getShortcuts(),
+            'failureBanner' => config('logscope.failure_banner.enabled', true)
+                ? WriteFailureLogger::recentFailures()
+                : null,
         ]);
+    }
+
+    /**
+     * Dismiss the cached write-failure breadcrumb so the banner clears.
+     */
+    public function dismissFailures(Request $request): JsonResponse
+    {
+        WriteFailureLogger::dismissFailures();
+
+        return response()->json(['ok' => true]);
     }
 
     /**

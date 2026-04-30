@@ -22,6 +22,7 @@
     <div class="flex-1 flex flex-col min-w-0">
         @include('logscope::partials.header')
         @include('logscope::partials.filters-bar')
+        @include('logscope::partials.failure-banner')
 
         <!-- Content Area -->
         <div class="flex-1 flex overflow-hidden">
@@ -50,8 +51,11 @@ window.logScopeConfig = {
     routes: {
         logs: '{{ route('logscope.logs') }}',
         stats: '{{ route('logscope.stats') }}',
-        apiBase: '{{ url(config('logscope.routes.prefix', 'logscope')) }}/api'
-    }
+        apiBase: '{{ url(config('logscope.routes.prefix', 'logscope')) }}/api',
+        dismissFailures: '{{ route('logscope.failures.dismiss') }}'
+    },
+    failureBanner: @json($failureBanner ?? null),
+    csrfToken: '{{ csrf_token() }}'
 };
 </script>
 {{ \LogScope\LogScope::appJs() }}
