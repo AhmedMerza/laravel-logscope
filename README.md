@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.5.5](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.5)** — Six silent log-loss bugs fixed; production observability for write failures.
+**Latest: [v1.5.6](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.6)** — In-UI failure banner + Octane terminate-chain hardening + quick-filter timezone fix.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
