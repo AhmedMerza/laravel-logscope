@@ -38,6 +38,13 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->app->booting(function () {
             $this->registerChannelProcessor();
         });
+
+        // Attach the MessageLogged listener as early as possible — in
+        // register() rather than boot() — so logs emitted during another
+        // provider's boot() (or any earlier-running boot phase) are captured.
+        // If the listener were registered in our own boot(), any provider
+        // that boots before us would have its boot-time logs silently dropped.
+        $this->registerLogCapture();
     }
 
     /**
@@ -109,7 +116,6 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerMigrations();
         $this->registerMiddleware();
-        $this->registerLogCapture();
     }
 
     /**
