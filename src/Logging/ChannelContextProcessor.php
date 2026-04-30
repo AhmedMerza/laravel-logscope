@@ -71,15 +71,21 @@ class ChannelContextProcessor implements ProcessorInterface
     }
 
     /**
-     * Get the last captured channel name without consuming it.
+     * Get the raw last-captured channel name, ignoring freshness.
      *
-     * @deprecated since 1.5.5 — prefer consumeLastChannel(), which clears
-     * state in one operation and prevents stale-channel leaks. Kept for
-     * test helpers and backwards compatibility.
+     * Returns whatever is currently stored in the static slot, even if
+     * it's stale (set by a prior log whose listener returned early or
+     * never ran). This was the original semantics; the listener no
+     * longer uses this method — it's kept for inspection in tests and
+     * for callers who explicitly want the raw value.
+     *
+     * @deprecated since 1.5.5, removed in 2.0 — prefer consumeLastChannel(),
+     * which clears state in one operation and prevents stale-channel leaks.
+     * New code should NOT depend on the raw value.
      */
     public static function getLastChannel(): ?string
     {
-        return static::$isFresh ? static::$lastChannel : null;
+        return static::$lastChannel;
     }
 
     /**

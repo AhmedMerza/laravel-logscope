@@ -38,6 +38,14 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->app->booting(function () {
             $this->registerChannelProcessor();
         });
+
+        // In long-running workers (Octane), static state survives across
+        // requests. Reset ChannelContextProcessor's slot at each Octane
+        // request boundary so a Log::build() log in request N+1 can never
+        // inherit a stale channel from request N. Only registers when
+        // Octane is actually installed — guards against pulling Octane
+        // as a hard dependency.
+        $this->registerOctaneStateReset();
     }
 
     /**
@@ -129,6 +137,32 @@ class LogScopeServiceProvider extends ServiceProvider
             $kernel = $this->app->make(Kernel::class);
             $kernel->pushMiddleware(CaptureRequestContext::class);
         }
+    }
+
+    /**
+     * Reset static channel state at Octane request boundaries.
+     *
+     * Octane keeps the worker process alive across requests. The Monolog
+     * channel processor stores the last channel name in static state.
+     * Without this listener, a Log::build() log in request N+1 could
+     * inherit the channel of request N's last log if a Monolog handler
+     * threw (or any other rare path that orphaned `$isFresh=true`).
+     *
+     * Only registers if Laravel\Octane\Events\RequestReceived exists —
+     * Octane is an optional peer, not a hard dependency.
+     */
+    protected function registerOctaneStateReset(): void
+    {
+        if (! class_exists(\Laravel\Octane\Events\RequestReceived::class)) {
+            return;
+        }
+
+        $this->app['events']->listen(
+            \Laravel\Octane\Events\RequestReceived::class,
+            function (): void {
+                \LogScope\Logging\ChannelContextProcessor::clearLastChannel();
+            }
+        );
     }
 
     /**
