@@ -5,11 +5,13 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.7] — 2026-04-30
 
 ### Fixed
 
 - **Deprecations filter regression in v1.5.5–v1.5.6** (#17) — channel-scoped filter from PR #8 didn't actually catch Laravel's PHP runtime deprecations. Root cause: Laravel synthesizes the `deprecations` channel lazily on first deprecation, AFTER our channel processor registration runs at boot — so the tap was never attached and `$channel` arrived as null in the listener. Re-added a narrow message-pattern fallback that matches Laravel's wrapped format (`"… is deprecated in <file> on line <N>"`). Two-layer match: channel-name first, message-pattern fallback. Avoids the original PR #8 false positives because the regex requires the `on line <N>` suffix that PHP runtime deprecations always have but business logs don't.
+
+  **Affected versions:** v1.5.5, v1.5.6. Upgrade to v1.5.7 to restore the filter behavior.
 
 ## [1.5.6] — 2026-04-30
 
@@ -135,6 +137,7 @@ The list response now includes the full `message` and `context` for each row, so
 
 For releases before v1.4.2, see the [tag list on GitHub](https://github.com/AhmedMerza/laravel-logscope/tags) or run `git log --oneline v0.1.0..v1.4.0` for commit-level history.
 
+[1.5.7]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.7
 [1.5.6]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.6
 [1.5.5]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.5
 [1.5.4]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.4
