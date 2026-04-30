@@ -107,9 +107,16 @@ return [
     | 'deprecation_channels' - Channels treated as PHP-deprecation channels
     |                  for the filter above. Default ['deprecations'].
     |
-    | 'null_channel' - Ignore logs without a channel. These are usually PHP
-    |                  errors/warnings captured by Laravel's error handler
-    |                  rather than explicit Log:: calls.
+    | 'null_channel' - Ignore logs that LogScope can't attribute to a named
+    |                  channel. ⚠️ READ BEFORE ENABLING: this is the same
+    |                  bucket as logs from Log::build() at runtime AND
+    |                  Laravel's own framework-level error reporter (which
+    |                  routes uncaught exceptions through a stack that may
+    |                  not have the channel processor). Enabling this WILL
+    |                  drop unhandled exceptions in many apps. Only enable
+    |                  if you know exactly which logs flow through the
+    |                  no-channel path in your app and you genuinely don't
+    |                  want them. Default: false.
     |
     */
 
