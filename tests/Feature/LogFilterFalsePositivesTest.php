@@ -11,8 +11,9 @@ use LogScope\Models\LogEntry;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
-
+    // RefreshDatabase already runs all migrations; package migrations are
+    // registered via loadMigrationsFrom() in LogScopeServiceProvider::boot()
+    // and are picked up automatically. No explicit artisan migrate call needed.
     ChannelContextProcessor::clearLastChannel();
     LogScopeServiceProvider::resetBufferState();
     LogEntry::query()->delete();
