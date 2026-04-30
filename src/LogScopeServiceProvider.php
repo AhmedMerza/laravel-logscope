@@ -127,13 +127,31 @@ class LogScopeServiceProvider extends ServiceProvider
      * global middleware stack. If an earlier middleware were to throw,
      * the resulting log entry would have no trace_id/ip_address/url —
      * making it harder to correlate with the failing request.
+     *
+     * Defensive: in apps that don't bind the HTTP kernel (e.g. console-only
+     * applications, or custom kernels that don't extend Foundation's), the
+     * make() call may throw or the resolved object may not implement
+     * prependMiddleware. Skip in those cases rather than crashing during
+     * service-provider boot.
      */
     protected function registerMiddleware(): void
     {
-        if (config('logscope.middleware.enabled', true)) {
-            $kernel = $this->app->make(Kernel::class);
-            $kernel->prependMiddleware(CaptureRequestContext::class);
+        if (! config('logscope.middleware.enabled', true)) {
+            return;
         }
+
+        try {
+            $kernel = $this->app->make(Kernel::class);
+        } catch (\Throwable) {
+            // No HTTP kernel bound — running in a non-HTTP context.
+            return;
+        }
+
+        if (! method_exists($kernel, 'prependMiddleware')) {
+            return;
+        }
+
+        $kernel->prependMiddleware(CaptureRequestContext::class);
     }
 
     /**
