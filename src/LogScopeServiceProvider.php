@@ -122,12 +122,17 @@ class LogScopeServiceProvider extends ServiceProvider
 
     /**
      * Register the request context middleware.
+     *
+     * Prepended (not pushed) so CaptureRequestContext runs FIRST in the
+     * global middleware stack. If an earlier middleware were to throw,
+     * the resulting log entry would have no trace_id/ip_address/url —
+     * making it harder to correlate with the failing request.
      */
     protected function registerMiddleware(): void
     {
         if (config('logscope.middleware.enabled', true)) {
             $kernel = $this->app->make(Kernel::class);
-            $kernel->pushMiddleware(CaptureRequestContext::class);
+            $kernel->prependMiddleware(CaptureRequestContext::class);
         }
     }
 
