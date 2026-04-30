@@ -44,6 +44,13 @@ class LogScopeServiceProvider extends ServiceProvider
         // provider's boot() (or any earlier-running boot phase) are captured.
         // If the listener were registered in our own boot(), any provider
         // that boots before us would have its boot-time logs silently dropped.
+        //
+        // Caveat: logs fired during another provider's register() (the phase
+        // we are in right now) ARE captured by the listener, but the channel
+        // name will be null. The Monolog channel processor that records the
+        // channel name is installed in the booting() callback above, which
+        // fires later. Logs from boot() onwards have correct channel
+        // attribution.
         $this->registerLogCapture();
     }
 
