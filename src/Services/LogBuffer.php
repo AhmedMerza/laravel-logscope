@@ -120,20 +120,25 @@ class LogBuffer implements LogBufferInterface
         $logsToFlush = self::$buffer;
         self::$buffer = [];
 
-        try {
-            $limits = self::$cachedLimits ?: config('logscope.limits', []);
-            $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
+        // Guard against re-entry: an observer or query listener that fires
+        // a log during the bulk insert would otherwise be re-captured by
+        // LogCapture and added back to the buffer or written sync.
+        WriteGuard::during(function () use ($logsToFlush) {
+            try {
+                $limits = self::$cachedLimits ?: config('logscope.limits', []);
+                $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
 
-            foreach (array_chunk($rows, 500) as $chunk) {
-                try {
-                    LogEntry::insert(self::normalizeChunk($chunk));
-                } catch (Throwable $e) {
-                    error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                foreach (array_chunk($rows, 500) as $chunk) {
+                    try {
+                        LogEntry::insert(self::normalizeChunk($chunk));
+                    } catch (Throwable $e) {
+                        error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                    }
                 }
+            } catch (Throwable $e) {
+                error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
             }
-        } catch (Throwable $e) {
-            error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
-        }
+        });
     }
 
     /**

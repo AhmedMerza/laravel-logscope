@@ -43,6 +43,13 @@ class LogCapture
      */
     protected function handleLogEvent(MessageLogged $event): void
     {
+        // Re-entrant guard: a write in progress may itself emit a log
+        // (observer on log_entries, query listener with Log::debug, etc.).
+        // Skip those — capturing them would recurse on every insert.
+        if (WriteGuard::isWriting()) {
+            return;
+        }
+
         // Prevent infinite loops - don't log our own operations
         if ($this->isInternalLog($event)) {
             return;

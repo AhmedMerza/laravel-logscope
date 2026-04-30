@@ -20,17 +20,23 @@ class LogWriter implements LogWriterInterface
 
     /**
      * Write a log entry based on the configured write mode.
+     *
+     * Wraps the write in WriteGuard so that any nested log emitted
+     * during the write (observer-driven, query listener, etc.) is
+     * skipped by LogCapture/LogScopeHandler instead of recursing.
      */
     public function write(array $data): void
     {
         $mode = config('logscope.write_mode', 'batch');
 
-        match ($mode) {
-            'sync' => $this->writeSync($data),
-            'queue' => $this->writeQueue($data),
-            'batch' => $this->writeBatch($data),
-            default => $this->writeSync($data),
-        };
+        WriteGuard::during(function () use ($mode, $data) {
+            match ($mode) {
+                'sync' => $this->writeSync($data),
+                'queue' => $this->writeQueue($data),
+                'batch' => $this->writeBatch($data),
+                default => $this->writeSync($data),
+            };
+        });
     }
 
     /**
