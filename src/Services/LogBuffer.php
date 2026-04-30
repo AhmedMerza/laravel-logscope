@@ -102,15 +102,23 @@ class LogBuffer implements LogBufferInterface
 
         // If the Laravel container is gone (e.g. after test teardown or during
         // PHP shutdown), we cannot resolve DB connections or config — bail out
-        // gracefully instead of emitting confusing error messages.
+        // gracefully. Surface the discard to error_log so a missing container
+        // at flush time is visible in stderr/php-fpm logs instead of being a
+        // silent data-loss event.
         try {
             if (! app()->bound('db')) {
+                $count = count(self::$buffer);
                 self::$buffer = [];
+                $entryWord = $count === 1 ? 'entry' : 'entries';
+                WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container has no db binding (PHP shutdown or test teardown)");
 
                 return;
             }
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $count = count(self::$buffer);
             self::$buffer = [];
+            $entryWord = $count === 1 ? 'entry' : 'entries';
+            WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container unavailable: [".get_class($e).'] '.$e->getMessage());
 
             return;
         }
@@ -128,11 +136,11 @@ class LogBuffer implements LogBufferInterface
                 try {
                     LogEntry::insert(self::normalizeChunk($chunk));
                 } catch (Throwable $e) {
-                    error_log('LogScope: Failed to flush log buffer chunk: ['.get_class($e).'] '.$e->getMessage());
+                    WriteFailureLogger::report($e, 'buffer-flush');
                 }
             }
         } catch (Throwable $e) {
-            error_log('LogScope: Failed to flush log buffer: ['.get_class($e).'] '.$e->getMessage());
+            WriteFailureLogger::report($e, 'buffer-flush');
         }
     }
 
