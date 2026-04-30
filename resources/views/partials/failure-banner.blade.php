@@ -1,23 +1,17 @@
+{{--
+    Write-failure banner.
+
+    Reads `failureBanner` state from the parent logScope() Alpine component
+    (initialized from window.logScopeConfig.failureBanner, which the
+    LogController hydrates from WriteFailureLogger::recentFailures()).
+
+    Dismiss is handled by dismissFailureBanner() in the parent component
+    so it can use the same showToast() mechanism for error feedback when
+    the dismiss POST fails (session expired, network error, etc.).
+--}}
 @if (! empty($failureBanner))
     <div
-        x-data="{
-            banner: window.logScopeConfig.failureBanner,
-            async dismiss() {
-                this.banner = null;
-                try {
-                    await fetch(window.logScopeConfig.routes.dismissFailures, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': window.logScopeConfig.csrfToken,
-                            'Accept': 'application/json',
-                        },
-                    });
-                } catch (e) {
-                    // best-effort — banner already hidden client-side
-                }
-            }
-        }"
-        x-show="banner"
+        x-show="failureBanner"
         x-cloak
         class="px-4 py-2 bg-red-500/10 border-b border-red-500/30 text-sm font-mono flex items-start gap-3"
         role="alert"
@@ -28,20 +22,20 @@
         <div class="flex-1 min-w-0">
             <div class="text-red-300">
                 LogScope has had
-                <strong x-text="banner?.count + ' write failure' + (banner?.count === 1 ? '' : 's')"></strong>
+                <strong x-text="failureBanner?.count + ' write failure' + (failureBanner?.count === 1 ? '' : 's')"></strong>
                 recently. Last error:
-                <span class="text-red-200" x-text="'[' + (banner?.last_class ?? 'Unknown') + ']'"></span>
-                <span class="text-red-200/80" x-text="banner?.last_message"></span>
+                <span class="text-red-200" x-text="'[' + (failureBanner?.last_class ?? 'Unknown') + ']'"></span>
+                <span class="text-red-200/80" x-text="failureBanner?.last_message"></span>
             </div>
             <div class="text-red-400/70 text-xs mt-0.5">
-                Source: <span x-text="banner?.last_where || 'unknown'"></span>
-                @ <span x-text="banner?.last_at"></span>
+                Source: <span x-text="failureBanner?.last_where || 'unknown'"></span>
+                @ <span x-text="failureBanner?.last_at"></span>
                 · Check your server / php-fpm error log for full details.
             </div>
         </div>
         <button
             type="button"
-            @click="dismiss()"
+            @click="dismissFailureBanner()"
             class="ml-auto text-red-400 hover:text-red-300 shrink-0"
             aria-label="Dismiss banner"
         >

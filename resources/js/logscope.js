@@ -41,6 +41,8 @@ function logScope() {
         // Toast notifications
         toast: { message: '', type: 'error', visible: false },
         toastTimeout: null,
+        // Write-failure banner (populated server-side from cache breadcrumb)
+        failureBanner: config.failureBanner || null,
         // Error handling
         errorRedirecting: false,
         forbiddenRedirect: config.forbiddenRedirect || '/',
@@ -1078,6 +1080,43 @@ function logScope() {
         hideToast() {
             if (this.toastTimeout) clearTimeout(this.toastTimeout);
             this.toast.visible = false;
+        },
+
+        // Write-failure banner: dismiss handler.
+        // Optimistic UI — clears the banner immediately on click. If the
+        // server-side dismiss fails (419 session expired, network, 5xx),
+        // restore the banner and surface the failure so the user knows the
+        // breadcrumb is still in cache and a refresh will bring it back.
+        async dismissFailureBanner() {
+            const previousBanner = this.failureBanner;
+            this.failureBanner = null;
+
+            try {
+                const response = await fetch(this.routes.dismissFailures, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': config.csrfToken || '',
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (response.status === 419) {
+                    this.failureBanner = previousBanner;
+                    this.showToast('Session expired — refresh the page and try again.', 'warning', 5000);
+                    return;
+                }
+
+                if (!response.ok) {
+                    this.failureBanner = previousBanner;
+                    this.showToast(`Could not dismiss banner (HTTP ${response.status}). Refresh to try again.`, 'error', 5000);
+                    return;
+                }
+
+                // Success — leave failureBanner as null.
+            } catch (e) {
+                this.failureBanner = previousBanner;
+                this.showToast('Network error while dismissing banner. Refresh to try again.', 'error', 5000);
+            }
         },
 
         // API error handling

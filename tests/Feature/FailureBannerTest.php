@@ -129,6 +129,11 @@ it('persists the breadcrumb forever by default (no TTL config)', function () {
 });
 
 it('honors a configured ttl_seconds when set', function () {
+    // Note: this test relies on Testbench's default array-cache driver
+    // computing expiry against Carbon::now() — so $this->travel() makes
+    // the cached value appear expired. Production drivers like Redis or
+    // database cache enforce TTL at the storage layer and ignore Carbon
+    // travel; behavior there is verified manually rather than in CI.
     config(['logscope.failure_banner.ttl_seconds' => 10]);
 
     WriteFailureLogger::report(new \RuntimeException('temporary'), 'test');
@@ -138,6 +143,18 @@ it('honors a configured ttl_seconds when set', function () {
     // Travel past the configured TTL — the breadcrumb should be gone.
     $this->travel(11)->seconds();
     expect(WriteFailureLogger::recentFailures())->toBeNull();
+});
+
+it('truncates very long error messages before caching', function () {
+    $longMessage = str_repeat('A', 800).'_END';
+
+    WriteFailureLogger::report(new \RuntimeException($longMessage), 'test');
+
+    $banner = WriteFailureLogger::recentFailures();
+
+    // 500 char limit + truncation indicator. The "_END" tail should be gone.
+    expect($banner['last_message'])->not->toContain('_END')
+        ->and(mb_strlen($banner['last_message']))->toBeLessThanOrEqual(515);
 });
 
 it('records first_at on the first failure and preserves it across subsequent reports', function () {

@@ -5,6 +5,17 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **In-UI failure banner** (#15) — `WriteFailureLogger::report()` now writes a cache breadcrumb (count, first/last timestamps, latest exception class+message+source) in addition to `error_log()`. The LogScope index view shows a red dismissible banner so operators see the package's own write failures without grepping server logs. Configurable via `logscope.failure_banner` (enabled + optional `ttl_seconds`; default forever-until-dismissed). Cache writes are best-effort; `error_log()` remains the canonical signal.
+- **Eager flush callbacks + Octane RequestTerminated listener** (#14) — moves terminate-callback registration from `LogBuffer::add()` (lazy) to `LogScopeServiceProvider::register()` (eager) so we're ahead of most user-provider terminate callbacks. Wraps our flush in try/catch so an internal failure doesn't break the terminate chain. Adds a `Laravel\Octane\Events\RequestTerminated` listener as an independent flush trigger that survives even when Laravel's terminate chain is broken by an earlier throwing callback. Octane is an optional peer (registered via `class_exists` guard).
+
+### Changed
+
+- `WriteFailureLogger` truncates cached error messages at 500 chars before storing — keeps cache writes cheap and the index page payload bounded.
+
 ## [1.5.5] — 2026-04-30
 
 ### Summary
