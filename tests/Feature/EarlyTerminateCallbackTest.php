@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
@@ -17,6 +18,15 @@ beforeEach(function () {
     LogEntry::query()->delete();
 
     config(['logscope.write_mode' => 'batch']);
+});
+
+afterEach(function () {
+    // DDL operations (Schema::drop) don't roll back inside RefreshDatabase's
+    // transaction — re-create the table if a test dropped it so subsequent
+    // tests in this file aren't affected.
+    if (! Schema::hasTable('log_entries')) {
+        $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
+    }
 });
 
 it('flushes the buffer before a later-registered terminate callback that throws', function () {
@@ -51,7 +61,7 @@ it('the safe flush wrapper swallows its own exceptions instead of breaking the t
     $bufferProperty->setAccessible(true);
     $bufferProperty->setValue(null, [['message' => 'doomed', 'level' => 'error']]);
 
-    \Illuminate\Support\Facades\Schema::drop('log_entries');
+    Schema::drop('log_entries');
 
     // Track that a SECOND callback (registered after LogScope's) actually runs.
     $secondCallbackRan = false;
@@ -62,9 +72,7 @@ it('the safe flush wrapper swallows its own exceptions instead of breaking the t
     $this->app->terminate();
 
     expect($secondCallbackRan)->toBeTrue();
-
-    // Restore the table for subsequent tests.
-    $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
+    // Schema is restored by the file-level afterEach.
 });
 
 it('registers the Octane RequestTerminated listener when Octane is installed', function () {

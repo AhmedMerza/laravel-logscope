@@ -28,12 +28,10 @@ class LogBuffer implements LogBufferInterface
     protected static array $cachedLimits = [];
 
     /**
-     * Whether terminating callback is registered.
-     */
-    protected static bool $terminatingRegistered = false;
-
-    /**
-     * Whether shutdown function is registered.
+     * Whether the PHP shutdown function has been registered for this
+     * process. Stays true once set so re-registering the service provider
+     * (e.g. in test suites that re-instantiate the app) doesn't stack
+     * multiple shutdown functions calling our flush.
      */
     protected static bool $shutdownRegistered = false;
 
@@ -153,12 +151,19 @@ class LogBuffer implements LogBufferInterface
 
     /**
      * Reset the buffer state (used for testing).
+     *
+     * NOTE: clearing $shutdownRegistered means a subsequent service-provider
+     * register() call WILL register a second register_shutdown_function for
+     * this process. PHP shutdown handlers stack — both will fire at exit.
+     * Both call the same flushSafely() closure, so the second is a no-op
+     * (buffer already drained), but the duplicate registration is a small
+     * test-time leak. Acceptable because resetBufferState() is only called
+     * between tests, and the process exits soon after the suite finishes.
      */
     public static function reset(): void
     {
         self::$buffer = [];
         self::$cachedLimits = [];
-        self::$terminatingRegistered = false;
         self::$shutdownRegistered = false;
     }
 

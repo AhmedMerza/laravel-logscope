@@ -228,11 +228,29 @@ class LogScopeServiceProvider extends ServiceProvider
      * - Octane RequestTerminated: independent flush trigger that survives
      *   even if Laravel's terminate callback chain is broken. Octane is an
      *   optional peer — only registers if installed.
+     *
+     * Note on cost: we register unconditionally regardless of write_mode.
+     * In sync/queue modes the buffer is always empty, so flushStatic
+     * early-returns — the per-request cost is one closure call returning
+     * `if (empty($buffer)) return;`. Negligible. Gating on write_mode at
+     * register time would miss runtime config changes (`config([...])`)
+     * and add a footgun for marginal benefit.
+     *
+     * Note on Octane double-flush: in Octane, a request fires BOTH
+     * Application::terminate() (running our `terminating` callback) AND
+     * Octane's RequestTerminated event (running our second listener).
+     * Step 2 is intentionally redundant — the buffer is already drained
+     * by step 1, so the second call is a no-op. The redundancy gives us
+     * a recovery path if the terminate chain is broken by an earlier
+     * throwing callback (the original bug this fix addresses).
      */
     protected function registerEagerFlushCallbacks(): void
     {
         // Internal try/catch wraps our own flush so an exception inside it
         // can't propagate out and break OTHER terminate callbacks downstream.
+        // Exceptions surface via error_log only — tests asserting flush
+        // success should inspect error_log content (see WriteFailureLogger
+        // test pattern) rather than expecting the exception to bubble.
         $flushSafely = static function (): void {
             try {
                 LogBuffer::flushStatic();
