@@ -53,16 +53,29 @@ describe('ignore.deprecations substring false positive', function () {
         expect(LogEntry::count())->toBe(1);
     });
 
+    /**
+     * Simulate a processor invocation: the channel slot AND isFresh flag
+     * must be set together — that's what consumeLastChannel checks.
+     */
+    function setChannelAsFresh(string $channel): void
+    {
+        $reflection = new ReflectionClass(ChannelContextProcessor::class);
+        $channelProp = $reflection->getProperty('lastChannel');
+        $channelProp->setAccessible(true);
+        $channelProp->setValue(null, $channel);
+
+        $freshProp = $reflection->getProperty('isFresh');
+        $freshProp->setAccessible(true);
+        $freshProp->setValue(null, true);
+    }
+
     it('still ignores PHP runtime deprecation warnings on the default deprecations channel', function () {
         config(['logscope.ignore.deprecations' => true]);
 
         // The post-fix filter ignores deprecations only when the LAST channel
         // captured by the processor is in the configured deprecation_channels
         // list (default: ['deprecations']).
-        $prop = (new ReflectionClass(ChannelContextProcessor::class))
-            ->getProperty('lastChannel');
-        $prop->setAccessible(true);
-        $prop->setValue(null, 'deprecations');
+        setChannelAsFresh('deprecations');
 
         event(new \Illuminate\Log\Events\MessageLogged(
             'warning',
@@ -79,10 +92,7 @@ describe('ignore.deprecations substring false positive', function () {
             'logscope.ignore.deprecation_channels' => ['php-deprecations', 'legacy-warnings'],
         ]);
 
-        $prop = (new ReflectionClass(ChannelContextProcessor::class))
-            ->getProperty('lastChannel');
-        $prop->setAccessible(true);
-        $prop->setValue(null, 'php-deprecations');
+        setChannelAsFresh('php-deprecations');
 
         event(new \Illuminate\Log\Events\MessageLogged('warning', 'a deprecation', []));
 
@@ -97,10 +107,7 @@ describe('ignore.deprecations substring false positive', function () {
             'logscope.ignore.deprecation_channels' => ['deprecations'],
         ]);
 
-        $prop = (new ReflectionClass(ChannelContextProcessor::class))
-            ->getProperty('lastChannel');
-        $prop->setAccessible(true);
-        $prop->setValue(null, 'application');
+        setChannelAsFresh('application');
 
         // 'application' isn't in the deprecation_channels list — the log must
         // be captured even though the message mentions deprecation (the old

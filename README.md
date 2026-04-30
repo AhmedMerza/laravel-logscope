@@ -23,6 +23,18 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
+### v1.5.5 — Correct channel attribution for `Log::build()` and Octane
+
+The Monolog channel processor stored the last log's channel in static state. Logs that bypassed the processor (`Log::build()` at runtime, or any log on a channel without the processor installed) inherited whatever was left over from a prior log — wrong attribution. In long-running workers (**Laravel Octane**), the static state survived across requests, so a `Log::build()` log in request N+1 could get tagged with the channel from the last log of request N.
+
+LogScope now uses an `$isFresh` flag set by every processor invocation. The new `consumeLastChannel()` returns the channel only when a processor invocation has happened since the last consume, and clears state in one operation. The listener consumes at the very top of its handler so even early-return paths (`isInternalLog`, `didHandleCurrentLog`, `WriteGuard`, ignored logs) leave clean state.
+
+For Octane users specifically, LogScope also registers a listener on `Laravel\Octane\Events\RequestReceived` that clears the channel slot at every request boundary — defense in depth against orphaned state from rare edge cases (Monolog handler exceptions, etc.). The listener only registers when Octane is actually installed.
+
+**Backwards compatibility:** the existing `ChannelContextProcessor::getLastChannel()` returns the raw value (its original semantics); it's now `@deprecated` (removed in 2.0) in favor of `consumeLastChannel()`. Existing test helpers that call `getLastChannel()` continue to work unchanged.
+
+---
+
 ### v1.5.4 — Correct source location for argument-validation errors
 
 When you call `new SomeClass()` with the wrong number or type of arguments, PHP throws an `ArgumentCountError` (or `TypeError` for type mismatches). For these errors PHP's `$e->getFile()`/`$e->getLine()` point at the **callee's declaration** (the constructor's signature), not the **caller** (where `new` was actually written). Previously this meant the `source` column in the log list would show e.g. `app/Services/UserService.php:11` (the constructor) instead of `app/Http/Controllers/UserController.php:42` (the broken `new`) — making it look like the bug was somewhere it wasn't.

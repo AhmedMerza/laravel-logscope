@@ -43,6 +43,14 @@ class LogCapture
      */
     protected function handleLogEvent(MessageLogged $event): void
     {
+        // Consume the channel set by the most recent processor invocation
+        // FIRST, before any early return. consumeLastChannel() returns null
+        // unless a processor invocation happened since the previous consume,
+        // and always clears state — so a Log::build() log (no processor)
+        // gets null, and a stale value left from a prior log can never leak
+        // forward, even if any of the early-return paths below fire.
+        $channel = ChannelContextProcessor::consumeLastChannel();
+
         // Re-entrant guard: a write in progress may itself emit a log
         // (observer on log_entries, query listener with Log::debug, etc.).
         // Skip those — capturing them would recurse on every insert.
@@ -60,10 +68,6 @@ class LogCapture
         if (LogScopeHandler::didHandleCurrentLog()) {
             return;
         }
-
-        // Get channel and reset for next log (prevents sticky channel on Log::build())
-        $channel = ChannelContextProcessor::getLastChannel();
-        ChannelContextProcessor::clearLastChannel();
 
         if ($this->shouldIgnoreLog($event, $channel)) {
             return;

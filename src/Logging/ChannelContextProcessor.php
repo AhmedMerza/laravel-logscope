@@ -25,6 +25,16 @@ class ChannelContextProcessor implements ProcessorInterface
     protected static ?string $lastChannel = null;
 
     /**
+     * Whether `$lastChannel` was set by a processor invocation that has
+     * not yet been consumed by the listener. Used to distinguish "the
+     * processor for THIS log just ran" from "stale state from a previous
+     * log whose listener returned early or didn't run". Without this
+     * flag, a log fired through Log::build() (which has no processor)
+     * would inherit the previous log's channel from the static state.
+     */
+    protected static bool $isFresh = false;
+
+    /**
      * The Laravel channel name this processor is registered for.
      */
     protected string $channel;
@@ -38,12 +48,40 @@ class ChannelContextProcessor implements ProcessorInterface
     {
         // Store the Laravel channel name for the MessageLogged listener
         static::$lastChannel = $this->channel;
+        static::$isFresh = true;
 
         return $record;
     }
 
     /**
-     * Get the last captured channel name.
+     * Consume the channel set by the most recent processor invocation.
+     *
+     * Returns the channel only if a processor invocation has happened
+     * since the last consume. Always clears state so the next log
+     * either gets its own fresh value (processor fires) or `null`
+     * (no processor, e.g. Log::build()).
+     */
+    public static function consumeLastChannel(): ?string
+    {
+        $channel = static::$isFresh ? static::$lastChannel : null;
+        static::$lastChannel = null;
+        static::$isFresh = false;
+
+        return $channel;
+    }
+
+    /**
+     * Get the raw last-captured channel name, ignoring freshness.
+     *
+     * Returns whatever is currently stored in the static slot, even if
+     * it's stale (set by a prior log whose listener returned early or
+     * never ran). This was the original semantics; the listener no
+     * longer uses this method — it's kept for inspection in tests and
+     * for callers who explicitly want the raw value.
+     *
+     * @deprecated since 1.5.5, removed in 2.0 — prefer consumeLastChannel(),
+     * which clears state in one operation and prevents stale-channel leaks.
+     * New code should NOT depend on the raw value.
      */
     public static function getLastChannel(): ?string
     {
@@ -56,5 +94,6 @@ class ChannelContextProcessor implements ProcessorInterface
     public static function clearLastChannel(): void
     {
         static::$lastChannel = null;
+        static::$isFresh = false;
     }
 }
