@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.5.8](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.8)** — Isolate `captureContext` callback errors so a buggy callback doesn't silently lose log entries.
+**Latest: [v1.5.9](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.9)** — Status keyboard shortcuts now act on the open log (rapid triage flow), with optimistic UI and no spinner.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 

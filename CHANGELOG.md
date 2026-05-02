@@ -5,12 +5,13 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.9] — 2026-05-02
 
 ### Changed
 
 - **Status keyboard shortcuts (default `O`/`I`/`R`/`X`) are now context-aware.** With a log detail panel open, pressing a status shortcut now changes THAT log's status and auto-advances to the next log — the rapid keyboard-triage flow. With no detail open, the legacy behavior is preserved (filter the list by that status). No config changes; same shortcut, smarter behavior.
-- **Status changes now use optimistic UI.** The list updates immediately (row removed if the new status is hidden by the current filter, badge updated otherwise); the detail panel auto-advances; no loading spinner. The API call runs in the background. On failure the row is restored and an error toast appears. Loading is still shown for filter changes / search / pagination.
+- **Status changes now use optimistic UI.** The list updates immediately (row removed if the new status is hidden by the current filter, badge updated otherwise); the detail panel auto-advances; no loading spinner. The API call runs in the background. On failure the row is restored (by ULID ordering, robust against intervening mutations) and an error toast appears. Loading is still shown for filter changes / search / pagination.
+- A no-op guard skips the API call when the log is already in the target status.
 - Shortcuts help dialog (`?`) now explains the dual meaning under "Status".
 
 ## [1.5.8] — 2026-05-02
@@ -151,6 +152,7 @@ The list response now includes the full `message` and `context` for each row, so
 
 For releases before v1.4.2, see the [tag list on GitHub](https://github.com/AhmedMerza/laravel-logscope/tags) or run `git log --oneline v0.1.0..v1.4.0` for commit-level history.
 
+[1.5.9]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.9
 [1.5.8]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.8
 [1.5.7]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.7
 [1.5.6]: https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.6
