@@ -197,7 +197,13 @@ return [
     | - label:    Display name
     | - color:    gray, yellow, green, slate, blue, red, orange, purple
     | - closed:   true for statuses that mean "no action needed"
-    | - shortcut: Single key for keyboard shortcut to filter by this status
+    | - shortcut: Single key for keyboard shortcut. Context-aware:
+    |             * With a log detail panel OPEN: change THAT log's
+    |               status to this value, then advance to the next log
+    |               (rapid keyboard triage flow).
+    |             * With NO detail open: filter the list by this status
+    |               (legacy behavior).
+    |             Set to null to disable.
     |
     | Built-in defaults:
     |   open:          { label: 'Open',          color: 'gray',   closed: false, shortcut: 'O' }

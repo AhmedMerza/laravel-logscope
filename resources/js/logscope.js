@@ -566,13 +566,93 @@ function logScope() {
             }
         },
 
+        // Update the status of the currently-selected log.
+        //
+        // Optimistic UI: we update the local list immediately and send the
+        // API call in the background. No loading spinner — the user can keep
+        // triaging without waiting. If the new status would be hidden by
+        // the current filter (e.g., default "open only" view + we just
+        // resolved), we remove the row from the list AND advance the
+        // detail panel to the next log so rapid keyboard triage works.
+        // On API failure: restore the row, restore the status, show toast.
         async setStatus(status, note = null) {
             if (!this.selectedLog) return;
+
+            const targetLog = this.selectedLog;
+            const targetId = targetLog.id;
+
+            // No-op guard: pressing the shortcut for the status the log is
+            // already in shouldn't fire a wasted API round-trip.
+            if (targetLog.status === status) return;
+
+            const previousIndex = this.logs.findIndex(l => l.id === targetId);
+            const previousLogSnapshot = { ...targetLog };
+
+            // Will the new status still be visible under the current filter?
+            //   - filters.statuses non-empty → must include the new status
+            //   - filters.statuses empty     → backend default = "open only"
+            //
+            // The "open only" default below mirrors the backend default in
+            // src/Http/Controllers/LogController.php (~line 69, where the
+            // controller calls $query->open() when no statuses filter is
+            // sent). If you change one, change the other.
+            const userFilteringByStatus = this.filters.statuses.length > 0;
+            const newStatusVisible = userFilteringByStatus
+                ? this.filters.statuses.includes(status)
+                : status === 'open';
+
+            // Apply optimistic change.
+            if (newStatusVisible) {
+                // Update in place — keep the row, update its status badge.
+                if (previousIndex !== -1) {
+                    this.logs[previousIndex] = { ...this.logs[previousIndex], status };
+                }
+                this.selectedLog = { ...this.selectedLog, status };
+            } else {
+                // Hide the row. Advance the detail panel to the next log if
+                // there is one, otherwise the previous log, otherwise close.
+                if (previousIndex !== -1) {
+                    this.logs.splice(previousIndex, 1);
+                }
+                if (this.logs.length === 0) {
+                    this.selectedLog = null;
+                } else {
+                    const nextIndex = Math.min(previousIndex, this.logs.length - 1);
+                    this.selectedLog = this.logs[nextIndex] || null;
+                    if (this.selectedLog) {
+                        this.scrollToSelectedLog();
+                        this.ensureLogDetailLoaded(this.selectedLog);
+                    }
+                }
+            }
+
+            // Closure captures targetId + snapshot for the restore path.
+            // Uses ULID ordering rather than the original index because
+            // chained calls (R, R, R fast) may have removed other rows in
+            // between, making previousIndex stale.
+            const restoreToList = () => {
+                if (this.logs.find(l => l.id === targetId)) {
+                    // Already in list (in-place update path); just reset it.
+                    const idx = this.logs.findIndex(l => l.id === targetId);
+                    this.logs[idx] = previousLogSnapshot;
+                    return;
+                }
+                // Was removed; re-insert by ULID order (newest at top).
+                // ULIDs are time-sortable lexicographically — find the first
+                // entry older than ours and insert before it.
+                const insertAt = this.logs.findIndex(l => l.id < targetId);
+                if (insertAt === -1) {
+                    this.logs.push(previousLogSnapshot);
+                } else {
+                    this.logs.splice(insertAt, 0, previousLogSnapshot);
+                }
+            };
+
             try {
                 const body = { status };
                 if (note) body.note = note;
 
-                const response = await fetch(`${this.routes.apiBase}/logs/${this.selectedLog.id}/status`, {
+                const response = await fetch(`${this.routes.apiBase}/logs/${targetId}/status`, {
                     method: 'PATCH',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -582,13 +662,29 @@ function logScope() {
                     body: JSON.stringify(body)
                 });
                 if (!response.ok) {
+                    restoreToList();
+                    if (this.selectedLog?.id !== targetId) {
+                        // Selection has moved on; don't yank it back. The
+                        // restored row stays in the list and the user can
+                        // re-open it from the toast/error.
+                    } else {
+                        this.selectedLog = previousLogSnapshot;
+                    }
                     this.handleApiError(response, 'updating status');
+                    this.showToast('Status update failed — restored.', 'error', 4000);
                     return;
                 }
+                // Success: nothing else to do — optimistic state is correct.
+                // Keep the freshly-fetched server data on selectedLog for the
+                // detail panel (notes timestamp, status_changed_by, etc.).
+                // Guarded by id check because in chained-update flows the
+                // selection may have advanced before this fetch resolved.
                 const data = await response.json();
-                this.selectedLog = data.data;
-                await this.fetchLogs();
+                if (this.selectedLog?.id === targetId) {
+                    this.selectedLog = { ...this.selectedLog, ...data.data };
+                }
             } catch (error) {
+                restoreToList();
                 this.handleNetworkError(error, 'updating status');
             }
         },
@@ -1441,13 +1537,24 @@ function logScope() {
                     }
                     break;
                 default:
-                    // Check for status shortcuts
+                    // Status shortcut keys (default O/I/R/X) are context-dependent:
+                    //   - When a log detail is open: change THAT log's status.
+                    //     Optimistic update + advance to next — the rapid
+                    //     keyboard triage flow ("read → resolve → next").
+                    //   - When no detail is open: filter by that status (the
+                    //     legacy behavior).
                     if (this.shortcuts[event.key]) {
                         event.preventDefault();
-                        this.filters.statuses = [this.shortcuts[event.key]];
-                        this.cursor = null;
-                        this.cursorStack = [];
-                        this.debouncedFetchLogs();
+                        const targetStatus = this.shortcuts[event.key];
+
+                        if (this.selectedLog) {
+                            this.setStatus(targetStatus);
+                        } else {
+                            this.filters.statuses = [targetStatus];
+                            this.cursor = null;
+                            this.cursorStack = [];
+                            this.debouncedFetchLogs();
+                        }
                     }
                     break;
             }
