@@ -311,8 +311,16 @@ Log::stack(['daily', 'slack'])->warning('Low inventory');
 | `d` | Toggle dark mode |
 | `?` | Show keyboard help |
 
-**Status shortcuts** (require Shift, filter by status):
+**Status shortcuts** *(require Shift, context-aware — **behavior change since v1.5.8**)*:
+
 | `O` | Open | `I` | Investigating | `R` | Resolved | `X` | Ignored |
+
+- **With a log detail panel open** → change that log's status, advance to the next log. Optimistic UI: the row updates (or disappears, if hidden by current filter) immediately, no spinner. Designed for rapid triage — chain `R, R, R, R` to resolve four logs in seconds.
+- **With no detail open** → filter the list by that status (the legacy behavior).
+
+Pre-v1.5.9, these shortcuts always filtered the list, regardless of whether a log was open. If you relied on that, the in-detail-panel behavior is what you'll notice as different. The "no detail open" path is unchanged.
+
+If a status update fails (network, server error), the row is restored and an error toast appears.
 
 Action shortcuts (`r`, `h`, `l`) and status shortcuts are configurable — see [Keyboard Shortcuts](#keyboard-shortcuts).
 
@@ -451,13 +459,19 @@ Available options: `label`, `icon` (calendar/clock/alert/filter), `levels`, `sta
 
 ### Status Shortcuts
 
-Each status has a default keyboard shortcut (uppercase, requires Shift). Customize in `config/logscope.php`:
+Each status has a default keyboard shortcut (uppercase, requires Shift). The shortcut is **context-aware**:
+
+- **Detail panel open:** change the open log's status, advance to next (rapid triage)
+- **Detail panel closed:** filter the list by that status
+
+Customize in `config/logscope.php`:
 
 ```php
 'statuses' => [
-    // Disable a shortcut
+    // Disable a shortcut entirely (no triage AND no filter for this status)
     'ignored' => ['shortcut' => null],
-    // Custom status with shortcut
+
+    // Custom status with shortcut — works in both contexts automatically
     'waiting' => ['label' => 'Waiting', 'color' => 'orange', 'shortcut' => 'w'],
 ],
 ```

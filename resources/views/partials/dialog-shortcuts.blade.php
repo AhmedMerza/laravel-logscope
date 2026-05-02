@@ -56,7 +56,11 @@
 
             <template x-if="Object.keys(shortcuts).length > 0">
                 <div>
-                    <h4 class="section-header pt-3">Filter by Status</h4>
+                    <h4 class="section-header pt-3">Status</h4>
+                    <p class="text-xs text-[var(--text-muted)] mt-1 mb-2">
+                        With a log open: change its status (and advance to next).<br>
+                        With no log open: filter the list by that status.
+                    </p>
                     <template x-for="(status, key) in shortcuts" :key="key">
                         <div class="flex items-center justify-between mt-2">
                             <span class="text-sm text-[var(--text-secondary)] capitalize" x-text="getStatusLabel(status)"></span>
