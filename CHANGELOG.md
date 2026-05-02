@@ -5,6 +5,12 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`captureContext` callback failures no longer lose the underlying log** (#18) — when a user-registered `LogScope::captureContext()` callback threw (e.g. accessing `currentAccessToken()->id` on a Sanctum `TransientToken` which has no `id` property), the throw cascaded into our log-write try/catch. Result: the original log was silently dropped AND the failure was misleadingly reported as a "write failure" in the in-UI banner. Now: callback throws are isolated. The original log lands with `_logscope_callback_error: "<class>: <message>"` added to the context as a marker. The callback failure is surfaced under its own source label `captureContext-callback` in the failure banner so it's distinguishable from real write failures. README's example was updated to type-check Sanctum tokens.
+
 ## [1.5.7] — 2026-04-30
 
 ### Fixed
