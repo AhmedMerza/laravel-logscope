@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.5.7](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.7)** — Hotfix: PHP deprecations filter regression in v1.5.5–v1.5.6. Upgrade if you rely on `LOGSCOPE_IGNORE_DEPRECATIONS`.
+**Latest: [v1.5.8](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.8)** — Isolate `captureContext` callback errors so a buggy callback doesn't silently lose log entries.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
