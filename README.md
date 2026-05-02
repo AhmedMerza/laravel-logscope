@@ -508,14 +508,21 @@ Add custom data to every log entry (e.g., API token ID, tenant ID):
 use LogScope\LogScope;
 
 LogScope::captureContext(function ($request) {
+    $token = $request->user()?->currentAccessToken();
+
     return [
-        'token_id' => $request->user()?->currentAccessToken()?->id,
+        // Sanctum returns TransientToken (no `id`) for session-authenticated
+        // requests and PersonalAccessToken (has `id`) for token-authenticated
+        // requests. Type-check before accessing.
+        'token_id' => $token instanceof \Laravel\Sanctum\PersonalAccessToken ? $token->id : null,
         'tenant_id' => $request->user()?->tenant_id,
     ];
 });
 ```
 
 This data is merged into the log's `context` field and appears in the JSON viewer.
+
+If your callback throws (a property access on the wrong type, an unbound service, etc.), LogScope catches the exception, drops the custom context for that log entry only, and adds `_logscope_callback_error` to the entry's context with the exception class + message. The original log is still captured. The callback failure is also surfaced via `error_log()` and the in-UI failure banner so you know the callback is broken.
 
 ### Artisan Commands
 

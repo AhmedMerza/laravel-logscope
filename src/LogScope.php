@@ -182,15 +182,32 @@ class LogScope
     /**
      * Get the additional captured context for the given request.
      *
+     * Wraps the user-registered callback in a try/catch so a buggy
+     * callback (e.g. accessing `currentAccessToken()->id` when Sanctum
+     * returned a TransientToken with no `id` property) doesn't cascade
+     * into losing the underlying log entry. On failure we return an
+     * empty array AND surface a one-shot error_log breadcrumb so the
+     * user knows their callback is broken — but we keep the original
+     * log captured.
+     *
      * @return array<string, mixed>
      */
     public static function getCapturedContext(Request $request): array
     {
-        if (static::$captureContextUsing !== null) {
-            return (static::$captureContextUsing)($request) ?? [];
+        if (static::$captureContextUsing === null) {
+            return [];
         }
 
-        return [];
+        try {
+            return (static::$captureContextUsing)($request) ?? [];
+        } catch (\Throwable $e) {
+            \LogScope\Services\WriteFailureLogger::report($e, 'captureContext-callback');
+
+            // Return an empty array so the original log still lands.
+            // Add a marker the user can search for in the captured
+            // entry's context to know which logs were affected.
+            return ['_logscope_callback_error' => get_class($e).': '.$e->getMessage()];
+        }
     }
 
     /**

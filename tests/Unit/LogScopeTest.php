@@ -77,6 +77,27 @@ it('resets capture context callback', function () {
     expect($context)->toBe([]);
 });
 
+it('isolates a throwing capture-context callback so the underlying log still lands', function () {
+    // Reproduces the production case: a Sanctum TransientToken doesn't
+    // have an `id` property, so accessing `->id` on it throws an
+    // ErrorException. Without isolation, that throw cascades into the
+    // outer write try/catch and the original log is silently lost.
+    LogScope::captureContext(function ($request) {
+        $obj = new \stdClass; // no `id` property — accessing throws via __get? actually returns null on stdClass
+        // Force a real Undefined-property-style error via throw
+        throw new \ErrorException('Undefined property: Laravel\\Sanctum\\TransientToken::$id');
+    });
+
+    $request = Request::create('/test');
+    $context = LogScope::getCapturedContext($request);
+
+    // Empty context (since the callback failed) PLUS a marker key so
+    // the user can see which entries were affected.
+    expect($context)->toHaveKey('_logscope_callback_error')
+        ->and($context['_logscope_callback_error'])->toContain('ErrorException')
+        ->and($context['_logscope_callback_error'])->toContain('Undefined property');
+});
+
 it('returns null when no statusChangedBy callback is set and no user', function () {
     $request = Request::create('/test');
 
