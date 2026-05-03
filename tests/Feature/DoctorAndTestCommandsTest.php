@@ -107,6 +107,20 @@ it('logscope:doctor flags an unknown queue connection in queue write mode', func
     expect($output)->toContain('not defined');
 });
 
+it('logscope:doctor renders `(unset)` rather than empty backticks when no queue connection resolves', function (): void {
+    config([
+        'logscope.write_mode' => 'queue',
+        'logscope.queue.connection' => null,
+        'queue.default' => null,
+    ]);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    expect($output)->toContain('connection `(unset)`');
+    expect($output)->not->toContain('connection `` ');
+});
+
 it('logscope:doctor reports queue mode using sync driver as a warning', function (): void {
     config([
         'logscope.write_mode' => 'queue',

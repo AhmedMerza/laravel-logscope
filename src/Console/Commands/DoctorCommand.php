@@ -116,12 +116,16 @@ class DoctorCommand extends Command
             return;
         }
 
-        $connectionName = config('logscope.queue.connection') ?: config('queue.default');
+        // Resolve to (string) so we never interpolate `null` or `false` into
+        // the FAIL message. Coerce empty to '(unset)' so the user sees what
+        // we actually looked up, not an empty backtick pair.
+        $connectionName = (string) (config('logscope.queue.connection') ?: config('queue.default') ?: '');
         $queueName = (string) config('logscope.queue.name', 'default');
         $known = (array) config('queue.connections', []);
 
-        if (! isset($known[$connectionName])) {
-            $this->markFail('Write mode', "queue mode set, but connection `{$connectionName}` is not defined in config/queue.php");
+        if ($connectionName === '' || ! isset($known[$connectionName])) {
+            $displayed = $connectionName === '' ? '(unset)' : $connectionName;
+            $this->markFail('Write mode', "queue mode set, but connection `{$displayed}` is not defined in config/queue.php");
 
             return;
         }
@@ -183,27 +187,44 @@ class DoctorCommand extends Command
         }
 
         // auto_schedule is off — try to detect a user-registered schedule
-        // entry for `logscope:prune`. If one exists, the user has wired it
-        // themselves and we should PASS (not nag). If not, it's worth a
-        // gentle nudge that pruning won't happen automatically.
-        if ($this->hasUserScheduledPrune()) {
+        // entry for `logscope:prune`, but only if Schedule has already been
+        // resolved by something else (see scanScheduleForPrune for why we
+        // refuse to force-resolve it ourselves).
+        $detection = $this->scanScheduleForPrune();
+
+        if ($detection === true) {
             $this->markPass('Retention', "{$days}-day window, prune is scheduled by your app");
 
             return;
         }
 
-        $this->markWarn('Retention', "{$days}-day window, but no schedule for `logscope:prune` was detected — set retention.auto_schedule=true or wire it in your console kernel");
+        if ($detection === false) {
+            $this->markWarn('Retention', "{$days}-day window, but no schedule entry for `logscope:prune` was found — set retention.auto_schedule=true or wire it in your console kernel");
+
+            return;
+        }
+
+        // $detection === null: we couldn't check without side effects.
+        $this->markWarn('Retention', "{$days}-day window — auto_schedule is off; confirm you've wired `logscope:prune` in your console kernel or set retention.auto_schedule=true");
     }
 
     /**
-     * Best-effort detection of a user-defined `logscope:prune` schedule
-     * entry. Resolves the Schedule binding (which forces every console
-     * provider to register its scheduled tasks) and scans for a matching
-     * command. Falls back to false on any error — the doctor command
-     * shouldn't crash because the scheduler couldn't be built.
+     * Tri-state detection of a user-defined `logscope:prune` schedule entry.
+     *
+     * Returns true/false when we can give a definitive answer, or null when
+     * Schedule hasn't been resolved yet and we refuse to force-resolve it
+     * from a diagnostic command. Resolving Schedule for the first time fires
+     * every callAfterResolving(Schedule::class, ...) callback in the app —
+     * usually harmless (singleton, the doctor process exits shortly after)
+     * but a read-only command shouldn't have visible side effects on the
+     * container, even if they're benign.
      */
-    protected function hasUserScheduledPrune(): bool
+    protected function scanScheduleForPrune(): ?bool
     {
+        if (! $this->getLaravel()->resolved(Schedule::class)) {
+            return null;
+        }
+
         try {
             $schedule = $this->getLaravel()->make(Schedule::class);
 
@@ -212,12 +233,12 @@ class DoctorCommand extends Command
                     return true;
                 }
             }
-        } catch (Throwable) {
-            // Schedule not bindable in this context — treat as "unknown",
-            // caller falls back to the default WARN.
-        }
 
-        return false;
+            return false;
+        } catch (Throwable) {
+            // Schedule was resolved but events() blew up — treat as unknown.
+            return null;
+        }
     }
 
     protected function checkAuthResolution(): void
