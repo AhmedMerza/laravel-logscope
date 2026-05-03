@@ -207,9 +207,14 @@ LOGSCOPE_QUEUE_CONNECTION=
 ```env
 LOGSCOPE_RETENTION_ENABLED=true
 LOGSCOPE_RETENTION_DAYS=30
+
+# Optional: let LogScope register the prune schedule for you (off by default).
+# Leave off if you already wire `logscope:prune` in your own console kernel.
+LOGSCOPE_RETENTION_AUTO_SCHEDULE=false
+LOGSCOPE_RETENTION_SCHEDULE_AT=03:00
 ```
 
-> **Note:** Retention requires scheduling `logscope:prune` - see [Schedule Pruning](#schedule-pruning).
+> **Note:** Retention requires either flipping `LOGSCOPE_RETENTION_AUTO_SCHEDULE=true` or scheduling `logscope:prune` yourself - see [Schedule Pruning](#schedule-pruning).
 
 ### Features
 
@@ -549,9 +554,21 @@ php artisan logscope:import storage/logs/laravel.log --days=7
 php artisan logscope:prune
 php artisan logscope:prune --dry-run
 php artisan logscope:prune --days=14
+
+# Diagnose configuration & wiring (CI-friendly: non-zero exit on any FAIL)
+php artisan logscope:doctor
+php artisan logscope:doctor --json
+
+# Smoke-test the capture pipeline end-to-end
+php artisan logscope:test
+php artisan logscope:test --keep   # leave the test entry in the table
 ```
 
 > **Note:** The import command is a one-time migration for existing log files. After setup, new logs are captured automatically.
+
+`logscope:doctor` checks the table, capture mode, write mode (including queue connection), middleware wiring, retention + schedule status, authorization resolution path, Octane integration, built assets, and any cached write-failure breadcrumb. Run it after install or whenever something feels off.
+
+`logscope:test` emits a uniquely-tagged log through the configured capture path, forces a sync write for the duration of the test, and verifies the entry lands in `log_entries`. Useful as a one-shot post-install sanity check.
 
 ---
 
@@ -567,6 +584,12 @@ LOG_LEVEL=info
 
 ### Schedule Pruning
 
+You have two options:
+
+**Option 1 — Let LogScope do it (opt-in, off by default).** Set `LOGSCOPE_RETENTION_AUTO_SCHEDULE=true` and LogScope registers `logscope:prune` on Laravel's scheduler at the time configured by `LOGSCOPE_RETENTION_SCHEDULE_AT` (defaults to `03:00`), with `->onOneServer()` for safe multi-server deploys.
+
+**Option 2 — Wire it yourself.** Leave `LOGSCOPE_RETENTION_AUTO_SCHEDULE` off and add the schedule entry where you keep the rest of your scheduled tasks:
+
 ```php
 // Laravel 11+ (routes/console.php)
 Schedule::command('logscope:prune')->daily();
@@ -574,6 +597,8 @@ Schedule::command('logscope:prune')->daily();
 // Laravel 10 (app/Console/Kernel.php)
 $schedule->command('logscope:prune')->daily();
 ```
+
+> **Don't enable both** — auto-schedule plus a manual entry will run prune twice per night.
 
 ### High-Traffic Apps
 
