@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.5.9](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.5.9)** — Status keyboard shortcuts now act on the open log (rapid triage flow), with optimistic UI and no spinner.
+**Latest: [v1.6.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.6.0)** — New `logscope:doctor` health check + `logscope:test` smoke test commands, plus opt-in scheduler registration for `logscope:prune`.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
