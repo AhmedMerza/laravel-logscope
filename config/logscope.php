@@ -22,11 +22,24 @@ return [
     | Control how long log entries are kept in the database. Set enabled to
     | false to keep logs indefinitely, or specify the number of days.
     |
+    | 'auto_schedule' - Opt-in. When true, LogScope registers the
+    |                   `logscope:prune` command on Laravel's scheduler so
+    |                   you don't need to wire it yourself. Default false:
+    |                   if you already schedule prune in your own
+    |                   `routes/console.php` or `Console\Kernel`, leave
+    |                   this off to avoid a duplicate run.
+    |
+    | 'schedule_at'   - 24h "HH:MM" string used when 'auto_schedule' is
+    |                   true. Defaults to 03:00 (low-traffic window).
+    |                   Only consulted when auto_schedule is enabled.
+    |
     */
 
     'retention' => [
         'enabled' => env('LOGSCOPE_RETENTION_ENABLED', true),
         'days' => env('LOGSCOPE_RETENTION_DAYS', 30),
+        'auto_schedule' => env('LOGSCOPE_RETENTION_AUTO_SCHEDULE', false),
+        'schedule_at' => env('LOGSCOPE_RETENTION_SCHEDULE_AT', '03:00'),
     ],
 
     /*

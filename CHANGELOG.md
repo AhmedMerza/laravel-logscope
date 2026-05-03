@@ -5,6 +5,14 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`logscope:doctor` command.** Runs a health check across the package's most common configuration footguns: missing migration, capture mode vs. channel wiring, write mode + queue connection, request-context middleware registration, retention policy, authorization resolution path (callback / gate / local-only fallback), Octane peer integration, built-asset presence, and the cached failure breadcrumb. Each check is reported as `PASS`/`WARN`/`FAIL` with an actionable hint. Returns a non-zero exit code on any FAIL, so it's CI-friendly. Supports `--json` for machine-readable output.
+- **`logscope:test` command.** Emits a uniquely-tagged sample log through the configured capture path (`Log::info` for `all` mode, `Log::channel('logscope')->info` for `channel` mode), temporarily forces sync writes for the duration of the test, then verifies the entry landed in `log_entries`. Cleans up on success unless `--keep` is passed. Useful as a smoke test after install or whenever you change capture/write mode.
+- **Opt-in scheduler registration for `logscope:prune`.** New `logscope.retention.auto_schedule` (default `false`) + `logscope.retention.schedule_at` (default `'03:00'`) config keys. When enabled, the package's service provider registers `logscope:prune` on Laravel's scheduler via `callAfterResolving(Schedule::class, ...)` and uses `->onOneServer()` for safe multi-server deploys. Default off so existing users who already wire prune in their own console kernel are unaffected — no duplicate runs.
+
 ## [1.5.9] — 2026-05-02
 
 ### Changed

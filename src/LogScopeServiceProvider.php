@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace LogScope;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
+use LogScope\Console\Commands\DoctorCommand;
 use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
 use LogScope\Console\Commands\PruneCommand;
 use LogScope\Console\Commands\SeedCommand;
+use LogScope\Console\Commands\TestCommand;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Contracts\LogBufferInterface;
 use LogScope\Contracts\LogWriterInterface;
@@ -145,6 +148,36 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerMigrations();
         $this->registerMiddleware();
+        $this->registerScheduledTasks();
+    }
+
+    /**
+     * Opt-in scheduling for `logscope:prune`.
+     *
+     * Off by default. When the user sets `logscope.retention.auto_schedule`
+     * to true, we register the prune command on Laravel's scheduler so they
+     * don't have to wire it themselves.
+     *
+     * Uses callAfterResolving so we don't force-construct the Schedule
+     * binding in HTTP requests that never touch it. ->onOneServer() guards
+     * multi-server deploys against duplicate prune runs (requires a cache
+     * driver that supports atomic locks; Laravel falls back to a single-
+     * server run with a warning if not).
+     */
+    protected function registerScheduledTasks(): void
+    {
+        if (! config('logscope.retention.auto_schedule', false)) {
+            return;
+        }
+
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $at = (string) config('logscope.retention.schedule_at', '03:00');
+
+            $schedule->command('logscope:prune')
+                ->dailyAt($at)
+                ->onOneServer()
+                ->name('logscope:prune-auto');
+        });
     }
 
     /**
@@ -285,6 +318,8 @@ class LogScopeServiceProvider extends ServiceProvider
                 ImportCommand::class,
                 PruneCommand::class,
                 SeedCommand::class,
+                DoctorCommand::class,
+                TestCommand::class,
             ]);
         }
     }
