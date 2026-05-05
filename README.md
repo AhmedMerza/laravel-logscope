@@ -743,16 +743,16 @@ LOGSCOPE_REDACT_SENSITIVE=true
 
 ## 🛡️ Extensions
 
-### LogScope Guard
+### Watchtower
 
-Block malicious IPs directly from the LogScope UI and sync the blacklist across all your environments automatically.
+Block malicious IPs directly from the LogScope UI and sync the blacklist across all your environments automatically. (Previously named `ahmedmerza/logscope-guard`.)
 
 ```bash
-composer require ahmedmerza/logscope-guard
-php artisan guard:install
+composer require ahmedmerza/laravel-watchtower
+php artisan watchtower:install
 ```
 
-[View LogScope Guard →](https://github.com/AhmedMerza/laravel-logscope-guard)
+[View Watchtower →](https://github.com/AhmedMerza/laravel-watchtower)
 
 ---
 

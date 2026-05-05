@@ -47,7 +47,7 @@ window.logScopeConfig = {
     channels: @json($channels),
     forbiddenRedirect: @json(config('logscope.routes.forbidden_redirect', '/')),
     unauthenticatedRedirect: @json(config('logscope.routes.unauthenticated_redirect', '/login')),
-    guard: @json(config('logscope-guard.enabled', false)),
+    guard: @json(config('watchtower.enabled', false)),
     routes: {
         logs: '{{ route('logscope.logs') }}',
         stats: '{{ route('logscope.stats') }}',
