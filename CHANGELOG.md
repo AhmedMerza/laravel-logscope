@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-05-13
+
 ### Added
 
 - **Write-failure fallback rows in `log_entries`.** When the normal write path throws (e.g. context sanitization touches a class the autoloader can't resolve, or a bulk insert blows up mid-flush), LogScope now writes a minimal marker row to `log_entries` so the failure shows up in the UI — not just in php-fpm's `error_log`. The marker row preserves the original `level`/`message`/`channel`/`trace_id` (re-read from request context if buildLogData itself threw, so correlation survives) and replaces `context` with a `_logscope_write_failure` block carrying the exception class, message, call-site label, and an occurrence counter. Per-process dedupe with a heartbeat every 100th occurrence keeps a sustained outage from flooding the table while still giving the operator a "still happening" signal. Wired into all three write modes (sync via `LogCapture`, queue via `WriteLogEntry::handle`, batch via `LogBuffer::performFlush`). Octane request-boundary listener now also resets `FallbackWriter`'s static map so long-running workers don't strand their dedupe state across requests. New config: `logscope.write_failure.persist_fallback` (default `true`, env `LOGSCOPE_WRITE_FAILURE_PERSIST_FALLBACK`).

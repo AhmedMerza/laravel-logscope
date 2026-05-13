@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.6.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.6.1)** — Default to `sync` write mode in the testing environment so consumer test suites stop seeing the noisy "Discarded N buffered log entries" warning + silent log loss; Watchtower integration rename (formerly LogScope Guard).
+**Latest: [v1.7.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.0)** — Write failures now surface as fallback rows in `log_entries` so they appear in the LogScope UI instead of vanishing into `error_log`; queue worker retry semantics tightened to distinguish transient DB errors (retry) from persistent code/autoload bugs (record + swallow).
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
