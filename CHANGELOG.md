@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-05-13
+
 ### Changed
 
 - **Watchtower integration** (formerly LogScope Guard) — README install command, the JS `guard` flag, and the `@includeIf` partial now point at `ahmedmerza/laravel-watchtower` and the `watchtower::` view namespace / `watchtower.*` config namespace. The companion package was renamed; LogScope users following the README will install the new package, and the in-detail-panel Block-IP button activates against the new namespaces. **Breaking only for users on the unreleased pre-rename Guard package** — anyone who already shipped the integration on top of `ahmedmerza/logscope-guard` (≤ v0.1.0) will see the Block-IP button stop appearing until they upgrade Guard to Watchtower.
