@@ -162,19 +162,44 @@ class LogBuffer implements LogBufferInterface
      */
     protected static function performFlush(array $logsToFlush): void
     {
-        try {
-            $limits = self::$cachedLimits ?: config('logscope.limits', []);
-            $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $logsToFlush);
+        $limits = self::$cachedLimits ?: config('logscope.limits', []);
 
-            foreach (array_chunk($rows, 500) as $chunk) {
-                try {
-                    LogEntry::insert(self::normalizeChunk($chunk));
-                } catch (Throwable $e) {
-                    WriteFailureLogger::report($e, 'buffer-flush');
-                }
+        // Chunk over the ORIGINAL data array — not the post-prepareData rows —
+        // so each entry's level/message/channel/trace_id is still in hand if
+        // we need to emit fallback rows for a failed chunk. prepareData is
+        // applied per-chunk just in time.
+        foreach (array_chunk($logsToFlush, 500) as $originalChunk) {
+            try {
+                $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $originalChunk);
+                LogEntry::insert(self::normalizeChunk($rows));
+            } catch (Throwable $e) {
+                WriteFailureLogger::report($e, 'buffer-flush');
+                self::writeFallbackForChunk($originalChunk, $e);
             }
-        } catch (Throwable $e) {
-            WriteFailureLogger::report($e, 'buffer-flush');
+        }
+    }
+
+    /**
+     * Emit a fallback row per entry in a failed chunk. The FallbackWriter's
+     * per-process dedupe collapses the per-row calls to one row per unique
+     * throw site, so a 500-entry chunk failing on a single autoload bug
+     * produces a single visible row in the UI — not 500.
+     *
+     * Resolving FallbackWriter via the container can fail at shutdown when
+     * the application is being torn down. Treat it as best-effort: if the
+     * container is gone, the error_log line from WriteFailureLogger::report
+     * is still the canonical signal.
+     */
+    private static function writeFallbackForChunk(array $originalChunk, Throwable $e): void
+    {
+        try {
+            $fallback = app(FallbackWriter::class);
+        } catch (Throwable) {
+            return;
+        }
+
+        foreach ($originalChunk as $data) {
+            $fallback->record($data, $e, 'buffer-flush');
         }
     }
 

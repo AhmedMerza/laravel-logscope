@@ -179,6 +179,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Write Failure Fallback
+    |--------------------------------------------------------------------------
+    |
+    | When the normal write path throws (e.g. an autoload error inside context
+    | sanitization, or a bulk insert blowing up mid-flush), LogScope can write
+    | a minimal *fallback* row to log_entries so the failure shows up in the
+    | UI alongside everything else — not just in php-fpm's error_log.
+    |
+    | The fallback row keeps the original level/message/channel/trace_id and
+    | replaces `context` with a `_logscope_write_failure` marker carrying the
+    | exception class, message, and call-site label. Per-process dedupe
+    | guarantees at most one fallback row per unique throw site, so a
+    | sustained outage doesn't flood the table.
+    |
+    | 'persist_fallback' - Toggle the fallback row. Disable if you prefer to
+    |                      rely on error_log + cache banner alone.
+    |
+    */
+    'write_failure' => [
+        'persist_fallback' => env('LOGSCOPE_WRITE_FAILURE_PERSIST_FALLBACK', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Features
     |--------------------------------------------------------------------------
     |
