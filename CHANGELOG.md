@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-05-13
+
+### Added
+
+- **Write-failure fallback rows in `log_entries`.** When the normal write path throws (e.g. context sanitization touches a class the autoloader can't resolve, or a bulk insert blows up mid-flush), LogScope now writes a minimal marker row to `log_entries` so the failure shows up in the UI — not just in php-fpm's `error_log`. The marker row preserves the original `level`/`message`/`channel`/`trace_id` (re-read from request context if buildLogData itself threw, so correlation survives) and replaces `context` with a `_logscope_write_failure` block carrying the exception class, message, call-site label, and an occurrence counter. Per-process dedupe with a heartbeat every 100th occurrence keeps a sustained outage from flooding the table while still giving the operator a "still happening" signal. Wired into all three write modes (sync via `LogCapture`, queue via `WriteLogEntry::handle`, batch via `LogBuffer::performFlush`). Octane request-boundary listener now also resets `FallbackWriter`'s static map so long-running workers don't strand their dedupe state across requests. New config: `logscope.write_failure.persist_fallback` (default `true`, env `LOGSCOPE_WRITE_FAILURE_PERSIST_FALLBACK`).
+
+### Changed
+
+- **Queue worker retry behavior.** `WriteLogEntry::handle` now classifies failures: SQLSTATE classes `08*` (connection) and `40*` (deadlock/serialization) re-throw so Laravel's queue retries kick in; everything else (autoload errors, schema mismatches, malformed data) is treated as persistent — recorded via the fallback row and `WriteFailureLogger`, then swallowed so a poisoned entry can't loop the worker forever. Previously every failure surfaced as a job-level exception, triggering unbounded retries on bugs that retries couldn't fix.
+- **`LogBuffer::performFlush` error isolation improved per-chunk.** `LogEntry::prepareData()` is now called inside the per-chunk try block (previously it ran once over the entire buffer up front). A single malformed entry now loses only its 500-row chunk, not the whole buffer. No config change required — strictly fewer entries lost on the failure path.
+
 ## [1.6.1] — 2026-05-13
 
 ### Changed

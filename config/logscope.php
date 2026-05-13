@@ -179,6 +179,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Write Failure Fallback
+    |--------------------------------------------------------------------------
+    |
+    | When the normal write path throws (e.g. an autoload error inside context
+    | sanitization, or a bulk insert blowing up mid-flush), LogScope can write
+    | a minimal *fallback* row to log_entries so the failure shows up in the
+    | UI alongside everything else — not just in php-fpm's error_log.
+    |
+    | The fallback row keeps the original level/message/channel/trace_id and
+    | replaces `context` with a `_logscope_write_failure` marker carrying the
+    | exception class, message, call-site label, and occurrence counter.
+    |
+    | Dedupe: per-process counter keyed on exception class + throw site. A
+    | row is emitted on the first occurrence and every 100th thereafter,
+    | so a sustained outage stays visible in the UI (heartbeat) without
+    | flooding the table. Octane workers reset the counter at request
+    | boundaries so the dedupe scopes to the request, not the worker
+    | lifetime.
+    |
+    | 'persist_fallback' - Toggle the fallback row. Disable if you prefer to
+    |                      rely on error_log + cache banner alone.
+    |
+    */
+    'write_failure' => [
+        'persist_fallback' => env('LOGSCOPE_WRITE_FAILURE_PERSIST_FALLBACK', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Features
     |--------------------------------------------------------------------------
     |

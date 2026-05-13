@@ -19,6 +19,7 @@ use LogScope\Contracts\LogWriterInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\Logging\AddChannelToContext;
 use LogScope\Services\ContextSanitizer;
+use LogScope\Services\FallbackWriter;
 use LogScope\Services\LogBuffer;
 use LogScope\Services\LogCapture;
 use LogScope\Services\LogWriter;
@@ -99,10 +100,15 @@ class LogScopeServiceProvider extends ServiceProvider
         });
         $this->app->alias(LogWriter::class, LogWriterInterface::class);
 
+        $this->app->singleton(FallbackWriter::class, function () {
+            return new FallbackWriter;
+        });
+
         $this->app->singleton(LogCapture::class, function ($app) {
             return new LogCapture(
                 $app->make(LogWriterInterface::class),
-                $app->make(ContextSanitizerInterface::class)
+                $app->make(ContextSanitizerInterface::class),
+                $app->make(FallbackWriter::class)
             );
         });
     }
@@ -254,13 +260,21 @@ class LogScopeServiceProvider extends ServiceProvider
     }
 
     /**
-     * Reset static channel state at Octane request boundaries.
+     * Reset static state at Octane request boundaries.
      *
-     * Octane keeps the worker process alive across requests. The Monolog
-     * channel processor stores the last channel name in static state.
-     * Without this listener, a Log::build() log in request N+1 could
-     * inherit the channel of request N's last log if a Monolog handler
-     * threw (or any other rare path that orphaned `$isFresh=true`).
+     * Octane keeps the worker process alive across requests, so any
+     * per-process static state will leak across them unless we clear it.
+     * Two consumers today:
+     *
+     * - ChannelContextProcessor's "last channel" slot — without reset,
+     *   a Log::build() log in request N+1 could inherit the channel of
+     *   request N's last log if a Monolog handler threw.
+     *
+     * - FallbackWriter's per-failure occurrence map — without reset, a
+     *   long-running worker would only ever emit ONE fallback row per
+     *   failure key for its entire lifetime (minus heartbeats every
+     *   REEMIT_EVERY). Resetting per-request scopes the dedupe to the
+     *   request, matching the natural mental model for ops dashboards.
      *
      * Only registers if Laravel\Octane\Events\RequestReceived exists —
      * Octane is an optional peer, not a hard dependency.
@@ -275,6 +289,7 @@ class LogScopeServiceProvider extends ServiceProvider
             \Laravel\Octane\Events\RequestReceived::class,
             function (): void {
                 \LogScope\Logging\ChannelContextProcessor::clearLastChannel();
+                FallbackWriter::reset();
             }
         );
     }

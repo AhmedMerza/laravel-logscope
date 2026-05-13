@@ -21,7 +21,8 @@ class LogCapture
 {
     public function __construct(
         protected LogWriterInterface $writer,
-        protected ContextSanitizerInterface $sanitizer
+        protected ContextSanitizerInterface $sanitizer,
+        protected FallbackWriter $fallback
     ) {}
 
     /**
@@ -73,6 +74,7 @@ class LogCapture
             return;
         }
 
+        $data = null;
         try {
             $data = $this->buildLogData($event, $channel);
             $this->writer->write($data);
@@ -83,6 +85,16 @@ class LogCapture
             // observability. WriteFailureLogger dedupes per-process so a
             // sustained outage doesn't dump thousands of identical lines.
             WriteFailureLogger::report($e, 'listener');
+
+            // Persist a minimal fallback row so the failure shows up in the
+            // LogScope UI alongside everything else, not just in error_log.
+            // If buildLogData itself threw, $data is still null — fall back
+            // to the raw MessageLogged event so we don't lose level/message.
+            if ($data !== null) {
+                $this->fallback->record($data, $e, 'listener');
+            } else {
+                $this->fallback->recordFromEvent($event, $channel, $e, 'listener');
+            }
         }
     }
 
