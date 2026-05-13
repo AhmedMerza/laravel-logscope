@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.6.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.6.0)** — New `logscope:doctor` health check + `logscope:test` smoke test commands, plus opt-in scheduler registration for `logscope:prune`.
+**Latest: [v1.6.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.6.1)** — Default to `sync` write mode in the testing environment so consumer test suites stop seeing the noisy "Discarded N buffered log entries" warning + silent log loss; Watchtower integration rename (formerly LogScope Guard).
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
