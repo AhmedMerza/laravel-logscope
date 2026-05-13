@@ -189,9 +189,14 @@ return [
     |
     | The fallback row keeps the original level/message/channel/trace_id and
     | replaces `context` with a `_logscope_write_failure` marker carrying the
-    | exception class, message, and call-site label. Per-process dedupe
-    | guarantees at most one fallback row per unique throw site, so a
-    | sustained outage doesn't flood the table.
+    | exception class, message, call-site label, and occurrence counter.
+    |
+    | Dedupe: per-process counter keyed on exception class + throw site. A
+    | row is emitted on the first occurrence and every 100th thereafter,
+    | so a sustained outage stays visible in the UI (heartbeat) without
+    | flooding the table. Octane workers reset the counter at request
+    | boundaries so the dedupe scopes to the request, not the worker
+    | lifetime.
     |
     | 'persist_fallback' - Toggle the fallback row. Disable if you prefer to
     |                      rely on error_log + cache banner alone.

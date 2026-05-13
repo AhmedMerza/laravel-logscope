@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Queue worker retry behavior.** `WriteLogEntry::handle` now classifies failures: SQLSTATE classes `08*` (connection) and `40*` (deadlock/serialization) re-throw so Laravel's queue retries kick in; everything else (autoload errors, schema mismatches, malformed data) is treated as persistent — recorded via the fallback row and `WriteFailureLogger`, then swallowed so a poisoned entry can't loop the worker forever. Previously every failure surfaced as a job-level exception, triggering unbounded retries on bugs that retries couldn't fix.
+- **`LogBuffer::performFlush` error isolation improved per-chunk.** `LogEntry::prepareData()` is now called inside the per-chunk try block (previously it ran once over the entire buffer up front). A single malformed entry now loses only its 500-row chunk, not the whole buffer. No config change required — strictly fewer entries lost on the failure path.
 
 ## [1.6.1] — 2026-05-13
 

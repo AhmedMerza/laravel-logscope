@@ -114,16 +114,16 @@ it('does not write a fallback row when persist_fallback is disabled', function (
     expect(LogEntry::query()->count())->toBe(0);
 });
 
-it('writes only one fallback row per unique failure within a single process', function () {
+it('emits a single fallback row within one heartbeat interval for repeated failures', function () {
     poisonNormalInserts();
 
+    // 25 occurrences is well below REEMIT_EVERY = 100, so we should see
+    // exactly one row — the first-occurrence emit. Heartbeat semantics are
+    // verified by the dedicated 100-occurrence test below.
     for ($i = 0; $i < 25; $i++) {
         Log::error("repeated message {$i}");
     }
 
-    // Dedupe key is exception class + throw site. All 25 throws hit the same
-    // closure (same file/line), so the fallback writer should emit exactly one
-    // row — matching the existing WriteFailureLogger dedupe semantics.
     expect(LogEntry::query()->count())->toBe(1);
 });
 
@@ -155,11 +155,10 @@ it('writes a fallback row when the queue worker insert fails', function () {
 it('writes a fallback row when batch buffer flush fails', function () {
     config(['logscope.write_mode' => 'batch']);
 
-    // Drop the table to force LogEntry::insert() to throw in performFlush.
-    // The fallback path will re-create the table for itself? No — the
-    // fallback uses the same table, so we must re-create it before the
-    // fallback runs. To exercise the wiring without needing two tables,
-    // we instead intercept via a spy on FallbackWriter and verify the call.
+    // LogEntry::insert() (the bulk-insert path) bypasses model events, so
+    // the `LogEntry::creating` poison used by sync/queue tests can't catch
+    // it. Spy on FallbackWriter instead and verify the wiring — the
+    // payload shape is already covered end-to-end by the sync tests.
     $spy = new class extends FallbackWriter
     {
         public array $calls = [];

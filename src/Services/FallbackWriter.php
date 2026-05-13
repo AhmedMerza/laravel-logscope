@@ -67,6 +67,19 @@ class FallbackWriter
      * and wrapped in WriteGuard so the listener doesn't re-capture the
      * insert. If the fallback insert itself fails, we silently swallow —
      * WriteFailureLogger has already emitted the failure to error_log.
+     *
+     * Counter semantics — the occurrence counter is incremented BEFORE the
+     * emit attempt, not after. This means the counter reflects "occurrences
+     * the writer has seen," not "rows successfully persisted." Consequence:
+     * if the first-occurrence emit fails (e.g. DB gone at shutdown), the
+     * next emit attempt isn't until the 100th occurrence — there's no
+     * automatic retry of the missed row. We accept that trade-off because:
+     * (1) WriteFailureLogger's error_log line is the canonical signal at
+     * shutdown and stays reliable when the DB is unreachable, and (2) the
+     * alternative (pre-check + post-increment-on-success) re-tries every
+     * call when the cause is persistent, which means N wasted insert
+     * attempts for a sustained outage instead of N/100. The error_log
+     * dedupe also caps at one line per 100 occurrences for the same reason.
      */
     public function record(array $data, Throwable $e, string $where): void
     {
