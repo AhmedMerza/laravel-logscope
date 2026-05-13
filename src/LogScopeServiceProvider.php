@@ -142,6 +142,7 @@ class LogScopeServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->applyTestingEnvironmentDefaults();
         $this->registerCommands();
         $this->registerPublishing();
         $this->registerRoutes();
@@ -149,6 +150,36 @@ class LogScopeServiceProvider extends ServiceProvider
         $this->registerMigrations();
         $this->registerMiddleware();
         $this->registerScheduledTasks();
+    }
+
+    /**
+     * Mirror Laravel's "sensible defaults in tests" pattern (mail=array,
+     * queue=sync, cache=array) by forcing write_mode to 'sync' when the
+     * app environment is 'testing'. Without this, the package-default
+     * 'batch' accumulates entries across tests that never trigger
+     * Application::terminate(); the leftover buffer is then discarded at
+     * PHP shutdown — emitting a noisy "Discarded N buffered log entries"
+     * line and silently losing the captured logs.
+     *
+     * Users who specifically want to exercise batch behavior in a test
+     * can still opt back in via `config(['logscope.write_mode' => 'batch'])`
+     * inside the test's setUp(); this default runs once at boot time and
+     * does not re-assert.
+     *
+     * Caveat: logs fired during *other* service providers' register()
+     * phase run before our boot(), so they still see write_mode = batch
+     * and land in the buffer. LogBuffer's Layer-2 testing-env cache
+     * silences the resulting shutdown discard so the user impact is
+     * limited to the buffered entries being lost (which is the same
+     * outcome they'd get without LogScope installed).
+     */
+    protected function applyTestingEnvironmentDefaults(): void
+    {
+        if (! $this->app->environment('testing')) {
+            return;
+        }
+
+        config(['logscope.write_mode' => 'sync']);
     }
 
     /**

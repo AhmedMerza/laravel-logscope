@@ -28,6 +28,16 @@ class LogBuffer implements LogBufferInterface
     protected static array $cachedLimits = [];
 
     /**
+     * Cached "are we running in the testing environment?" answer, recorded
+     * while the container is still alive. Read at flush time — possibly
+     * during PHP shutdown when the container is gone — to decide whether
+     * the buffer-discard event deserves an error_log notify. In testing,
+     * losing the buffer at teardown is expected and uninteresting; in
+     * production it's real data loss and must stay loud.
+     */
+    protected static ?bool $cachedTestingEnv = null;
+
+    /**
      * Whether the PHP shutdown function has been registered for this
      * process. Stays true once set so re-registering the service provider
      * (e.g. in test suites that re-instantiate the app) doesn't stack
@@ -46,6 +56,11 @@ class LogBuffer implements LogBufferInterface
     {
         // Cache config limits while the container is still alive
         self::$cachedLimits = config('logscope.limits', []);
+
+        // Same idea for the testing-env flag: capture it now so flushStatic
+        // can answer "should the discard warning be quiet?" after the
+        // container has been torn down.
+        self::$cachedTestingEnv ??= $this->app->environment('testing');
 
         self::$buffer[] = $data;
     }
@@ -99,16 +114,14 @@ class LogBuffer implements LogBufferInterface
             if (! app()->bound('db')) {
                 $count = count(self::$buffer);
                 self::$buffer = [];
-                $entryWord = $count === 1 ? 'entry' : 'entries';
-                WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container has no db binding (PHP shutdown or test teardown)");
+                self::notifyDiscard($count, 'container has no db binding (PHP shutdown or test teardown)');
 
                 return;
             }
         } catch (Throwable $e) {
             $count = count(self::$buffer);
             self::$buffer = [];
-            $entryWord = $count === 1 ? 'entry' : 'entries';
-            WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — container unavailable: [".get_class($e).'] '.$e->getMessage());
+            self::notifyDiscard($count, 'container unavailable: ['.get_class($e).'] '.$e->getMessage());
 
             return;
         }
@@ -122,6 +135,22 @@ class LogBuffer implements LogBufferInterface
         // a log during the bulk insert would otherwise be re-captured by
         // LogCapture and added back to the buffer or written sync.
         WriteGuard::during(fn () => self::performFlush($logsToFlush));
+    }
+
+    /**
+     * Surface a buffer-discard event to error_log, unless we cached
+     * "running in the testing environment" at add() time — in which case
+     * the loss is expected and uninteresting. Production stays loud so a
+     * real shutdown-time data loss is visible.
+     */
+    private static function notifyDiscard(int $count, string $reason): void
+    {
+        if (self::$cachedTestingEnv === true) {
+            return;
+        }
+
+        $entryWord = $count === 1 ? 'entry' : 'entries';
+        WriteFailureLogger::notify("Discarded {$count} buffered log {$entryWord} — {$reason}");
     }
 
     /**
@@ -164,6 +193,7 @@ class LogBuffer implements LogBufferInterface
     {
         self::$buffer = [];
         self::$cachedLimits = [];
+        self::$cachedTestingEnv = null;
         self::$shutdownRegistered = false;
     }
 

@@ -202,6 +202,24 @@ LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
 ```
 
+### Testing
+
+LogScope forces `write_mode` to `sync` whenever the app is running in the `testing` environment, regardless of what `LOGSCOPE_WRITE_MODE` or `config/logscope.php` says. This mirrors how Laravel ships sensible test defaults for mail (`array`), queue (`sync`), and cache (`array`).
+
+Why: in `batch` mode the buffer is flushed on `Application::terminate()`. Unit tests that never dispatch a request never trigger that callback, so entries accumulate across tests and get discarded at PHP shutdown — producing both noisy stderr warnings and silent loss of the captured logs. `sync` writes land inside the test's transaction and roll back cleanly with `RefreshDatabase` / `DatabaseTransactions`.
+
+If you specifically want to exercise batch behavior in a test, opt back in inside `setUp()`:
+
+```php
+protected function setUp(): void
+{
+    parent::setUp();
+    config(['logscope.write_mode' => 'batch']);
+}
+```
+
+Even with that override, the shutdown discard warning is suppressed in the testing env (the loss is expected and uninteresting) — production keeps the loud notify so real data loss stays visible.
+
 ### Retention
 
 ```env

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Watchtower integration** (formerly LogScope Guard) — README install command, the JS `guard` flag, and the `@includeIf` partial now point at `ahmedmerza/laravel-watchtower` and the `watchtower::` view namespace / `watchtower.*` config namespace. The companion package was renamed; LogScope users following the README will install the new package, and the in-detail-panel Block-IP button activates against the new namespaces. **Breaking only for users on the unreleased pre-rename Guard package** — anyone who already shipped the integration on top of `ahmedmerza/logscope-guard` (≤ v0.1.0) will see the Block-IP button stop appearing until they upgrade Guard to Watchtower.
 
+### Fixed
+
+- **Noisy "Discarded N buffered log entries" warning + silent log loss during test runs** (#22) — when a consumer's project default was `batch` (or the bare package default), unit tests that never dispatched a request never triggered `Application::terminate()`. Buffered entries accumulated across tests, then got discarded at PHP shutdown when the container was gone — producing both a stderr warning per test run AND silently losing the captured logs. Two-layer fix: (1) the service provider now forces `write_mode = sync` whenever the app environment is `testing`, mirroring Laravel's own `mail=array` / `queue=sync` / `cache=array` test defaults; users who specifically want to exercise batch behavior can still opt back in via `config(['logscope.write_mode' => 'batch'])` in their test's `setUp()`. (2) `LogBuffer` now caches `app->environment('testing')` at `add()` time (while the container is alive) and suppresses the shutdown-discard `error_log` notify when that flag is set — production keeps the loud notify so real data loss stays visible. README gains a "Testing" subsection documenting the override and opt-in pattern.
+
 ## [1.6.0] — 2026-05-03
 
 ### Added
