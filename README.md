@@ -361,6 +361,24 @@ Type directly in the search box using `field:value` syntax:
 
 **Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`
 
+#### How multi-word and quoted searches behave
+
+LogScope only switches into structured-parse mode when the input actually looks structured. Otherwise the whole input is matched as a single substring — so a stray `:` in a log message (e.g. `failed: timeout`) doesn't fragment your query.
+
+| Input | Treated as | Matches |
+|-------|------------|---------|
+| `payment failed: timeout` | Single substring | Logs whose message/context/source contains the contiguous phrase `payment failed: timeout` |
+| `"payment failed"` | Single substring (quotes stripped) | Logs containing `payment failed` contiguously |
+| `level:error message:timeout` | Structured (`field:value` × 2) | Logs where `level` matches `error` AND `message` contains `timeout` |
+| `payment -warning` | Structured (per-token `-` exclusion) | Logs containing `payment` AND NOT containing `warning` |
+| `level:error` alone | Structured | Logs where `level` matches `error` |
+
+**Structured mode triggers when the input contains any of:** a quoted phrase (`"..."`), a per-token exclusion (`-word` or ` -word`), or a `field:value` where `field` is one of the searchable field names listed above.
+
+#### NOT toggle = true boolean complement
+
+The UI's NOT toggle (or `exclude=1` on a `searches[]` query-string entry) inverts the entire search expression. For any input, `include_count + exclude_count == total_count` — logs are never lost between the two views.
+
 > **Tip:** Request context filters (trace ID, user ID, IP, URL) support partial matching. Type `192.168` to find all IPs starting with that prefix, or `42` to find user IDs containing "42".
 
 > **Tip:** Click on trace ID, user ID, or IP address in the detail panel to pivot your investigation — severity, channel, status, and search filters are cleared so nothing is hidden. Your date range is preserved.

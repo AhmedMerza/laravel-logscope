@@ -96,7 +96,6 @@ class LogController extends Controller
             $validFields = $this->getSearchableFields();
 
             if (is_array($searches) && count($searches) > 0) {
-                $terms = [];
                 foreach ($searches as $search) {
                     if (empty($search['value'])) {
                         continue;
@@ -111,25 +110,31 @@ class LogController extends Controller
                         $field = 'any';
                     }
 
-                    // Parse syntax if field is 'any' and syntax feature is enabled
-                    if ($field === 'any' && $useSearchSyntax && str_contains($value, ':')) {
-                        $parsed = $this->parseSearchSyntax($value);
-                        foreach ($parsed as $term) {
-                            // Apply exclude from UI if the parsed term isn't already excluding
-                            if ($exclude && ! $term['exclude']) {
-                                $term['exclude'] = true;
-                            }
-                            $terms[] = $term;
-                        }
+                    // Decide whether the value warrants structured-syntax parsing.
+                    // A bare `:` is NOT enough — see shouldUseStructuredSearch().
+                    // Otherwise the input is treated as a single substring term,
+                    // and the UI's NOT toggle (exclude) inverts that whole group.
+                    if ($field === 'any' && $useSearchSyntax && $this->shouldUseStructuredSearch($value)) {
+                        // Per-term `-foo` exclusions inside $value are preserved
+                        // as the user wrote them. The outer `exclude` flag is
+                        // applied to the whole group via $negateGroup below —
+                        // NOT propagated onto each term (which would give
+                        // "contains NONE" instead of the boolean complement).
+                        $terms = $this->parseSearchSyntax($value);
                     } else {
-                        $terms[] = [
+                        $terms = [[
                             'field' => $field,
                             'value' => $value,
-                            'exclude' => $exclude,
-                        ];
+                            'exclude' => false,
+                        ]];
                     }
+
+                    // Apply this search entry as its own where/whereNot group.
+                    // Each searches[] entry is independent; they're AND'd at
+                    // the outer query level by virtue of being separate where
+                    // clauses.
+                    $this->applySearchTerms($query, $terms, $useRegex, negateGroup: $exclude);
                 }
-                $this->applySearchTerms($query, $terms, $useRegex);
             }
         } elseif ($request->filled('search')) {
             if ($useSearchSyntax) {
@@ -668,15 +673,29 @@ class LogController extends Controller
     }
 
     /**
-     * Apply search terms to query.
+     * Apply a list of parsed search terms to the query as a single group.
+     *
+     * $negateGroup wraps the whole AND'd expression in a SQL NOT, giving
+     * the boolean complement of the include set. This is the semantic of
+     * the UI's "NOT" toggle: "show me everything that does NOT match this
+     * filter," not "show me logs that contain NONE of the words" (which
+     * is what per-term negation would produce, and which fails to sum to
+     * the total — see GitHub issue #24).
+     *
+     * Per-term `exclude` flags inside $terms (from the parser's `-foo`
+     * syntax) remain in effect inside the group. When the group is
+     * negated, the boolean complement of the whole structured expression
+     * is what the user gets — including any per-term `-` they wrote.
      */
-    protected function applySearchTerms($query, array $terms, bool $useRegex = false): void
+    protected function applySearchTerms($query, array $terms, bool $useRegex = false, bool $negateGroup = false): void
     {
         if (empty($terms)) {
             return;
         }
 
-        $query->where(function ($q) use ($terms, $useRegex) {
+        $method = $negateGroup ? 'whereNot' : 'where';
+
+        $query->$method(function ($q) use ($terms, $useRegex) {
             foreach ($terms as $index => $term) {
                 $field = $term['field'];
                 $value = $term['value'];
@@ -689,6 +708,52 @@ class LogController extends Controller
                 }
             }
         });
+    }
+
+    /**
+     * Decide whether a search value should be routed through the structured
+     * parser (parseSearchSyntax) or treated as a single substring term.
+     *
+     * Why this exists: the previous "any colon triggers structured mode"
+     * rule mistook trailing punctuation (e.g. `skipped:`) for a field:value
+     * separator, then tokenized the whole input by whitespace. Combined with
+     * the UI's per-term NOT propagation, this produced search results that
+     * silently dropped logs containing some-but-not-all of the tokens (see
+     * GitHub issue #24).
+     *
+     * The structured parser is only invoked when at least one of these
+     * actually-structural cues is present:
+     *
+     *  - A quoted phrase (`"..."`) — the parser strips the quotes.
+     *  - A leading `-` on a token (`-foo` or ` -foo`) — per-term exclusion.
+     *  - A `field:value` where `field` is a known searchable column name.
+     *
+     * A bare `:` anywhere else is just punctuation. We keep the input as
+     * one substring search instead of fragmenting it.
+     */
+    private function shouldUseStructuredSearch(string $value): bool
+    {
+        if (str_contains($value, '"')) {
+            return true;
+        }
+
+        // Per-token exclusion: a `-` either at the start of the string or
+        // immediately after whitespace, followed by at least one non-space.
+        if (preg_match('/(^|\s)-\S/', $value)) {
+            return true;
+        }
+
+        // Valid field-name colon prefix. Anchored to word boundaries so
+        // `foo:bar` (where foo isn't a field) doesn't fragment.
+        $fields = $this->getSearchableFields();
+        if (! empty($fields)) {
+            $pattern = '/\b('.implode('|', array_map(fn ($f) => preg_quote($f, '/'), $fields)).'):\S/i';
+            if (preg_match($pattern, $value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -705,31 +770,32 @@ class LogController extends Controller
         $likeValue = '%'.$value.'%';
         $boolean = $index === 0 ? 'and' : 'and';
 
+        // COALESCE the column to '' so NULL columns never produce NULL truth
+        // values. Without this, the group-level `whereNot()` used for the UI's
+        // NOT toggle hits SQL three-valued logic: `NOT (NULL OR FALSE)` is
+        // NULL, which is filtered out of the result set — meaning rows with
+        // NULL columns silently disappear from BOTH include and exclude. With
+        // COALESCE, every LIKE comparison is definitively TRUE or FALSE.
         if ($field === 'any') {
             if ($exclude) {
                 $q->where(function ($subQ) use ($likeValue) {
-                    $subQ->where(function ($mq) use ($likeValue) {
-                        $mq->where('message', 'not like', $likeValue)->orWhereNull('message');
-                    })->where(function ($cq) use ($likeValue) {
-                        $cq->where('context', 'not like', $likeValue)->orWhereNull('context');
-                    })->where(function ($sq) use ($likeValue) {
-                        $sq->where('source', 'not like', $likeValue)->orWhereNull('source');
-                    });
+                    $subQ->whereRaw("COALESCE(message, '') NOT LIKE ?", [$likeValue])
+                        ->whereRaw("COALESCE(context, '') NOT LIKE ?", [$likeValue])
+                        ->whereRaw("COALESCE(source, '') NOT LIKE ?", [$likeValue]);
                 }, null, null, $boolean);
             } else {
                 $q->where(function ($subQ) use ($likeValue) {
-                    $subQ->where('message', 'like', $likeValue)
-                        ->orWhere('context', 'like', $likeValue)
-                        ->orWhere('source', 'like', $likeValue);
+                    $subQ->whereRaw("COALESCE(message, '') LIKE ?", [$likeValue])
+                        ->orWhereRaw("COALESCE(context, '') LIKE ?", [$likeValue])
+                        ->orWhereRaw("COALESCE(source, '') LIKE ?", [$likeValue]);
                 }, null, null, $boolean);
             }
         } else {
+            // $field comes from the validated whitelist above — safe to interpolate.
             if ($exclude) {
-                $q->where(function ($subQ) use ($field, $likeValue) {
-                    $subQ->where($field, 'not like', $likeValue)->orWhereNull($field);
-                }, null, null, $boolean);
+                $q->whereRaw("COALESCE({$field}, '') NOT LIKE ?", [$likeValue], $boolean);
             } else {
-                $q->where($field, 'like', $likeValue, $boolean);
+                $q->whereRaw("COALESCE({$field}, '') LIKE ?", [$likeValue], $boolean);
             }
         }
     }
@@ -763,32 +829,27 @@ class LogController extends Controller
             return;
         }
 
+        // See the COALESCE rationale on applyLikeSearch — same NULL-handling
+        // issue applies to regex against nullable columns.
         if ($field === 'any') {
             if ($exclude) {
                 $q->where(function ($subQ) use ($value, $regexOp) {
-                    $subQ->where(function ($mq) use ($value, $regexOp) {
-                        $mq->whereRaw("message {$regexOp} ?", [$value])->orWhereNull('message');
-                    })->where(function ($cq) use ($value, $regexOp) {
-                        $cq->whereRaw("context {$regexOp} ?", [$value])->orWhereNull('context');
-                    })->where(function ($sq) use ($value, $regexOp) {
-                        $sq->whereRaw("source {$regexOp} ?", [$value])->orWhereNull('source');
-                    });
+                    $subQ->whereRaw("COALESCE(message, '') {$regexOp} ?", [$value])
+                        ->whereRaw("COALESCE(context, '') {$regexOp} ?", [$value])
+                        ->whereRaw("COALESCE(source, '') {$regexOp} ?", [$value]);
                 }, null, null, $boolean);
             } else {
                 $q->where(function ($subQ) use ($value, $regexOp) {
-                    $subQ->whereRaw("message {$regexOp} ?", [$value])
-                        ->orWhereRaw("context {$regexOp} ?", [$value])
-                        ->orWhereRaw("source {$regexOp} ?", [$value]);
+                    $subQ->whereRaw("COALESCE(message, '') {$regexOp} ?", [$value])
+                        ->orWhereRaw("COALESCE(context, '') {$regexOp} ?", [$value])
+                        ->orWhereRaw("COALESCE(source, '') {$regexOp} ?", [$value]);
                 }, null, null, $boolean);
             }
         } else {
-            if ($exclude) {
-                $q->where(function ($subQ) use ($field, $value, $regexOp) {
-                    $subQ->whereRaw("{$field} {$regexOp} ?", [$value])->orWhereNull($field);
-                }, null, null, $boolean);
-            } else {
-                $q->whereRaw("{$field} {$regexOp} ?", [$value], $boolean);
-            }
+            // $field comes from the validated whitelist — safe to interpolate.
+            // $regexOp already encodes negation when $exclude is true, so the
+            // include/exclude branches collapse to one whereRaw call.
+            $q->whereRaw("COALESCE({$field}, '') {$regexOp} ?", [$value], $boolean);
         }
     }
 }
