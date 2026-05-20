@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.7.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.0)** — Write failures now surface as fallback rows in `log_entries` so they appear in the LogScope UI instead of vanishing into `error_log`; queue worker retry semantics tightened to distinguish transient DB errors (retry) from persistent code/autoload bugs (record + swallow).
+**Latest: [v1.7.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.1)** — Search NOT toggle is now a true boolean complement (#24): `include + exclude == total` for any input. A stray colon in a phrase no longer fragments your search, and rows with NULL columns no longer disappear from both views.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
