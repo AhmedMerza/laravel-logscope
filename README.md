@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.7.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.0)** — Write failures now surface as fallback rows in `log_entries` so they appear in the LogScope UI instead of vanishing into `error_log`; queue worker retry semantics tightened to distinguish transient DB errors (retry) from persistent code/autoload bugs (record + swallow).
+**Latest: [v1.7.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.1)** — Search NOT toggle is now a true boolean complement (#24): `include + exclude == total` for any input. A stray colon in a phrase no longer fragments your search, and rows with NULL columns no longer disappear from both views.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
@@ -360,6 +360,24 @@ Type directly in the search box using `field:value` syntax:
 | `-text` | `-deprecated` | Exclude from all fields |
 
 **Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`
+
+#### How multi-word and quoted searches behave
+
+LogScope only switches into structured-parse mode when the input actually looks structured. Otherwise the whole input is matched as a single substring — so a stray `:` in a log message (e.g. `failed: timeout`) doesn't fragment your query.
+
+| Input | Treated as | Matches |
+|-------|------------|---------|
+| `payment failed: timeout` | Single substring | Logs whose message/context/source contains the contiguous phrase `payment failed: timeout` |
+| `"payment failed"` | Single substring (quotes stripped) | Logs containing `payment failed` contiguously |
+| `level:error message:timeout` | Structured (`field:value` × 2) | Logs where `level` matches `error` AND `message` contains `timeout` |
+| `payment -warning` | Structured (per-token `-` exclusion) | Logs containing `payment` AND NOT containing `warning` |
+| `level:error` alone | Structured | Logs where `level` matches `error` |
+
+**Structured mode triggers when the input contains any of:** a quoted phrase (`"..."`), a per-token exclusion (`-word` or ` -word`), or a `field:value` where `field` is one of the searchable field names listed above.
+
+#### NOT toggle = true boolean complement
+
+The UI's NOT toggle (or `exclude=1` on a `searches[]` query-string entry) inverts the entire search expression. For any input, `include_count + exclude_count == total_count` — logs are never lost between the two views.
 
 > **Tip:** Request context filters (trace ID, user ID, IP, URL) support partial matching. Type `192.168` to find all IPs starting with that prefix, or `42` to find user IDs containing "42".
 

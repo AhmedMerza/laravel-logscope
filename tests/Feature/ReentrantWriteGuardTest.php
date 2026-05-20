@@ -29,6 +29,25 @@ afterEach(function () {
     // If future Laravel versions add framework listeners we need to keep,
     // switch to a more surgical removal.
     LogEntry::flushEventListeners();
+
+    // Drop any DB::listen callbacks the tests below registered. They hook
+    // QueryExecuted and fire Log::warning on every query touching log_entries
+    // — leaking them into later test files (notably the search tests) causes
+    // side-effect log rows to land in the DB mid-test and breaks deterministic
+    // fixture counts.
+    $dispatcher = DB::connection()->getEventDispatcher();
+    if ($dispatcher !== null) {
+        $dispatcher->forget(\Illuminate\Database\Events\QueryExecuted::class);
+    }
+
+    // The Log::warning calls fired by the listener above land in LogBuffer's
+    // static $buffer during the assertion phase (after WriteGuard has already
+    // unwound from flushStatic). RefreshDatabase rolls back DB changes but
+    // doesn't touch our static buffer — those leftover entries would then
+    // drain at HTTP terminate in whichever later test file makes the first
+    // request, inserting "batch-side-effect-N" rows mid-fixture and breaking
+    // count-based assertions (notably SearchNotComplementTest).
+    LogScopeServiceProvider::resetBufferState();
 });
 
 it('does not re-capture logs fired by an observer during the write itself', function () {

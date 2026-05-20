@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-05-20
+
+### Fixed
+
+- **Search NOT toggle is now a true boolean complement** (#24). Previously, when the search input contained any `:` (including a trailing colon like `failed:`), the controller silently flipped into structured-tokenize mode, AND'd the resulting tokens, and propagated the UI's exclude flag onto each token individually. The result: `include` returned logs containing **all** tokens; `exclude` returned logs containing **none** of them. Logs containing some-but-not-all tokens fell through both filters and became invisible. Three changes: (1) the colon-trigger now requires either a quoted phrase, a per-token `-` exclusion, or a `field:value` where `field` is a known searchable column — a stray `:` no longer fragments the input; (2) the UI's exclude flag wraps the parsed AND'd expression in a single SQL `NOT (...)` instead of negating each term; (3) `applyLikeSearch`/`applyRegexSearch` now COALESCE nullable columns to `''` so the wrapped `NOT` doesn't hit SQL three-valued-logic propagation on rows where searchable columns are NULL. Invariant guaranteed by tests: `include_count + exclude_count == total_count` for any input.
+
 ## [1.7.0] — 2026-05-13
 
 ### Added
