@@ -745,15 +745,19 @@ class LogController extends Controller
 
         // Valid field-name colon prefix. Anchored to word boundaries so
         // `foo:bar` (where foo isn't a field) doesn't fragment.
-        $fields = $this->getSearchableFields();
-        if (! empty($fields)) {
-            $pattern = '/\b('.implode('|', array_map(fn ($f) => preg_quote($f, '/'), $fields)).'):\S/i';
-            if (preg_match($pattern, $value)) {
-                return true;
+        //
+        // The pattern is built once per request from the static field list
+        // and memoized — same value across every search hit on this instance.
+        static $fieldPattern = null;
+        if ($fieldPattern === null) {
+            $fields = $this->getSearchableFields();
+            if (empty($fields)) {
+                return false;
             }
+            $fieldPattern = '/\b('.implode('|', array_map(fn ($f) => preg_quote($f, '/'), $fields)).'):\S/i';
         }
 
-        return false;
+        return (bool) preg_match($fieldPattern, $value);
     }
 
     /**
@@ -768,7 +772,12 @@ class LogController extends Controller
         }
 
         $likeValue = '%'.$value.'%';
-        $boolean = $index === 0 ? 'and' : 'and';
+        // All terms within an applySearchTerms call are AND-combined. The
+        // $index parameter is kept on the signature so subclasses can switch
+        // on position (e.g. swap to 'or' for the first term and 'and' for
+        // the rest) without changing the call sites, but we currently have
+        // no use for that distinction.
+        $boolean = 'and';
 
         // COALESCE the column to '' so NULL columns never produce NULL truth
         // values. Without this, the group-level `whereNot()` used for the UI's
@@ -811,7 +820,8 @@ class LogController extends Controller
             $field = 'any';
         }
 
-        $boolean = $index === 0 ? 'and' : 'and';
+        // See applyLikeSearch — same AND-combine rationale for $boolean.
+        $boolean = 'and';
         $driver = $q->getConnection()->getDriverName();
 
         // Build regex operator based on database driver

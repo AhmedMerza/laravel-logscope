@@ -30,17 +30,11 @@ afterEach(function () {
     // switch to a more surgical removal.
     LogEntry::flushEventListeners();
 
-    // Also drop any DB::listen callbacks the tests below registered. They
-    // hook QueryExecuted and fire Log::warning on every query touching
-    // log_entries — leaking them into later test files (notably the search
-    // tests) causes side-effect log rows to land in the DB mid-test and
-    // breaks deterministic fixture counts. Forget both via the global bus
-    // (app('events')) and via the connection's own dispatcher — Testbench
-    // can route these through either depending on the database driver.
     // Drop any DB::listen callbacks the tests below registered. They hook
-    // QueryExecuted and fire Log::warning on every query touching log_entries.
-    // Without removing them, the listener keeps firing in later tests in
-    // this same file as the assertion SELECTs run.
+    // QueryExecuted and fire Log::warning on every query touching log_entries
+    // — leaking them into later test files (notably the search tests) causes
+    // side-effect log rows to land in the DB mid-test and breaks deterministic
+    // fixture counts.
     $dispatcher = DB::connection()->getEventDispatcher();
     if ($dispatcher !== null) {
         $dispatcher->forget(\Illuminate\Database\Events\QueryExecuted::class);

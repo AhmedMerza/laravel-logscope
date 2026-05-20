@@ -192,6 +192,29 @@ it('a known field name followed by colon DOES trigger structured search', functi
     expect($include)->toBe(1);
 });
 
+it('multiple searches[] entries are AND-combined at the query level', function () {
+    // Two independent searches[] entries — first an include for "alpha",
+    // second a NOT for "driver". The controller emits a where(...) and a
+    // whereNot(...) on the same query; Laravel ANDs them by default.
+    // Result should be rows that contain "alpha" AND don't contain "driver".
+    LogEntry::createEntry(['level' => 'info', 'message' => 'alpha and driver', 'occurred_at' => now()]);          // has both
+    LogEntry::createEntry(['level' => 'info', 'message' => 'alpha alone', 'occurred_at' => now()->subSecond()]);  // alpha, no driver  ← match
+    LogEntry::createEntry(['level' => 'info', 'message' => 'driver alone', 'occurred_at' => now()->subSeconds(2)]); // driver, no alpha
+    LogEntry::createEntry(['level' => 'info', 'message' => 'neither', 'occurred_at' => now()->subSeconds(3)]);      // nothing
+
+    $url = '/logscope/api/logs?'.http_build_query([
+        'searches' => [
+            ['field' => 'any', 'value' => 'alpha', 'exclude' => 0],
+            ['field' => 'any', 'value' => 'driver', 'exclude' => 1],
+        ],
+    ]);
+    $response = test()->getJson($url);
+    $response->assertOk();
+
+    $messages = collect($response->json('data'))->pluck('message')->all();
+    expect($messages)->toBe(['alpha alone']);
+});
+
 it('a non-field word followed by colon is treated as a literal substring', function () {
     LogEntry::createEntry(['level' => 'info', 'message' => 'skipped: driver', 'occurred_at' => now()]);
     // Reverse-order distractor: contains both "skipped:" and "driver" but
