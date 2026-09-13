@@ -248,8 +248,7 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         $result = [];
         foreach ($data as $key => $value) {
-            $lowerKey = strtolower((string) $key);
-            if ($this->isSensitiveKey($lowerKey)) {
+            if ($this->isSensitiveKey((string) $key)) {
                 $result[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $result[$key] = $this->redactSensitive($value);

@@ -268,16 +268,24 @@ describe('request redaction', function () {
     });
 
     it('redacts custom credential headers by name fragment', function () {
+        // Each header contains exactly one default fragment, so dropping any
+        // fragment from the defaults fails this test.
         $request = Request::create('/', server: [
-            'HTTP_X_AUTH_TOKEN' => 't',
             'HTTP_X_API_KEY' => 'k',
+            'HTTP_X_CSRF_TOKEN' => 't',
+            'HTTP_X_CLIENT_SECRET' => 's',
+            'HTTP_X_PASSWORD' => 'p',
+            'HTTP_X_SESSION_ID' => 'i',
             'HTTP_ACCEPT' => 'application/json',
         ]);
 
         $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
 
-        expect($headers['x-auth-token'])->toBe(['[REDACTED]'])
-            ->and($headers['x-api-key'])->toBe(['[REDACTED]'])
+        expect($headers['x-api-key'])->toBe(['[REDACTED]'])
+            ->and($headers['x-csrf-token'])->toBe(['[REDACTED]'])
+            ->and($headers['x-client-secret'])->toBe(['[REDACTED]'])
+            ->and($headers['x-password'])->toBe(['[REDACTED]'])
+            ->and($headers['x-session-id'])->toBe(['[REDACTED]'])
             ->and($headers['accept'])->toBe(['application/json']);
     });
 
@@ -291,14 +299,16 @@ describe('request redaction', function () {
             ->and($headers['cookie'])->toBe(['[REDACTED]']);
     });
 
-    it('matches configured sensitive keys ignoring case', function () {
+    it('replaces the default sensitive keys with configured ones, ignoring case', function () {
+        // Replacing (not merging) is the escape hatch for default false positives:
+        // the default 'token' would otherwise redact prompt_tokens.
         config(['logscope.context.sensitive_keys' => ['PIN']]);
-        $request = Request::create('/', 'POST', ['pin' => '1234', 'email' => 'bob@example.com']);
+        $request = Request::create('/', 'POST', ['pin' => '1234', 'prompt_tokens' => '150']);
 
         $input = (new ContextSanitizer)->sanitize(['request' => $request])['request']['input'];
 
         expect($input['pin'])->toBe('[REDACTED]')
-            ->and($input['email'])->toBe('bob@example.com');
+            ->and($input['prompt_tokens'])->toBe('150');
     });
 });
 
