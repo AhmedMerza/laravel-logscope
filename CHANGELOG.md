@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A log fired after container teardown no longer crashes the process** (#36). A `Logger` resolved before teardown still dispatches `MessageLogged`, so logging through it afterwards (e.g. from a `register_shutdown_function` in a test suite) ran LogScope's listener with no container. Its ignore-config check called `config()` outside the listener's `try`, threw `Target class [config] does not exist`, and exited a passing suite with code 255. That check now skips the log when config can't be read. With no container, the entry couldn't be written anyway.
+
 ## [1.8.0] — 2026-09-13
 
 ### Security

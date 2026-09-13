@@ -146,8 +146,24 @@ class LogCapture
 
     /**
      * Check if this log should be ignored based on config settings.
+     *
+     * Runs outside handleLogEvent()'s try, so it must not throw. A logger
+     * held across container teardown can still dispatch MessageLogged into
+     * this listener (e.g. from a shutdown function); config() then throws
+     * "Target class [config] does not exist". The entry couldn't be written
+     * with no container anyway, so skip it quietly rather than crash the
+     * process.
      */
     protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
+    {
+        try {
+            return $this->matchesIgnoreConfig($event, $channel);
+        } catch (Throwable) {
+            return true;
+        }
+    }
+
+    protected function matchesIgnoreConfig(MessageLogged $event, ?string $channel): bool
     {
         // Check if we should ignore deprecation messages.
         //
