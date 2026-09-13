@@ -397,8 +397,10 @@ return [
     |                    will be replaced with [REDACTED].
     |                    Set to [] to use defaults, or provide your own list.
     |
-    | 'sensitive_headers' - Request headers that should be redacted.
-    |                       Set to [] to use defaults, or provide your own list.
+    | 'sensitive_headers' - Request header name fragments that should be redacted.
+    |                       Headers containing these strings (case-insensitive)
+    |                       will be replaced with [REDACTED].
+    |                       Entries are added to the defaults, never replace them.
     |
     */
 
@@ -411,8 +413,7 @@ return [
         //           apikey, authorization, credit_card, card_number, cvv, ssn
         'sensitive_keys' => [],
 
-        // Set to [] to use defaults, or provide your own list to override
-        // Defaults: authorization, cookie, x-csrf-token, x-xsrf-token
+        // Added to the defaults: auth, cookie, token, key, secret, password, session
         'sensitive_headers' => [],
     ],
 

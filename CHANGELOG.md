@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **HTTP Basic auth passwords are no longer stored when a `Request` is logged** (#34). Symfony copies Basic auth credentials into the header bag as `php-auth-user` / `php-auth-pw`. Header redaction matched exact names and `php-auth-pw` wasn't one of them, so `Log::info('…', ['request' => $request])` on a Basic-auth request stored the password in plaintext. **Rows written before this release may contain it** — search log context for `php-auth-pw` and prune those entries.
+
+### Changed
+
+- **Sensitive headers match by name fragment and add to the defaults** (#34). The defaults are now `auth`, `cookie`, `token`, `key`, `secret`, `password` and `session`, matched anywhere in the header name, so custom credential headers like `x-auth-token` and `x-api-key` are redacted without configuration. Entries in `context.sensitive_headers` are added to the defaults instead of replacing them. Harmless headers that contain a fragment (e.g. `x-idempotency-key`) are now redacted too.
+
+### Fixed
+
+- **Custom `sensitive_keys` and `sensitive_headers` entries match regardless of case** (#34). Only the incoming name was lowercased, so an entry like `'API_KEY'` or `'X-Api-Key'` never matched. `sensitive_keys` still replaces the defaults, so a false positive such as `token` → `prompt_tokens` can be dropped.
+
 ## [1.7.1] — 2026-05-20
 
 ### Fixed

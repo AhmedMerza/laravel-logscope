@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
 use LogScope\Services\ContextSanitizer;
 
 enum TestBackedEnum: string
@@ -253,6 +254,51 @@ describe('sanitize', function () {
             ->and($result['error']['_type'])->toBe('exception')
             ->and($result['user']['_type'])->toBe('object')
             ->and($result['user']['class'])->toBe('stdClass');
+    });
+});
+
+describe('request redaction', function () {
+    it('redacts the Basic auth password Symfony copies into php-auth-pw', function () {
+        $request = Request::create('/', server: ['HTTP_AUTHORIZATION' => 'Basic '.base64_encode('bob:hunter2')]);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['php-auth-pw'])->toBe(['[REDACTED]'])
+            ->and($headers['authorization'])->toBe(['[REDACTED]']);
+    });
+
+    it('redacts custom credential headers by name fragment', function () {
+        $request = Request::create('/', server: [
+            'HTTP_X_AUTH_TOKEN' => 't',
+            'HTTP_X_API_KEY' => 'k',
+            'HTTP_ACCEPT' => 'application/json',
+        ]);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['x-auth-token'])->toBe(['[REDACTED]'])
+            ->and($headers['x-api-key'])->toBe(['[REDACTED]'])
+            ->and($headers['accept'])->toBe(['application/json']);
+    });
+
+    it('adds configured sensitive headers to the defaults, ignoring case', function () {
+        config(['logscope.context.sensitive_headers' => ['X-Tenant']]);
+        $request = Request::create('/', server: ['HTTP_X_TENANT' => 'acme', 'HTTP_COOKIE' => 'session=abc']);
+
+        $headers = (new ContextSanitizer)->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['x-tenant'])->toBe(['[REDACTED]'])
+            ->and($headers['cookie'])->toBe(['[REDACTED]']);
+    });
+
+    it('matches configured sensitive keys ignoring case', function () {
+        config(['logscope.context.sensitive_keys' => ['PIN']]);
+        $request = Request::create('/', 'POST', ['pin' => '1234', 'email' => 'bob@example.com']);
+
+        $input = (new ContextSanitizer)->sanitize(['request' => $request])['request']['input'];
+
+        expect($input['pin'])->toBe('[REDACTED]')
+            ->and($input['email'])->toBe('bob@example.com');
     });
 });
 

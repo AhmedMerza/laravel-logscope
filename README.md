@@ -721,7 +721,7 @@ Configure in `config/logscope.php`:
     'expand_objects' => true,      // Set false to show [Object: ClassName]
     'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
     'sensitive_keys' => [],        // Empty = use defaults, or provide your own list
-    'sensitive_headers' => [],     // Empty = use defaults, or provide your own list
+    'sensitive_headers' => [],     // Name fragments added to the defaults (auth, cookie, token, key, ...)
 ],
 ```
 
