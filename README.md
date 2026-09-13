@@ -23,7 +23,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v1.7.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.7.1)** — Search NOT toggle is now a true boolean complement (#24): `include + exclude == total` for any input. A stray colon in a phrase no longer fragments your search, and rows with NULL columns no longer disappear from both views.
+**Latest: [v1.8.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v1.8.0)** — Security fix (#34): logging a `Request` no longer stores HTTP Basic auth passwords (`php-auth-pw`) or custom credential headers like `x-auth-token`. Sensitive headers now match by name fragment, and your own `sensitive_headers` entries add to the defaults instead of replacing them. Rows written before this release may already contain `php-auth-pw` — search `context:php-auth-pw` and prune them.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
@@ -721,7 +721,7 @@ Configure in `config/logscope.php`:
     'expand_objects' => true,      // Set false to show [Object: ClassName]
     'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
     'sensitive_keys' => [],        // Empty = use defaults, or provide your own list
-    'sensitive_headers' => [],     // Empty = use defaults, or provide your own list
+    'sensitive_headers' => [],     // Name fragments added to the defaults (auth, cookie, token, key, ...)
 ],
 ```
 

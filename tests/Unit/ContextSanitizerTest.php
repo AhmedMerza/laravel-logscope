@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
 use LogScope\Services\ContextSanitizer;
 
 enum TestBackedEnum: string
@@ -253,6 +254,61 @@ describe('sanitize', function () {
             ->and($result['error']['_type'])->toBe('exception')
             ->and($result['user']['_type'])->toBe('object')
             ->and($result['user']['class'])->toBe('stdClass');
+    });
+});
+
+describe('request redaction', function () {
+    it('redacts the Basic auth password Symfony copies into php-auth-pw', function () {
+        $request = Request::create('/', server: ['HTTP_AUTHORIZATION' => 'Basic '.base64_encode('bob:hunter2')]);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['php-auth-pw'])->toBe(['[REDACTED]'])
+            ->and($headers['authorization'])->toBe(['[REDACTED]']);
+    });
+
+    it('redacts custom credential headers by name fragment', function () {
+        // Each header contains exactly one default fragment, so dropping any
+        // fragment from the defaults fails this test.
+        $request = Request::create('/', server: [
+            'HTTP_X_API_KEY' => 'k',
+            'HTTP_X_CSRF_TOKEN' => 't',
+            'HTTP_X_CLIENT_SECRET' => 's',
+            'HTTP_X_PASSWORD' => 'p',
+            'HTTP_X_SESSION_ID' => 'i',
+            'HTTP_ACCEPT' => 'application/json',
+        ]);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['x-api-key'])->toBe(['[REDACTED]'])
+            ->and($headers['x-csrf-token'])->toBe(['[REDACTED]'])
+            ->and($headers['x-client-secret'])->toBe(['[REDACTED]'])
+            ->and($headers['x-password'])->toBe(['[REDACTED]'])
+            ->and($headers['x-session-id'])->toBe(['[REDACTED]'])
+            ->and($headers['accept'])->toBe(['application/json']);
+    });
+
+    it('adds configured sensitive headers to the defaults, ignoring case', function () {
+        config(['logscope.context.sensitive_headers' => ['X-Tenant']]);
+        $request = Request::create('/', server: ['HTTP_X_TENANT' => 'acme', 'HTTP_COOKIE' => 'session=abc']);
+
+        $headers = (new ContextSanitizer)->sanitize(['request' => $request])['request']['headers'];
+
+        expect($headers['x-tenant'])->toBe(['[REDACTED]'])
+            ->and($headers['cookie'])->toBe(['[REDACTED]']);
+    });
+
+    it('replaces the default sensitive keys with configured ones, ignoring case', function () {
+        // Replacing (not merging) is the escape hatch for default false positives:
+        // the default 'token' would otherwise redact prompt_tokens.
+        config(['logscope.context.sensitive_keys' => ['PIN']]);
+        $request = Request::create('/', 'POST', ['pin' => '1234', 'prompt_tokens' => '150']);
+
+        $input = (new ContextSanitizer)->sanitize(['request' => $request])['request']['input'];
+
+        expect($input['pin'])->toBe('[REDACTED]')
+            ->and($input['prompt_tokens'])->toBe('150');
     });
 });
 

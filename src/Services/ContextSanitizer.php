@@ -7,6 +7,7 @@ namespace LogScope\Services;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use JsonSerializable;
 use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\Contracts\ContextSanitizerInterface;
@@ -57,13 +58,19 @@ class ContextSanitizer implements ContextSanitizerInterface
     ];
 
     /**
-     * Default sensitive headers.
+     * Default sensitive header name fragments.
+     *
+     * Matched anywhere in the header name, so custom headers (x-auth-token,
+     * x-api-key) and Symfony's php-auth-pw are covered without listing them.
      */
     protected const DEFAULT_SENSITIVE_HEADERS = [
-        'authorization',
+        'auth',
         'cookie',
-        'x-csrf-token',
-        'x-xsrf-token',
+        'token',
+        'key',
+        'secret',
+        'password',
+        'session',
     ];
 
     public function __construct()
@@ -75,8 +82,11 @@ class ContextSanitizer implements ContextSanitizerInterface
         $configKeys = config('logscope.context.sensitive_keys', []);
         $this->sensitiveKeys = ! empty($configKeys) ? $configKeys : self::DEFAULT_SENSITIVE_KEYS;
 
-        $configHeaders = config('logscope.context.sensitive_headers', []);
-        $this->sensitiveHeaders = ! empty($configHeaders) ? $configHeaders : self::DEFAULT_SENSITIVE_HEADERS;
+        // Headers add to the defaults rather than replacing them: keys can be
+        // replaced to escape false positives (token → prompt_tokens), but no
+        // header is worth losing authorization/cookie redaction over.
+        $configHeaders = (array) config('logscope.context.sensitive_headers', []);
+        $this->sensitiveHeaders = [...self::DEFAULT_SENSITIVE_HEADERS, ...$configHeaders];
     }
 
     /**
@@ -238,8 +248,7 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         $result = [];
         foreach ($data as $key => $value) {
-            $lowerKey = strtolower((string) $key);
-            if ($this->isSensitiveKey($lowerKey)) {
+            if ($this->isSensitiveKey((string) $key)) {
                 $result[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $result[$key] = $this->redactSensitive($value);
@@ -256,13 +265,7 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     protected function isSensitiveKey(string $key): bool
     {
-        foreach ($this->sensitiveKeys as $sensitive) {
-            if (str_contains($key, $sensitive)) {
-                return true;
-            }
-        }
-
-        return false;
+        return Str::contains($key, $this->sensitiveKeys, ignoreCase: true);
     }
 
     /**
@@ -273,8 +276,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         $result = [];
 
         foreach ($headers as $name => $values) {
-            $lowerName = strtolower($name);
-            if (in_array($lowerName, $this->sensitiveHeaders, true)) {
+            if (Str::contains($name, $this->sensitiveHeaders, ignoreCase: true)) {
                 $result[$name] = ['[REDACTED]'];
             } else {
                 $result[$name] = $values;
