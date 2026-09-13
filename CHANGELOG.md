@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-09-13
+
 ### Security
 
 - **HTTP Basic auth passwords are no longer stored when a `Request` is logged** (#34). Symfony copies Basic auth credentials into the header bag as `php-auth-user` / `php-auth-pw`. Header redaction matched exact names and `php-auth-pw` wasn't one of them, so `Log::info('…', ['request' => $request])` on a Basic-auth request stored the password in plaintext. **Rows written before this release may contain it** — search log context for `php-auth-pw` and prune those entries.
