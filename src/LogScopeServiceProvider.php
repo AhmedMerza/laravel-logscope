@@ -307,6 +307,14 @@ class LogScopeServiceProvider extends ServiceProvider
      * - Octane RequestTerminated: independent flush trigger that survives
      *   even if Laravel's terminate callback chain is broken. Octane is an
      *   optional peer — only registers if installed.
+     * - Queue Looping: fires before a worker takes each job, and on every
+     *   poll while idle, so a daemon flushes a job's logs once it finishes
+     *   instead of when the worker exits (#28).
+     * - Queue WorkerStopping: fires before a timed-out job makes the worker
+     *   SIGKILL itself, which skips the shutdown function — the only chance
+     *   to write the logs of the job that hung. If it hung inside a database
+     *   transaction, the insert joins that transaction and the kill rolls it
+     *   back; skipping the flush would lose the logs just the same.
      *
      * Note on cost: we register unconditionally regardless of write_mode.
      * In sync/queue modes the buffer is always empty, so flushStatic
@@ -348,6 +356,18 @@ class LogScopeServiceProvider extends ServiceProvider
         if (class_exists(\Laravel\Octane\Events\RequestTerminated::class)) {
             $this->app['events']->listen(
                 \Laravel\Octane\Events\RequestTerminated::class,
+                $flushSafely
+            );
+        }
+
+        // Looping is dispatched with events->until(), so a listener returning
+        // false would pause the worker — $flushSafely returns null.
+        if (class_exists(\Illuminate\Queue\Events\Looping::class)) {
+            $this->app['events']->listen(
+                [
+                    \Illuminate\Queue\Events\Looping::class,
+                    \Illuminate\Queue\Events\WorkerStopping::class,
+                ],
                 $flushSafely
             );
         }

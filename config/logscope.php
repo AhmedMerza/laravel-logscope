@@ -316,6 +316,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Batch Limits
+    |--------------------------------------------------------------------------
+    |
+    | When write_mode is 'batch', the buffer is also written before the
+    | process ends once it holds 'max_entries' logs, or once its oldest log
+    | is 'max_age' seconds old. This keeps long-running artisan commands
+    | from holding their logs in memory until they exit. Queue workers
+    | also flush after every job. Set either limit to 0 to disable it.
+    |
+    | Neither limit flushes inside an open database transaction, so a
+    | rollback can't discard buffered logs.
+    |
+    */
+
+    'batch' => [
+        'max_entries' => env('LOGSCOPE_BATCH_MAX_ENTRIES', 500),
+        'max_age' => env('LOGSCOPE_BATCH_MAX_AGE', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Configuration
     |--------------------------------------------------------------------------
     |

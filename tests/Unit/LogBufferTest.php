@@ -173,6 +173,9 @@ describe('flushStatic', function () {
             $table->timestamp('created_at')->nullable();
         });
 
+        // Keep all 501 entries for one flush, so the second chunk fails within it.
+        config(['logscope.batch.max_entries' => 0, 'logscope.batch.max_age' => 0]);
+
         $buffer = new LogBuffer(app());
 
         for ($i = 0; $i < 500; $i++) {
@@ -193,5 +196,78 @@ describe('flushStatic', function () {
 
         expect($count)->toBe(500);
         expect(LogBuffer::getBuffer())->toBe([]);
+    });
+});
+
+describe('early flush (#28)', function () {
+    beforeEach(function () {
+        $this->artisan('migrate');
+        config(['logscope.batch.max_entries' => 0, 'logscope.batch.max_age' => 0]);
+    });
+
+    $entry = fn (string $message) => ['level' => 'info', 'message' => $message];
+    $stored = fn () => DB::table(config('logscope.table', 'log_entries'))->count();
+
+    it('flushes once the buffer reaches max_entries', function () use ($entry, $stored) {
+        config(['logscope.batch.max_entries' => 3]);
+        $buffer = new LogBuffer(app());
+
+        $buffer->add($entry('one'));
+        $buffer->add($entry('two'));
+
+        expect($stored())->toBe(0)
+            ->and(LogBuffer::getBuffer())->toHaveCount(2);
+
+        $buffer->add($entry('three'));
+
+        expect($stored())->toBe(3)
+            ->and(LogBuffer::getBuffer())->toBe([]);
+    });
+
+    it('flushes once the oldest entry reaches max_age', function () use ($entry, $stored) {
+        config(['logscope.batch.max_age' => 10]);
+        $buffer = new LogBuffer(app());
+
+        $buffer->add($entry('first'));
+        $this->travel(9)->seconds();
+        $buffer->add($entry('second'));
+
+        expect($stored())->toBe(0);
+
+        $this->travel(1)->seconds();
+        $buffer->add($entry('third'));
+
+        expect($stored())->toBe(3)
+            ->and(LogBuffer::getBuffer())->toBe([]);
+    });
+
+    it('keeps buffering for the life of the process when both limits are 0', function () use ($entry, $stored) {
+        $buffer = new LogBuffer(app());
+
+        for ($i = 0; $i < 600; $i++) {
+            $buffer->add($entry("entry {$i}"));
+        }
+        $this->travel(1)->hours();
+        $buffer->add($entry('late'));
+
+        expect($stored())->toBe(0)
+            ->and(LogBuffer::getBuffer())->toHaveCount(601);
+    });
+
+    it('does not flush inside a transaction, so a rollback keeps the logs', function () use ($entry, $stored) {
+        config(['logscope.batch.max_entries' => 2]);
+        $buffer = new LogBuffer(app());
+
+        DB::beginTransaction();
+        $buffer->add($entry('one'));
+        $buffer->add($entry('two'));
+        DB::rollBack();
+
+        expect(LogBuffer::getBuffer())->toHaveCount(2);
+
+        $buffer->add($entry('after rollback'));
+
+        expect($stored())->toBe(3)
+            ->and(LogBuffer::getBuffer())->toBe([]);
     });
 });
