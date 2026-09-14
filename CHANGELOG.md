@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`user_id` is now a string column, and the API returns it as a string** (#26). Run `php artisan migrate`. The migration keeps logging running on large tables: it swaps in the new column in one statement, builds its indexes online, copies existing ids across in batches of 1,000, then drops the old column. On 1M rows it took about two minutes on MySQL 8 and Postgres 16, and no log insert waited longer than 102 ms (a plain type change blocked inserts for 48 s). Older logs show no user id until the copy reaches them. If a run is interrupted, running `migrate` again resumes it. If you published the migrations with the `logscope-migrations` tag, publish again to get the new one. Integer ids keep working until the migration runs. Laravel 10 may need `doctrine/dbal` installed for it.
+
 ### Fixed
+
+- **Logs are no longer lost when the logged-in user's id isn't an integer** (#26). `user_id` was an unsigned big integer, so under MySQL strict mode a UUID/ULID key or an id like `admin_1` failed the insert. In batch mode that lost every log in the flushed chunk, and the fallback rows meant to surface the failure in the UI carried the same id and failed too. Both capture modes (`all` and `channel`) now store the id as a string. An id that can't be stored (longer than 255 characters, or not an integer, string or `Stringable`) is saved as `null` so the log itself is kept.
 
 - **A log fired after container teardown no longer crashes the process** (#36). A `Logger` resolved before teardown still dispatches `MessageLogged`, so logging through it afterwards (e.g. from a `register_shutdown_function` in a test suite) ran LogScope's listener with no container. Its ignore-config check called `config()` outside the listener's `try`, threw `Target class [config] does not exist`, and exited a passing suite with code 255. That check now skips the log when config can't be read (with no container, the entry couldn't be written anyway) and reports it to `error_log` as `LogScope[ignore-check]: Failed to write log entry: …`. Reports are deduped, so a teardown adds one line per process, not one per late log.
 

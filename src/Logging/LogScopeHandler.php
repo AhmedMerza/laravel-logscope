@@ -75,7 +75,7 @@ class LogScopeHandler extends AbstractProcessingHandler
             $userId = null;
             $customContext = [];
             if (app()->bound('request')) {
-                $userId = request()->user()?->id;
+                $userId = LogEntry::normalizeUserId(request()->user()?->id);
                 $customContext = LogScope::getCapturedContext(request());
             }
 

@@ -181,8 +181,10 @@ class LogEntry extends Model
             return $query;
         }
 
+        // Compare as a string: user_id is a string column, and an integer
+        // binding makes MySQL cast every row, skipping the index.
         if (ctype_digit($userId)) {
-            return $query->where('user_id', (int) $userId);
+            return $query->where('user_id', $userId);
         }
 
         return $query->where('user_id', 'like', $userId.'%');
@@ -436,6 +438,25 @@ class LogEntry extends Model
         $attributes['created_at'] = $timestamp;
 
         return $attributes;
+    }
+
+    /**
+     * Normalize an authenticated user's id for the user_id column (#26).
+     * Integer, string and Stringable ids (e.g. UUID objects) are stored as
+     * strings. Anything else, or an id too long for the column, becomes null:
+     * one unstorable value fails the insert and, in batch mode, loses every
+     * log in the chunk. A truncated id could match a different user, so it
+     * isn't truncated.
+     */
+    public static function normalizeUserId(mixed $id): ?string
+    {
+        if (! is_int($id) && ! is_string($id) && ! $id instanceof \Stringable) {
+            return null;
+        }
+
+        $id = (string) $id;
+
+        return $id === '' || mb_strlen($id) > 255 ? null : $id;
     }
 
     /**
