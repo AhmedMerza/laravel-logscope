@@ -214,8 +214,9 @@ class LogBuffer implements LogBufferInterface
         foreach (array_chunk($logsToFlush, 500) as $originalChunk) {
             try {
                 $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $originalChunk);
-                LogEntry::insert(self::normalizeChunk($rows));
+                TransactionSavepoint::around(fn () => LogEntry::insert(self::normalizeChunk($rows)));
             } catch (Throwable $e) {
+                TransactionSavepoint::rethrowIfLost($e);
                 WriteFailureLogger::report($e, 'buffer-flush');
                 self::writeFallbackForChunk($originalChunk, $e);
             }

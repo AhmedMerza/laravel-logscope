@@ -44,7 +44,7 @@ class LogWriter implements LogWriterInterface
      */
     protected function writeSync(array $data): void
     {
-        LogEntry::createEntry($data);
+        TransactionSavepoint::around(fn () => LogEntry::createEntry($data));
     }
 
     /**
@@ -52,7 +52,12 @@ class LogWriter implements LogWriterInterface
      */
     protected function writeQueue(array $data): void
     {
-        WriteLogEntry::dispatch($data);
+        // The database queue driver inserts the job on the app's connection.
+        // Not an arrow function: PendingDispatch only pushes the job when it
+        // is destroyed, which must happen inside the savepoint.
+        TransactionSavepoint::around(function () use ($data) {
+            WriteLogEntry::dispatch($data);
+        });
     }
 
     /**

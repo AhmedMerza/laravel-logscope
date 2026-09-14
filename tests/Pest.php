@@ -14,7 +14,9 @@
 use LogScope\Tests\AutoScheduleEnabledTestCase;
 use LogScope\Tests\EagerProviderTestCase;
 use LogScope\Tests\TestCase;
+use LogScope\Tests\TransactionTestCase;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
+pest()->extend(TransactionTestCase::class)->in('Transactions');
 pest()->extend(EagerProviderTestCase::class)->in('EagerProvider');
 pest()->extend(AutoScheduleEnabledTestCase::class)->in('AutoSchedule');
