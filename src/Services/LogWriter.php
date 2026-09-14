@@ -44,7 +44,7 @@ class LogWriter implements LogWriterInterface
      */
     protected function writeSync(array $data): void
     {
-        LogEntry::createEntry($data);
+        TransactionSavepoint::around(fn () => LogEntry::createEntry($data));
     }
 
     /**

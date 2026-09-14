@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use LogScope\Models\LogEntry;
 use LogScope\Services\FallbackWriter;
+use LogScope\Services\TransactionSavepoint;
 use LogScope\Services\WriteFailureLogger;
 use LogScope\Services\WriteGuard;
 use Throwable;
@@ -46,8 +47,10 @@ class WriteLogEntry implements ShouldQueue
     public function handle(): void
     {
         try {
-            WriteGuard::during(fn () => LogEntry::createEntry($this->data));
+            WriteGuard::during(fn () => TransactionSavepoint::around(fn () => LogEntry::createEntry($this->data)));
         } catch (Throwable $e) {
+            TransactionSavepoint::rethrowIfLost($e);
+
             // Transient DB conditions (connection failures, deadlocks) are
             // exactly what queue retries exist for — let Laravel re-run the
             // job. No fallback row in this branch: if the retry succeeds
@@ -65,7 +68,8 @@ class WriteLogEntry implements ShouldQueue
 
             try {
                 app(FallbackWriter::class)->record($this->data, $e, 'queue-worker');
-            } catch (Throwable) {
+            } catch (Throwable $fallbackError) {
+                TransactionSavepoint::rethrowIfLost($fallbackError);
                 // last-resort: error_log already covered observability
             }
         }

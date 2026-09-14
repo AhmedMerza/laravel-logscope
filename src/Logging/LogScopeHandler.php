@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Context;
 use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\TransactionSavepoint;
 use LogScope\Services\WriteGuard;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
@@ -79,7 +80,7 @@ class LogScopeHandler extends AbstractProcessingHandler
                 $customContext = LogScope::getCapturedContext(request());
             }
 
-            LogEntry::createEntry([
+            TransactionSavepoint::around(fn () => LogEntry::createEntry([
                 'level' => strtolower($record->level->name),
                 'message' => $record->message,
                 'context' => $this->sanitizeContext(array_merge($record->context, $customContext)),
@@ -93,8 +94,10 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'http_method' => $requestContext['http_method'] ?? null,
                 'url' => $requestContext['url'] ?? null,
                 'occurred_at' => $record->datetime,
-            ]);
+            ]));
         } catch (Throwable $e) {
+            TransactionSavepoint::rethrowIfLost($e);
+
             // Don't break the calling application, but always surface the
             // failure to PHP's error log. Hiding it behind APP_DEBUG meant
             // production DB outages caused silent total log loss with zero
@@ -139,11 +142,14 @@ class LogScopeHandler extends AbstractProcessingHandler
             return;
         }
 
-        // Simple check - if the query fails, the table doesn't exist
+        // Simple check - if the query fails, the table doesn't exist. It runs
+        // inside the app's transaction too, so it needs the savepoint as well.
         try {
-            LogEntry::query()->limit(1)->count();
+            TransactionSavepoint::around(fn () => LogEntry::query()->limit(1)->count());
             $this->initialized = true;
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            TransactionSavepoint::rethrowIfLost($e);
+
             throw new \RuntimeException('LogScope tables not migrated. Run: php artisan migrate');
         }
     }
