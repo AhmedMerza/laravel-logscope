@@ -151,14 +151,18 @@ class LogCapture
      * held across container teardown can still dispatch MessageLogged into
      * this listener (e.g. from a shutdown function); config() then throws
      * "Target class [config] does not exist". The entry couldn't be written
-     * with no container anyway, so skip it quietly rather than crash the
-     * process.
+     * with no container anyway, so skip it rather than crash the process —
+     * but still report it, like every other failure on the capture path.
+     * WriteFailureLogger needs no container and dedupes by throw site, so a
+     * teardown costs one error_log line per process, not one per late log.
      */
     protected function shouldIgnoreLog(MessageLogged $event, ?string $channel): bool
     {
         try {
             return $this->matchesIgnoreConfig($event, $channel);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            WriteFailureLogger::report($e, 'ignore-check');
+
             return true;
         }
     }
