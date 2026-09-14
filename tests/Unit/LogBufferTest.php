@@ -174,7 +174,7 @@ describe('flushStatic', function () {
         });
 
         // Keep all 501 entries for one flush, so the second chunk fails within it.
-        config(['logscope.batch.max_entries' => 0]);
+        config(['logscope.batch.max_entries' => 0, 'logscope.batch.max_age' => 0]);
 
         $buffer = new LogBuffer(app());
 

@@ -312,7 +312,9 @@ class LogScopeServiceProvider extends ServiceProvider
      *   instead of when the worker exits (#28).
      * - Queue WorkerStopping: fires before a timed-out job makes the worker
      *   SIGKILL itself, which skips the shutdown function — the only chance
-     *   to write the logs of the job that hung.
+     *   to write the logs of the job that hung. If it hung inside a database
+     *   transaction, the insert joins that transaction and the kill rolls it
+     *   back; skipping the flush would lose the logs just the same.
      *
      * Note on cost: we register unconditionally regardless of write_mode.
      * In sync/queue modes the buffer is always empty, so flushStatic

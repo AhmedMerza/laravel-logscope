@@ -97,8 +97,9 @@ class LogBuffer implements LogBufferInterface
      */
     private static function shouldFlushEarly(int $now): bool
     {
-        $maxEntries = (int) config('logscope.batch.max_entries', 500);
-        $maxAge = (int) config('logscope.batch.max_age', 10);
+        $batch = config('logscope.batch', []);
+        $maxEntries = (int) ($batch['max_entries'] ?? 500);
+        $maxAge = (int) ($batch['max_age'] ?? 10);
 
         $full = $maxEntries > 0 && count(self::$buffer) >= $maxEntries;
         $stale = $maxAge > 0 && $now - self::$bufferStartedAt >= $maxAge;
