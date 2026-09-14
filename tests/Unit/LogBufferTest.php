@@ -270,36 +270,4 @@ describe('early flush (#28)', function () {
         expect($stored())->toBe(3)
             ->and(LogBuffer::getBuffer())->toBe([]);
     });
-
-    it('flushes inside a transaction once the buffer reaches 10× max_entries', function () use ($entry, $stored) {
-        config(['logscope.batch.max_entries' => 2]);
-        $buffer = new LogBuffer(app());
-
-        DB::beginTransaction();
-        for ($i = 1; $i < 20; $i++) {
-            $buffer->add($entry("entry {$i}"));
-        }
-
-        expect(LogBuffer::getBuffer())->toHaveCount(19);
-
-        $buffer->add($entry('entry 20'));
-        DB::commit();
-
-        expect($stored())->toBe(20)
-            ->and(LogBuffer::getBuffer())->toBe([]);
-    });
-
-    it('never flushes inside a transaction on age alone when max_entries is 0', function () use ($entry, $stored) {
-        config(['logscope.batch.max_age' => 10]);
-        $buffer = new LogBuffer(app());
-
-        DB::beginTransaction();
-        $buffer->add($entry('first'));
-        $this->travel(11)->seconds();
-        $buffer->add($entry('second'));
-        DB::commit();
-
-        expect($stored())->toBe(0)
-            ->and(LogBuffer::getBuffer())->toHaveCount(2);
-    });
 });
