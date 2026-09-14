@@ -154,9 +154,22 @@ return new class extends Migration
     private function createIndexesConcurrently(string $table): void
     {
         foreach ([['user_id'], ['user_id', 'occurred_at']] as $columns) {
+            $name = $this->indexName($table, $columns);
+
+            // An interrupted concurrent build leaves an INVALID index that the
+            // planner never uses, and IF NOT EXISTS would skip past it.
+            $invalid = DB::selectOne(
+                'select not indisvalid as invalid from pg_index where indexrelid = to_regclass(?)',
+                [$name],
+            )?->invalid;
+
+            if ($invalid) {
+                DB::statement("drop index concurrently {$name}");
+            }
+
             DB::statement(sprintf(
                 'create index concurrently if not exists %s on %s (%s)',
-                $this->indexName($table, $columns),
+                $name,
                 DB::getQueryGrammar()->wrapTable($table),
                 implode(', ', $columns),
             ));

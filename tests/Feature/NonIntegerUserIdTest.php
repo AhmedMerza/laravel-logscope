@@ -171,6 +171,7 @@ it('keeps the log but drops a user id the column cannot hold', function (string 
         ->and($entry->user_id)->toBeNull();
 })->with(['listener', 'handler'])->with([
     'too long' => [str_repeat('a', 256)],
+    'empty' => [''],
     'array' => [['id' => 1]],
 ]);
 
