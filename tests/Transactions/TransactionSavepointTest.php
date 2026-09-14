@@ -145,11 +145,47 @@ it('keeps successful writes made inside the transaction', function () {
         ->and(LogEntry::query()->pluck('message')->sort()->values()->all())->toBe(['first', 'second']);
 });
 
-it('rethrows to the app when the write ends its transaction, so DB::transaction retries', function () {
+it('keeps the app transaction when the database queue cannot store the job', function () {
+    // Laravel's default queue driver, with no jobs table to insert into.
+    config(['logscope.write_mode' => 'queue', 'queue.default' => 'database']);
+    Schema::dropIfExists('jobs');
+
+    DB::beginTransaction();
+    DB::table('app_rows')->insert(['note' => 'before']);
+    Log::info('this dispatch fails');
+    DB::table('app_rows')->insert(['note' => 'after']);
+    DB::commit();
+
+    expect(appRowNotes())->toBe(['before', 'after'])
+        ->and(fallbackRowCount())->toBe(1);
+});
+
+it('keeps the app transaction when the failure breadcrumb cannot be cached', function () {
+    // Laravel's default cache store, with no cache table to write into.
+    config(['cache.default' => 'database']);
+    Schema::dropIfExists('cache');
+    failNextLogInsert();
+
+    DB::beginTransaction();
+    DB::table('app_rows')->insert(['note' => 'before']);
+    Log::info('this insert fails, and so does its breadcrumb');
+    DB::table('app_rows')->insert(['note' => 'after']);
+    DB::commit();
+
+    expect(appRowNotes())->toBe(['before', 'after'])
+        ->and(fallbackRowCount())->toBe(1);
+});
+
+it('rethrows to the app when the write ends its transaction, so DB::transaction retries', function (string $path) {
     // Stand-in for a MySQL deadlock: the database ends the whole transaction
-    // during LogScope's insert, and the savepoint goes with it.
-    LogEntry::creating(function () {
-        LogEntry::flushEventListeners();
+    // during LogScope's first insert, and the savepoint goes with it.
+    $ended = false;
+    DB::connection()->beforeExecuting(function (string $query) use (&$ended) {
+        if ($ended || ! str_starts_with($query, 'insert') || ! str_contains($query, 'log_entries')) {
+            return;
+        }
+
+        $ended = true;
         DB::getPdo()->exec('ROLLBACK');
 
         throw new RuntimeException('Deadlock found when trying to get lock; try restarting transaction');
@@ -157,17 +193,45 @@ it('rethrows to the app when the write ends its transaction, so DB::transaction 
 
     $attempts = 0;
 
-    DB::transaction(function () use (&$attempts) {
+    DB::transaction(function () use (&$attempts, $path) {
         $attempts++;
         DB::table('app_rows')->insert(['note' => "attempt {$attempts}"]);
-        Log::info('logged in the transaction');
+        logThrough($path, 'logged in the transaction');
     }, attempts: 2);
 
     expect($attempts)->toBe(2)
         ->and(appRowNotes())->toBe(['attempt 2'])
         ->and(LogEntry::query()->pluck('message')->all())->toBe(['logged in the transaction'])
         ->and(fallbackRowCount())->toBe(0);
-});
+})->with(['listener', 'channel handler', 'queue job', 'batch flush']);
+
+/**
+ * Log one message through a single LogScope write path, all the way to the
+ * database insert.
+ */
+function logThrough(string $path, string $message): void
+{
+    if ($path === 'channel handler') {
+        (new LogScopeHandler)->handle(new LogRecord(new DateTimeImmutable, 'logscope', Level::Info, $message));
+
+        return;
+    }
+
+    config([
+        'logscope.write_mode' => match ($path) {
+            'listener' => 'sync',
+            'queue job' => 'queue',
+            'batch flush' => 'batch',
+        },
+        'queue.default' => 'sync',
+    ]);
+
+    Log::info($message);
+
+    if ($path === 'batch flush') {
+        LogBuffer::flushStatic();
+    }
+}
 
 it('does not throw when the app logs its own failed statement before rolling back', function () {
     DB::table('app_rows')->insert(['id' => 1, 'note' => 'existing']);

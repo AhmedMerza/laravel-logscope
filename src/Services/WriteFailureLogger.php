@@ -198,42 +198,50 @@ class WriteFailureLogger
             $cache = app('cache');
             $ttl = self::resolveBreadcrumbTtl();
 
-            // Increment counter; on first write, also stash first_at so the
-            // UI can show how long the issue has been ongoing.
-            //
-            // Concurrency note: the get-after-increment pattern below isn't
-            // a check-and-set — it's intentional re-stamping. Two concurrent
-            // writers both call increment() (atomic on Redis/DB/array), then
-            // both re-put with the same fresh count. The race outcome is
-            // "both writers store the same correct value", which is fine.
-            // The forever() re-put is only there to defeat increment's
-            // implicit auto-TTL on some cache drivers (older Memcached/file).
-            $isFirst = ! $cache->has(self::CACHE_PREFIX.'count');
-            $cache->increment(self::CACHE_PREFIX.'count');
-            self::cachePutWithTtl(
-                $cache,
-                self::CACHE_PREFIX.'count',
-                (int) $cache->get(self::CACHE_PREFIX.'count', 0),
-                $ttl
-            );
-
-            if ($isFirst) {
-                // Concurrency note: two concurrent first-failures may both
-                // see has() === false and both write first_at. The second
-                // write wins by milliseconds. Eventually-consistent — fine
-                // for a banner that's about gauging severity, not forensics.
-                self::cachePutWithTtl($cache, self::CACHE_PREFIX.'first_at', self::nowIso(), $ttl);
-            }
-
-            self::cachePutWithTtl($cache, self::CACHE_PREFIX.'last', [
-                'class' => get_class($e),
-                'message' => self::truncate($e->getMessage(), self::MAX_MESSAGE_LENGTH),
-                'where' => $where,
-                'at' => self::nowIso(),
-            ], $ttl);
-        } catch (Throwable) {
+            // The database cache store writes on the app's connection, inside
+            // its transaction, so it needs the same savepoint as a log write.
+            TransactionSavepoint::around(fn () => self::writeBreadcrumbEntries($cache, $ttl, $e, $where));
+        } catch (Throwable $cacheError) {
+            TransactionSavepoint::rethrowIfLost($cacheError);
             // best-effort: error_log is the reliable signal
         }
+    }
+
+    private static function writeBreadcrumbEntries(mixed $cache, ?int $ttl, Throwable $e, string $where): void
+    {
+        // Increment counter; on first write, also stash first_at so the
+        // UI can show how long the issue has been ongoing.
+        //
+        // Concurrency note: the get-after-increment pattern below isn't
+        // a check-and-set — it's intentional re-stamping. Two concurrent
+        // writers both call increment() (atomic on Redis/DB/array), then
+        // both re-put with the same fresh count. The race outcome is
+        // "both writers store the same correct value", which is fine.
+        // The forever() re-put is only there to defeat increment's
+        // implicit auto-TTL on some cache drivers (older Memcached/file).
+        $isFirst = ! $cache->has(self::CACHE_PREFIX.'count');
+        $cache->increment(self::CACHE_PREFIX.'count');
+        self::cachePutWithTtl(
+            $cache,
+            self::CACHE_PREFIX.'count',
+            (int) $cache->get(self::CACHE_PREFIX.'count', 0),
+            $ttl
+        );
+
+        if ($isFirst) {
+            // Concurrency note: two concurrent first-failures may both
+            // see has() === false and both write first_at. The second
+            // write wins by milliseconds. Eventually-consistent — fine
+            // for a banner that's about gauging severity, not forensics.
+            self::cachePutWithTtl($cache, self::CACHE_PREFIX.'first_at', self::nowIso(), $ttl);
+        }
+
+        self::cachePutWithTtl($cache, self::CACHE_PREFIX.'last', [
+            'class' => get_class($e),
+            'message' => self::truncate($e->getMessage(), self::MAX_MESSAGE_LENGTH),
+            'where' => $where,
+            'at' => self::nowIso(),
+        ], $ttl);
     }
 
     /**
