@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use LogScope\Logging\ChannelContextProcessor;
@@ -81,4 +83,28 @@ it('registers the Octane RequestTerminated listener when Octane is installed', f
     }
 
     expect($this->app['events']->hasListeners(\Laravel\Octane\Events\RequestTerminated::class))->toBeTrue();
+});
+
+it('flushes the buffer each time a queue worker loops, without pausing the worker (#28)', function () {
+    Log::error('logged by a job');
+
+    expect(LogBuffer::getBuffer())->toHaveCount(1);
+
+    // Worker::daemonShouldRun() pauses the worker if this returns false.
+    $response = $this->app['events']->until(new Looping('database', 'default'));
+
+    expect($response)->toBeNull()
+        ->and(LogEntry::where('message', 'logged by a job')->count())->toBe(1)
+        ->and(LogBuffer::getBuffer())->toBeEmpty();
+});
+
+it('flushes the buffer when a queue worker stops, before a job timeout SIGKILLs it (#28)', function () {
+    Log::error('logged by a job that timed out');
+
+    // Worker::kill() dispatches this, then SIGKILLs the process — the
+    // shutdown function never runs.
+    event(new WorkerStopping(1));
+
+    expect(LogEntry::where('message', 'logged by a job that timed out')->count())->toBe(1)
+        ->and(LogBuffer::getBuffer())->toBeEmpty();
 });

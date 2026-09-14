@@ -152,6 +152,8 @@ Batch mode (`LOGSCOPE_WRITE_MODE=batch`, default) accumulates logs during the re
 - OOM kill: same
 - `E_PARSE` / `E_COMPILE_ERROR`: PHP can't run user code at shutdown for these
 
+What's at risk is what's still in the buffer. The buffer is also written once it holds 500 logs or its oldest log is 10 seconds old (see [Write Mode](#write-mode-performance)), and queue workers flush after every job, so a long-running artisan command or worker loses at most that much, not everything it logged since it started. Neither limit flushes inside an open database transaction, so a crash during a long transaction can still lose more.
+
 **If low-loss is critical**, set `LOGSCOPE_WRITE_MODE=sync` to write every log immediately. Cost: each `Log::*()` call adds a synchronous DB round-trip.
 
 ### 5. `null_channel` filter — read before enabling
@@ -196,6 +198,12 @@ LOGSCOPE_CAPTURE=all
 # 'sync' - Write immediately (simple, but slower)
 # 'queue' - Queue each log entry (best for high-traffic)
 LOGSCOPE_WRITE_MODE=batch
+
+# Batch mode also writes early, so long-running commands don't hold logs
+# until they exit: once 500 logs are buffered, or the oldest is 10 seconds
+# old. Queue workers also flush after every job. 0 disables a limit.
+LOGSCOPE_BATCH_MAX_ENTRIES=500
+LOGSCOPE_BATCH_MAX_AGE=10
 
 # Queue settings (when using 'queue' mode)
 LOGSCOPE_QUEUE=default

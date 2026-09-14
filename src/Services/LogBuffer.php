@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Services;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Carbon;
 use LogScope\Contracts\LogBufferInterface;
 use LogScope\Models\LogEntry;
 use Throwable;
@@ -13,7 +14,8 @@ use Throwable;
  * Manages buffered log writes for batch mode.
  *
  * Handles accumulating logs during request lifecycle and flushing
- * them at the end via terminating callback and shutdown function.
+ * them at the end via terminating callback and shutdown function,
+ * or earlier once the buffer hits its size or age limit.
  */
 class LogBuffer implements LogBufferInterface
 {
@@ -21,6 +23,11 @@ class LogBuffer implements LogBufferInterface
      * Buffer for batch write mode.
      */
     protected static array $buffer = [];
+
+    /**
+     * Unix timestamp of the oldest entry in the buffer.
+     */
+    protected static int $bufferStartedAt = 0;
 
     /**
      * Cached config limits so flushStatic() works after container teardown.
@@ -62,7 +69,42 @@ class LogBuffer implements LogBufferInterface
         // container has been torn down.
         self::$cachedTestingEnv ??= $this->app->environment('testing');
 
+        $now = Carbon::now()->getTimestamp();
+
+        if (self::$buffer === []) {
+            self::$bufferStartedAt = $now;
+        }
+
         self::$buffer[] = $data;
+
+        if (self::shouldFlushEarly($now)) {
+            self::flushStatic();
+        }
+    }
+
+    /**
+     * Whether the buffer should be written before the process ends.
+     *
+     * The terminate and shutdown flushes only fire when the process exits,
+     * so without a bound a long-running artisan command holds every log in
+     * memory until then — invisible to readers and lost on SIGKILL/OOM (#28).
+     * A web request rarely reaches either limit, so it still flushes once.
+     *
+     * Never flushes inside an open transaction: the insert would share the
+     * app's connection and roll back with it, taking the logs that explain
+     * the rollback. The limits stay exceeded, so the next add() after the
+     * transaction ends flushes instead.
+     */
+    private static function shouldFlushEarly(int $now): bool
+    {
+        $maxEntries = (int) config('logscope.batch.max_entries', 500);
+        $maxAge = (int) config('logscope.batch.max_age', 10);
+
+        $full = $maxEntries > 0 && count(self::$buffer) >= $maxEntries;
+        $stale = $maxAge > 0 && $now - self::$bufferStartedAt >= $maxAge;
+
+        return ($full || $stale)
+            && (new LogEntry)->getConnection()->transactionLevel() === 0;
     }
 
     /**
