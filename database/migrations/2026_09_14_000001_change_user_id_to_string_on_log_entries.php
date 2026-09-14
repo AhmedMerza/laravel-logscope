@@ -183,14 +183,19 @@ return new class extends Migration
 
     /**
      * The name Blueprint generates for index($columns), so the indexes match
-     * what the original migration created.
+     * what the original migration created. Blueprint only prefixes index names
+     * when the connection sets prefix_indexes.
      */
     private function indexName(string $table, array $columns): string
     {
-        return str_replace(
-            ['-', '.'],
-            '_',
-            strtolower(Schema::getConnection()->getTablePrefix().$table.'_'.implode('_', $columns).'_index'),
-        );
+        $connection = Schema::getConnection();
+
+        if ($connection->getConfig('prefix_indexes')) {
+            $table = str_contains($table, '.')
+                ? substr_replace($table, '.'.$connection->getTablePrefix(), strrpos($table, '.'), 1)
+                : $connection->getTablePrefix().$table;
+        }
+
+        return str_replace(['-', '.'], '_', strtolower($table.'_'.implode('_', $columns).'_index'));
     }
 };

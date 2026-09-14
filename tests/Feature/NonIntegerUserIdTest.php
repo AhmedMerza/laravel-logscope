@@ -114,6 +114,34 @@ it('resumes a migration that was stopped during the copy', function () {
     expect(LogEntry::query()->orderBy('message')->pluck('user_id')->all())->toBe(['7', '8', 'admin_1']);
 });
 
+it('names indexes the way Laravel does for any table prefix setting', function (string $prefix, ?bool $prefixIndexes) {
+    // The MySQL and Postgres branches name indexes themselves; a mismatch
+    // makes the MySQL index step drop an index that doesn't exist.
+    $default = config('database.default');
+    config([
+        'database.connections.prefix_probe' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => $prefix, 'prefix_indexes' => $prefixIndexes],
+        'database.default' => 'prefix_probe',
+    ]);
+
+    try {
+        Schema::create('log_entries', function (Blueprint $table) {
+            $table->string('user_id')->index();
+        });
+        $laravelName = collect(Schema::getIndexes('log_entries'))->pluck('name')->sole();
+
+        $migration = userIdMigration();
+        expect((new ReflectionMethod($migration, 'indexName'))->invoke($migration, 'log_entries', ['user_id']))
+            ->toBe($laravelName);
+    } finally {
+        config(['database.default' => $default]);
+        DB::purge('prefix_probe');
+    }
+})->with([
+    'no prefix' => ['', true],
+    'prefixed index names' => ['app_', true],
+    'unprefixed index names' => ['app_', false],
+]);
+
 it('stores a non-integer user id as-is', function (string $path) {
     expect(logAsUserWithId($path, 'admin_1')?->user_id)->toBe('admin_1');
     LogEntry::query()->delete();
