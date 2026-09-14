@@ -176,7 +176,7 @@ it('keeps the app transaction when the failure breadcrumb cannot be cached', fun
         ->and(fallbackRowCount())->toBe(1);
 });
 
-it('rethrows to the app when the write ends its transaction, so DB::transaction retries', function (string $path) {
+it('never throws from a log call when the write ends the app transaction', function (string $path) {
     // Stand-in for a MySQL deadlock: the database ends the whole transaction
     // during LogScope's first insert, and the savepoint goes with it.
     $ended = false;
@@ -191,18 +191,13 @@ it('rethrows to the app when the write ends its transaction, so DB::transaction 
         throw new RuntimeException('Deadlock found when trying to get lock; try restarting transaction');
     });
 
-    $attempts = 0;
+    DB::beginTransaction();
+    DB::table('app_rows')->insert(['note' => 'before']);
 
-    DB::transaction(function () use (&$attempts, $path) {
-        $attempts++;
-        DB::table('app_rows')->insert(['note' => "attempt {$attempts}"]);
-        logThrough($path, 'logged in the transaction');
-    }, attempts: 2);
+    expect(fn () => logThrough($path, 'logged in the transaction'))->not->toThrow(Throwable::class)
+        ->and(file_get_contents($this->errorLogFile))->toContain('Failed to write log entry');
 
-    expect($attempts)->toBe(2)
-        ->and(appRowNotes())->toBe(['attempt 2'])
-        ->and(LogEntry::query()->pluck('message')->all())->toBe(['logged in the transaction'])
-        ->and(fallbackRowCount())->toBe(0);
+    DB::rollBack();
 })->with(['listener', 'channel handler', 'queue job', 'batch flush']);
 
 /**
@@ -265,11 +260,13 @@ it('does not throw when the app logs after a deadlock has already ended its tran
     DB::rollBack();
 })->skip(fn () => DB::getDriverName() !== 'mysql', 'Only MySQL ends a transaction on its own');
 
-it('rethrows a real MySQL deadlock on the log insert so DB::transaction retries', function () {
+it('never throws from a log call when a real MySQL deadlock ends the app transaction', function () {
     DB::statement('CREATE TABLE locks (id INT PRIMARY KEY) ENGINE=InnoDB');
     DB::statement('INSERT INTO locks VALUES (1), (2)');
     DB::statement('CREATE TABLE ballast (id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB');
-    DB::unprepared('CREATE TRIGGER log_insert_locks BEFORE INSERT ON log_entries FOR EACH ROW SELECT id INTO @locked FROM locks WHERE id = 2 FOR UPDATE');
+    // Only the insert made while @lock_on_log_insert is set takes the lock, so
+    // the fallback row written after the deadlock goes through.
+    DB::unprepared('CREATE TRIGGER log_insert_locks BEFORE INSERT ON log_entries FOR EACH ROW BEGIN IF @lock_on_log_insert = 1 THEN SET @lock_on_log_insert = 0; SELECT id INTO @locked FROM locks WHERE id = 2 FOR UPDATE; END IF; END');
 
     $config = config('database.connections.mysql');
     $other = new mysqli($config['host'], $config['username'], $config['password'], $config['database'], (int) $config['port']);
@@ -280,36 +277,31 @@ it('rethrows a real MySQL deadlock on the log insert so DB::transaction retries'
     $other->query('INSERT INTO ballast VALUES '.implode(',', array_fill(0, 50, '()')));
     $other->query('SELECT id FROM locks WHERE id = 2 FOR UPDATE');
 
-    $attempts = 0;
-
     // Fail fast instead of InnoDB's 50s default if the test goes wrong.
     DB::statement('SET SESSION innodb_lock_wait_timeout = 5');
 
-    DB::transaction(function () use (&$attempts, $other) {
-        $attempts++;
+    DB::beginTransaction();
+    DB::table('app_rows')->insert(['note' => 'before']);
+    DB::select('SELECT id FROM locks WHERE id = 1 FOR UPDATE');
+    $other->query('SELECT id FROM locks WHERE id = 1 FOR UPDATE', MYSQLI_ASYNC);
+    waitForLockWait();
+    DB::statement('SET @lock_on_log_insert = 1');
 
-        if ($attempts === 1) {
-            DB::table('app_rows')->insert(['note' => 'attempt 1']);
-            DB::select('SELECT id FROM locks WHERE id = 1 FOR UPDATE');
-            $other->query('SELECT id FROM locks WHERE id = 1 FOR UPDATE', MYSQLI_ASYNC);
-            waitForLockWait();
-        } else {
-            // The deadlock let the other session take row 1; finish it so the
-            // retry isn't blocked.
-            $read = [$other];
-            $write = $error = [];
-            mysqli_poll($read, $write, $error, 5);
-            $other->reap_async_query();
-            $other->query('ROLLBACK');
-            DB::table('app_rows')->insert(['note' => 'attempt 2']);
-        }
+    expect(fn () => Log::info('this insert deadlocks'))->not->toThrow(Throwable::class);
 
-        Log::info("logged on attempt {$attempts}");
-    }, attempts: 2);
+    $read = [$other];
+    $write = $error = [];
+    mysqli_poll($read, $write, $error, 5);
+    $other->reap_async_query();
+    $other->query('ROLLBACK');
 
-    expect($attempts)->toBe(2)
-        ->and(appRowNotes())->toBe(['attempt 2'])
-        ->and(LogEntry::query()->pluck('message')->all())->toBe(['logged on attempt 2']);
+    // The known limit: MySQL ended the transaction, so the app's row is gone
+    // and its own commit reports it. LogScope records the failure.
+    expect(fn () => DB::commit())->toThrow(PDOException::class, 'There is no active transaction')
+        ->and(appRowNotes())->toBe([])
+        ->and(fallbackRowCount())->toBe(1);
+
+    DB::rollBack();
 })->skip(fn () => DB::getDriverName() !== 'mysql', 'Needs MySQL');
 
 function waitForLockWait(): void

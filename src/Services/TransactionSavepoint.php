@@ -6,7 +6,6 @@ namespace LogScope\Services;
 
 use LogScope\Models\LogEntry;
 use Throwable;
-use WeakMap;
 
 /**
  * Keeps a failed LogScope write from destroying the app's open transaction (#40).
@@ -23,25 +22,15 @@ use WeakMap;
  * — measured on Postgres, RELEASE costs an extra round trip per write and
  * saves less than that at commit. Laravel doesn't release its savepoints either.
  *
- * When the savepoint can't be restored, the database has already ended the
- * app's transaction (a MySQL deadlock, a lost connection). Swallowing that
- * would let the app keep writing in autocommit mode and fail at commit with
- * "There is no active transaction", its data half committed. So the original
- * error is marked "lost" and every LogScope catch site rethrows it: the app
- * sees the deadlock where it happened, exactly as if its own query had hit it,
- * and DB::transaction($callback, $attempts) retries the closure.
+ * A log call still never throws. The one case a savepoint can't cover is a
+ * database that has already ended the app's transaction — a MySQL deadlock on
+ * the log insert, or a lost connection. Rolling back to the savepoint then
+ * fails too; the original error goes to the caller's catch as usual, and the
+ * app's own commit reports the ended transaction.
  */
 class TransactionSavepoint
 {
     private const NAME = 'logscope';
-
-    /**
-     * Errors that ended the app's transaction. Weak so a long-running worker
-     * doesn't hold every such exception for its lifetime.
-     *
-     * @var WeakMap<Throwable, true>|null
-     */
-    private static ?WeakMap $lost = null;
 
     /**
      * Run a LogScope write, inside a savepoint when a transaction is open.
@@ -61,18 +50,7 @@ class TransactionSavepoint
         }
 
         $pdo = $connection->getPdo();
-
-        // A failure here is an ordinary write failure — e.g. the app's own
-        // statement already aborted its Postgres transaction and it is now
-        // logging that error. LogScope changed nothing, so nothing is lost.
         $pdo->exec($grammar->compileSavepoint(self::NAME));
-
-        // Laravel still counts a transaction the server has already ended —
-        // the app is logging its own MySQL deadlock before rolling back.
-        // SAVEPOINT then succeeds without effect, and the write autocommits.
-        if (! $pdo->inTransaction()) {
-            return $write();
-        }
 
         try {
             return $write();
@@ -80,21 +58,9 @@ class TransactionSavepoint
             try {
                 $pdo->exec($grammar->compileSavepointRollBack(self::NAME));
             } catch (Throwable) {
-                self::$lost ??= new WeakMap;
-                self::$lost[$e] = true;
+                // The transaction is already gone; report the write's own error.
             }
 
-            throw $e;
-        }
-    }
-
-    /**
-     * Rethrow the error if it ended the app's transaction. Call first in every
-     * catch block that would otherwise swallow a LogScope write failure.
-     */
-    public static function rethrowIfLost(Throwable $e): void
-    {
-        if (isset(self::$lost[$e])) {
             throw $e;
         }
     }

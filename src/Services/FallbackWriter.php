@@ -101,8 +101,7 @@ class FallbackWriter
             WriteGuard::during(fn () => TransactionSavepoint::around(
                 fn () => LogEntry::createEntry($this->buildPayload($data, $e, $where, $count))
             ));
-        } catch (Throwable $fallbackError) {
-            TransactionSavepoint::rethrowIfLost($fallbackError);
+        } catch (Throwable) {
             // Last-resort: the failure has already been surfaced to error_log
             // by WriteFailureLogger::report. Don't recurse into another error.
         }

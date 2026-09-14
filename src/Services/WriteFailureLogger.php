@@ -201,8 +201,7 @@ class WriteFailureLogger
             // The database cache store writes on the app's connection, inside
             // its transaction, so it needs the same savepoint as a log write.
             TransactionSavepoint::around(fn () => self::writeBreadcrumbEntries($cache, $ttl, $e, $where));
-        } catch (Throwable $cacheError) {
-            TransactionSavepoint::rethrowIfLost($cacheError);
+        } catch (Throwable) {
             // best-effort: error_log is the reliable signal
         }
     }
