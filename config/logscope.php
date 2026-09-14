@@ -325,8 +325,9 @@ return [
     | from holding their logs in memory until they exit. Queue workers
     | also flush after every job. Set either limit to 0 to disable it.
     |
-    | Neither limit flushes inside an open database transaction, so a
-    | rollback can't discard buffered logs.
+    | Inside an open database transaction the flush waits for it to end, so a
+    | rollback can't discard buffered logs. If the buffer reaches 10 times
+    | 'max_entries' first, it's written anyway to keep memory bounded.
     |
     */
 

@@ -20,6 +20,12 @@ use Throwable;
 class LogBuffer implements LogBufferInterface
 {
     /**
+     * Inside an open transaction, flush anyway once the buffer holds this
+     * many times batch.max_entries — see shouldFlushEarly().
+     */
+    private const TRANSACTION_CAP_FACTOR = 10;
+
+    /**
      * Buffer for batch write mode.
      */
     protected static array $buffer = [];
@@ -90,10 +96,13 @@ class LogBuffer implements LogBufferInterface
      * memory until then — invisible to readers and lost on SIGKILL/OOM (#28).
      * A web request rarely reaches either limit, so it still flushes once.
      *
-     * Never flushes inside an open transaction: the insert would share the
-     * app's connection and roll back with it, taking the logs that explain
-     * the rollback. The limits stay exceeded, so the next add() after the
-     * transaction ends flushes instead.
+     * Inside an open transaction it waits: the insert would share the app's
+     * connection and roll back with it, taking the logs that explain the
+     * rollback. The limits stay exceeded, so the next add() after the
+     * transaction ends flushes instead. A long enough transaction would grow
+     * the buffer without bound, so at TRANSACTION_CAP_FACTOR × max_entries it
+     * flushes anyway — a rollback then deletes those logs, but memory stays
+     * bounded.
      */
     private static function shouldFlushEarly(int $now): bool
     {
@@ -101,11 +110,16 @@ class LogBuffer implements LogBufferInterface
         $maxEntries = (int) ($batch['max_entries'] ?? 500);
         $maxAge = (int) ($batch['max_age'] ?? 10);
 
-        $full = $maxEntries > 0 && count(self::$buffer) >= $maxEntries;
+        $count = count(self::$buffer);
+        $full = $maxEntries > 0 && $count >= $maxEntries;
         $stale = $maxAge > 0 && $now - self::$bufferStartedAt >= $maxAge;
 
-        return ($full || $stale)
-            && (new LogEntry)->getConnection()->transactionLevel() === 0;
+        if (! $full && ! $stale) {
+            return false;
+        }
+
+        return (new LogEntry)->getConnection()->transactionLevel() === 0
+            || ($full && $count >= $maxEntries * self::TRANSACTION_CAP_FACTOR);
     }
 
     /**
