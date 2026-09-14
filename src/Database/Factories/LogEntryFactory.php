@@ -307,7 +307,7 @@ class LogEntryFactory extends Factory
     /**
      * Set the user ID.
      */
-    public function forUser(int $userId): static
+    public function forUser(int|string $userId): static
     {
         return $this->state(fn (array $attributes) => ['user_id' => $userId]);
     }

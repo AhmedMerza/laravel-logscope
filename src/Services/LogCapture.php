@@ -12,6 +12,7 @@ use LogScope\Contracts\LogWriterInterface;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\Logging\LogScopeHandler;
 use LogScope\LogScope;
+use LogScope\Models\LogEntry;
 use Throwable;
 
 /**
@@ -110,7 +111,7 @@ class LogCapture
         $userId = null;
         $customContext = [];
         if (app()->bound('request')) {
-            $userId = request()->user()?->id;
+            $userId = LogEntry::normalizeUserId(request()->user()?->id);
             $customContext = LogScope::getCapturedContext(request());
         }
 
