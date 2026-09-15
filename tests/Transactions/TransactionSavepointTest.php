@@ -26,8 +26,7 @@ use Symfony\Component\Uid\Ulid;
 
 beforeEach(function () {
     // Not RefreshDatabase: its wrapping transaction would hide what the app's
-    // commit really does. Not DatabaseMigrations: its rollback trips over a
-    // package migration's down() (#41).
+    // commit really does.
     Artisan::call('migrate:fresh');
 
     LogScopeServiceProvider::resetBufferState();

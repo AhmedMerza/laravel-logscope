@@ -74,37 +74,15 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
+     *
+     * Intentionally empty (#41). After up() the table is the same whether this
+     * was a new install (up() skipped) or a v0.5 upgrade, so down() can't tell
+     * which to restore. Restoring the v0.5 columns broke rollback on new
+     * installs: 2026_01_22's down() then couldn't find the status index. With
+     * nothing here, 2026_01_22's down() removes the status columns on both.
      */
     public function down(): void
     {
-        $table = config('logscope.table', 'log_entries');
-
-        // Skip if status column doesn't exist
-        if (! Schema::hasColumn($table, 'status')) {
-            return;
-        }
-
-        Schema::table($table, function (Blueprint $table) {
-            // Restore old columns
-            $table->string('environment', 50)->nullable()->index();
-            $table->timestamp('resolved_at')->nullable()->index();
-            $table->string('resolved_by', 255)->nullable();
-
-            // Add back composite index
-            $table->index(['environment', 'level']);
-        });
-
-        // Migrate resolved status back
-        DB::table($table)
-            ->where('status', 'resolved')
-            ->update([
-                'resolved_at' => DB::raw('status_changed_at'),
-                'resolved_by' => DB::raw('status_changed_by'),
-            ]);
-
-        Schema::table($table, function (Blueprint $table) {
-            $table->dropIndex(['status']);
-            $table->dropColumn(['status', 'status_changed_at', 'status_changed_by']);
-        });
+        //
     }
 };
