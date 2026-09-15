@@ -1,0 +1,89 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Laravel 10 isn't tested: the Context facade LogScope uses needs 11.
+          - { php: '8.2', laravel: '11', testbench: '9.*' }
+          - { php: '8.4', laravel: '12', testbench: '10.*' }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-update --no-interaction
+          composer update --prefer-dist --prefer-stable --no-interaction --no-progress
+
+      - run: vendor/bin/pest
+
+  # tests/Transactions and MigrationsTest test engine-specific behaviour, so
+  # they also run on the engines. See TransactionTestCase.
+  databases:
+    name: Postgres 16 / MySQL 8
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: logscope
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: logscope
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -psecret" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: logscope
+      DB_PASSWORD: secret
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pdo_mysql
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --prefer-stable --no-interaction --no-progress
+
+      - name: Postgres
+        run: vendor/bin/pest tests/Transactions tests/Feature/MigrationsTest.php
+        env:
+          LOGSCOPE_TEST_DB: pgsql
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+
+      - name: MySQL
+        if: ${{ !cancelled() }}
+        run: vendor/bin/pest tests/Transactions tests/Feature/MigrationsTest.php
+        env:
+          LOGSCOPE_TEST_DB: mysql
+          DB_PORT: 3306
+          DB_USERNAME: root
