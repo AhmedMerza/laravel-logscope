@@ -49,8 +49,6 @@ class WriteLogEntry implements ShouldQueue
         try {
             WriteGuard::during(fn () => TransactionSavepoint::around(fn () => LogEntry::createEntry($this->data)));
         } catch (Throwable $e) {
-            TransactionSavepoint::rethrowIfLost($e);
-
             // Transient DB conditions (connection failures, deadlocks) are
             // exactly what queue retries exist for — let Laravel re-run the
             // job. No fallback row in this branch: if the retry succeeds
@@ -68,8 +66,7 @@ class WriteLogEntry implements ShouldQueue
 
             try {
                 app(FallbackWriter::class)->record($this->data, $e, 'queue-worker');
-            } catch (Throwable $fallbackError) {
-                TransactionSavepoint::rethrowIfLost($fallbackError);
+            } catch (Throwable) {
                 // last-resort: error_log already covered observability
             }
         }

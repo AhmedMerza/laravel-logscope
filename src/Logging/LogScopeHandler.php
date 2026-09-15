@@ -96,8 +96,6 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'occurred_at' => $record->datetime,
             ]));
         } catch (Throwable $e) {
-            TransactionSavepoint::rethrowIfLost($e);
-
             // Don't break the calling application, but always surface the
             // failure to PHP's error log. Hiding it behind APP_DEBUG meant
             // production DB outages caused silent total log loss with zero
@@ -147,9 +145,7 @@ class LogScopeHandler extends AbstractProcessingHandler
         try {
             TransactionSavepoint::around(fn () => LogEntry::query()->limit(1)->count());
             $this->initialized = true;
-        } catch (Throwable $e) {
-            TransactionSavepoint::rethrowIfLost($e);
-
+        } catch (Throwable) {
             throw new \RuntimeException('LogScope tables not migrated. Run: php artisan migrate');
         }
     }
