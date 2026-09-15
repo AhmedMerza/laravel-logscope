@@ -17,14 +17,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('log_entries', function (Blueprint $table) {
+        Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
             $table->index(['ip_address', 'occurred_at']);
         });
     }
 
     public function down(): void
     {
-        Schema::table('log_entries', function (Blueprint $table) {
+        Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
             $table->dropIndex(['ip_address', 'occurred_at']);
         });
     }
