@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`user_id` is now a string column, and the API returns it as a string** (#26). Run `php artisan migrate`. The migration keeps logging running on large tables: it swaps in the new column in one statement, builds its indexes online, copies existing ids across in batches of 1,000, then drops the old column. On 1M rows it took about two minutes on MySQL 8 and Postgres 16, and no log insert waited longer than 102 ms (a plain type change blocked inserts for 48 s). Older logs show no user id until the copy reaches them. If a run is interrupted, running `migrate` again resumes it. If you published the migrations with the `logscope-migrations` tag, publish again to get the new one. Integer ids keep working until the migration runs. Laravel 10 may need `doctrine/dbal` installed for it.
+- **LogScope now requires Laravel 11 or later** (#52). `composer.json` allowed Laravel 10, but LogScope has never worked on it. Since v0.1.0 it has used Laravel's `Context` facade, which Laravel 11 added. On Laravel 10 every web request failed with `Class "Illuminate\Support\Facades\Context" not found` (unless `LOGSCOPE_MIDDLEWARE_ENABLED=false`), and log entries weren't saved. Composer no longer installs LogScope on Laravel 10. Nothing changes on Laravel 11 or 12.
+
+- **`user_id` is now a string column, and the API returns it as a string** (#26). Run `php artisan migrate`. The migration keeps logging running on large tables: it swaps in the new column in one statement, builds its indexes online, copies existing ids across in batches of 1,000, then drops the old column. On 1M rows it took about two minutes on MySQL 8 and Postgres 16, and no log insert waited longer than 102 ms (a plain type change blocked inserts for 48 s). Older logs show no user id until the copy reaches them. If a run is interrupted, running `migrate` again resumes it. If you published the migrations with the `logscope-migrations` tag, publish again to get the new one. Integer ids keep working until the migration runs.
 
 ### Fixed
 
