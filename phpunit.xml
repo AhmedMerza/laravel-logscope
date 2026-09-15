@@ -14,6 +14,12 @@
         <testsuite name="Transactions">
             <directory>tests/Transactions</directory>
         </testsuite>
+        <testsuite name="AutoSchedule">
+            <directory>tests/AutoSchedule</directory>
+        </testsuite>
+        <testsuite name="EagerProvider">
+            <directory>tests/EagerProvider</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
