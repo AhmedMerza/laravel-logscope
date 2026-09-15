@@ -49,6 +49,4 @@ composer.lock
 # Editor config (personal preference)
 .editorconfig
 
-# GitHub workflows (not needed yet)
-.github/
 package-lock.json
