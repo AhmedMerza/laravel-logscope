@@ -70,7 +70,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change no
 ## 📋 Requirements
 
 - PHP 8.2+
-- Laravel 10+
+- Laravel 11+
 - SQLite, MySQL, or PostgreSQL
 
 ---
@@ -119,7 +119,7 @@ PHP routes `trigger_error()` through the registered `set_error_handler`, and Lar
 - Custom `set_error_handler` calls in user code that don't chain to the previous handler
 - `error_reporting` being lowered to exclude `E_USER_*` levels
 
-If something seems missing here, check `error_reporting()` and that `\Illuminate\Foundation\Bootstrap\HandleExceptions::class` is in your bootstrap chain (it is by default in Laravel 10/11/12).
+If something seems missing here, check `error_reporting()` and that `\Illuminate\Foundation\Bootstrap\HandleExceptions::class` is in your bootstrap chain (it is by default).
 
 ### 3. Direct Monolog instances bypass capture
 
@@ -635,10 +635,10 @@ You have two options:
 **Option 2 — Wire it yourself.** Leave `LOGSCOPE_RETENTION_AUTO_SCHEDULE` off and add the schedule entry where you keep the rest of your scheduled tasks:
 
 ```php
-// Laravel 11+ (routes/console.php)
+// routes/console.php
 Schedule::command('logscope:prune')->daily();
 
-// Laravel 10 (app/Console/Kernel.php)
+// or app/Console/Kernel.php, in apps upgraded from Laravel 10 or earlier that kept it
 $schedule->command('logscope:prune')->daily();
 ```
 
