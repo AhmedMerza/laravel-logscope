@@ -179,18 +179,32 @@ it('logscope:doctor fails when CaptureRequestContext is not in the global stack 
     expect(Artisan::output())->toContain('CaptureRequestContext is not in the global stack');
 });
 
-it('logscope:doctor warns when the kernel does not expose its global stack', function (): void {
-    // A custom kernel that doesn't extend Foundation's: registerMiddleware()
-    // fell back to prepending, which lands before TrustProxies, and doctor
-    // can't read the stack to confirm either way.
+it('logscope:doctor warns when the kernel can only be prepended to', function (): void {
+    // No stack accessors but prependMiddleware exists, so registerMiddleware()
+    // did register — at the front, ahead of TrustProxies. Wrong position, not
+    // absent.
     app()->instance(Kernel::class, new class
     {
-        // intentionally empty — no getGlobalMiddleware
+        public function prependMiddleware($middleware) {}
     });
 
     Artisan::call('logscope:doctor');
 
-    expect(Artisan::output())->toContain('does not expose its global stack');
+    expect(Artisan::output())->toContain('could only prepend');
+});
+
+it('logscope:doctor fails when the kernel exposes no middleware API at all', function (): void {
+    // Neither accessor nor prependMiddleware: registerMiddleware() registered
+    // NOTHING. Every context field is missing, not just ip_address — reporting
+    // that as a proxy-IP warning would understate it.
+    app()->instance(Kernel::class, new class
+    {
+        // intentionally empty — no middleware API whatsoever
+    });
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('exposes no middleware API');
 });
 
 it('logscope:doctor warns when TrustProxies is not in the global stack', function (): void {
