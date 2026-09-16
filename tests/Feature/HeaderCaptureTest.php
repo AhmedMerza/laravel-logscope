@@ -84,6 +84,25 @@ it('cuts values over max_value_length and marks them truncated', function () {
         ->and($value)->not->toBe(str_repeat('a', 50));
 });
 
+it('survives a header value that is not valid UTF-8', function () {
+    // Header bytes come from the client, so this is reachable by anyone.
+    // Unencodable input used to make json_encode return false, which cast
+    // to '' — wiping the column here, and failing the insert on MySQL and
+    // Postgres, where '' is not valid JSON.
+    config(['logscope.context.headers.allowlist' => ['referer']]);
+
+    $this->get('/logscope-test/headers', [
+        'Referer' => "https://shop.test/cart/".chr(0xB1).chr(0x1F),
+    ])->assertOk();
+
+    $entry = LogEntry::query()->latest('occurred_at')->first();
+
+    expect($entry->getRawOriginal('headers'))->not->toBe('')
+        ->and(json_decode($entry->getRawOriginal('headers'), true))->toBeArray()
+        ->and($entry->headers)->toHaveKey('referer')
+        ->and($entry->headers['referer'])->toStartWith('https://shop.test/cart/');
+});
+
 it('stores null rather than an empty object for CLI-originated logs', function () {
     // No request, so CaptureRequestContext never runs.
     Log::info('from the console');

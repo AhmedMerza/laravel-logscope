@@ -65,10 +65,21 @@ class LogEntry extends Model
     /**
      * Encode headers for storage. Shared with prepareData(), which writes
      * through insert() and so never reaches the mutator above.
+     *
+     * JSON_INVALID_UTF8_SUBSTITUTE is load-bearing: header values are the
+     * only attacker-controlled bytes that reach this encoder, and a client
+     * is free to send a malformed sequence in, say, Referer. Without it
+     * json_encode returns false, which casts to '' — silently wiping the
+     * row's headers on sqlite, and failing the insert outright on MySQL
+     * and Postgres, where '' is not valid JSON. Bad bytes become U+FFFD
+     * instead; valid input is byte-identical either way.
      */
     public static function encodeHeaders(array $headers): string
     {
-        return (string) json_encode($headers, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return (string) json_encode(
+            $headers,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 
     public function getTable(): string
