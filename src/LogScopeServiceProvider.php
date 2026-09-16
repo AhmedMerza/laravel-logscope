@@ -6,6 +6,7 @@ namespace LogScope;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\ServiceProvider;
 use LogScope\Console\Commands\DoctorCommand;
 use LogScope\Console\Commands\ImportCommand;
@@ -228,15 +229,20 @@ class LogScopeServiceProvider extends ServiceProvider
     /**
      * Register the request context middleware.
      *
-     * Prepended (not pushed) so CaptureRequestContext runs FIRST in the
-     * global middleware stack. If an earlier middleware were to throw,
-     * the resulting log entry would have no trace_id/ip_address/url —
-     * making it harder to correlate with the failing request.
+     * Inserted directly AFTER TrustProxies, not prepended: `$request->ip()`
+     * only honours `X-Forwarded-For` once TrustProxies has handed Symfony the
+     * trusted-proxy list, so capturing any earlier records the load balancer's
+     * address as `ip_address` for every request behind a proxy. With no
+     * TrustProxies in the global stack it goes first, as it always did.
+     *
+     * The cost of running second: if one of the few middleware ahead of
+     * TrustProxies throws (ValidatePathEncoding, TrustHosts), that log entry
+     * has no trace_id/ip_address/url to correlate with the failing request.
      *
      * Defensive: in apps that don't bind the HTTP kernel (e.g. console-only
      * applications, or custom kernels that don't extend Foundation's), the
-     * make() call may throw or the resolved object may not implement
-     * prependMiddleware. Skip in those cases rather than crashing during
+     * make() call may throw or the resolved object may not expose the global
+     * middleware stack. Skip in those cases rather than crashing during
      * service-provider boot.
      */
     protected function registerMiddleware(): void
@@ -252,11 +258,33 @@ class LogScopeServiceProvider extends ServiceProvider
             return;
         }
 
-        if (! method_exists($kernel, 'prependMiddleware')) {
+        if (! method_exists($kernel, 'getGlobalMiddleware') || ! method_exists($kernel, 'setGlobalMiddleware')) {
+            // Custom kernel without the Foundation stack accessors: take the
+            // front of the stack if it will have us, otherwise skip.
+            if (method_exists($kernel, 'prependMiddleware')) {
+                $kernel->prependMiddleware(CaptureRequestContext::class);
+            }
+
             return;
         }
 
-        $kernel->prependMiddleware(CaptureRequestContext::class);
+        $middleware = $kernel->getGlobalMiddleware();
+
+        // prependMiddleware() skipped a middleware already in the stack;
+        // array_splice() doesn't, so keep the guard ourselves rather than
+        // capture (and overwrite) the request context twice per request.
+        if (in_array(CaptureRequestContext::class, $middleware, true)) {
+            return;
+        }
+
+        // is_a() also matches an app's own subclass, e.g. App\Http\Middleware\TrustProxies
+        $trustProxies = collect($middleware)->search(
+            fn ($class) => is_string($class) && is_a($class, TrustProxies::class, true)
+        );
+
+        array_splice($middleware, $trustProxies === false ? 0 : $trustProxies + 1, 0, [CaptureRequestContext::class]);
+
+        $kernel->setGlobalMiddleware($middleware);
     }
 
     /**
