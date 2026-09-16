@@ -276,7 +276,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         $result = [];
 
         foreach ($headers as $name => $values) {
-            if (Str::contains($name, $this->sensitiveHeaders, ignoreCase: true)) {
+            if ($this->isSensitiveHeader((string) $name)) {
                 $result[$name] = ['[REDACTED]'];
             } else {
                 $result[$name] = $values;
@@ -284,6 +284,63 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Check if a header name is sensitive.
+     */
+    protected function isSensitiveHeader(string $name): bool
+    {
+        return Str::contains($name, $this->sensitiveHeaders, ignoreCase: true);
+    }
+
+    /**
+     * Reduce a request's headers to the configured allowlist, for the
+     * entry's own `headers` column.
+     *
+     * Names are lowercased, repeated headers are joined with ", ", and
+     * values are flattened to strings — the column is read by humans in
+     * the detail panel and substring-matched by `headers:` search, and
+     * Symfony's name => [values] shape serves neither.
+     *
+     * Returns null rather than an empty array when capture is off or
+     * nothing matched, so an HTTP row with no allowlisted headers reads
+     * the same as a CLI row: no headers to show.
+     */
+    public function captureHeaders(array $headers): ?array
+    {
+        if (! config('logscope.context.headers.enabled', true)) {
+            return null;
+        }
+
+        $allowlist = array_map(
+            static fn ($name): string => strtolower((string) $name),
+            (array) config('logscope.context.headers.allowlist', [])
+        );
+
+        if ($allowlist === []) {
+            return null;
+        }
+
+        $maxLength = (int) config('logscope.context.headers.max_value_length', 500);
+
+        $captured = [];
+
+        foreach ($headers as $name => $values) {
+            $name = strtolower((string) $name);
+
+            if (! in_array($name, $allowlist, true)) {
+                continue;
+            }
+
+            // Redaction wins over the allowlist: listing authorization
+            // explicitly still gets you [REDACTED], never the token.
+            $captured[$name] = $this->isSensitiveHeader($name)
+                ? '[REDACTED]'
+                : Str::limit(implode(', ', (array) $values), $maxLength, '…[truncated]');
+        }
+
+        return $captured === [] ? null : $captured;
     }
 
     /**

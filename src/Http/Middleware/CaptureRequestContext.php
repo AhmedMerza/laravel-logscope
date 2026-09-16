@@ -34,6 +34,7 @@ class CaptureRequestContext
             'user_agent' => $request->userAgent(),
             'http_method' => $request->method(),
             'url' => $this->sanitizer->sanitizeUrl($request->fullUrl()),
+            'headers' => $this->sanitizer->captureHeaders($request->headers->all()),
         ]);
 
         return $next($request);

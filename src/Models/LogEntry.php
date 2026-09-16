@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +43,32 @@ class LogEntry extends Model
             'status' => LogStatus::class,
             'is_truncated' => 'boolean',
         ];
+    }
+
+    /**
+     * Captured request headers (#30).
+     *
+     * Not a plain 'array' cast: the default encoder escapes slashes and
+     * unicode, which would store `application\/xml` and
+     * `…[truncated]`. `headers:` search is a substring LIKE over
+     * this column, so `headers:application/xml` — the search people
+     * actually type — would find nothing.
+     */
+    protected function headers(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?array => $value === null ? null : json_decode($value, true),
+            set: fn (?array $value): ?string => $value === null ? null : static::encodeHeaders($value),
+        );
+    }
+
+    /**
+     * Encode headers for storage. Shared with prepareData(), which writes
+     * through insert() and so never reaches the mutator above.
+     */
+    public static function encodeHeaders(array $headers): string
+    {
+        return (string) json_encode($headers, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     public function getTable(): string
@@ -417,6 +444,13 @@ class LogEntry extends Model
             } else {
                 $attributes['context'] = $contextJson;
             }
+        }
+
+        // insert() bypasses the 'headers' array cast, so encode it here.
+        // isset() skips null, which must stay a real null rather than
+        // becoming the string "null" (#30).
+        if (isset($attributes['headers']) && is_array($attributes['headers'])) {
+            $attributes['headers'] = static::encodeHeaders($attributes['headers']);
         }
 
         // Normalise occurred_at to a DB-safe string
