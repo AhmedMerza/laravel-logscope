@@ -173,7 +173,10 @@ it('logscope:doctor fails when CaptureRequestContext is not in the global stack 
 
     Artisan::call('logscope:doctor');
 
-    expect(Artisan::output())->toContain('is not in the global stack');
+    // Name the subject: the TrustProxies-absent warning below ends in the same
+    // "is not in the global stack", so the bare substring can't tell the two
+    // branches apart and would pass on either.
+    expect(Artisan::output())->toContain('CaptureRequestContext is not in the global stack');
 });
 
 it('logscope:doctor warns when the kernel does not expose its global stack', function (): void {
