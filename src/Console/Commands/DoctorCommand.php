@@ -160,7 +160,7 @@ class DoctorCommand extends Command
         }
 
         if (! method_exists($kernel, 'getGlobalMiddleware')) {
-            $this->markWarn('Middleware', 'HTTP kernel does not expose its global stack — cannot verify where CaptureRequestContext runs');
+            $this->markWarn('Middleware', 'HTTP kernel does not expose its global stack — LogScope falls back to prepending there, which runs before TrustProxies, so behind a proxy ip_address is the proxy\'s address');
 
             return;
         }

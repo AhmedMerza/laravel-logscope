@@ -166,6 +166,30 @@ it('logscope:doctor fails when CaptureRequestContext runs before TrustProxies', 
     expect(Artisan::output())->toContain('before TrustProxies');
 });
 
+it('logscope:doctor fails when CaptureRequestContext is not in the global stack at all', function (): void {
+    // The branch that flips doctor's exit code: something replaced the stack
+    // after LogScope booted, so no request context is captured at all.
+    app(Kernel::class)->setGlobalMiddleware([TrustProxies::class]);
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('is not in the global stack');
+});
+
+it('logscope:doctor warns when the kernel does not expose its global stack', function (): void {
+    // A custom kernel that doesn't extend Foundation's: registerMiddleware()
+    // fell back to prepending, which lands before TrustProxies, and doctor
+    // can't read the stack to confirm either way.
+    app()->instance(Kernel::class, new class
+    {
+        // intentionally empty — no getGlobalMiddleware
+    });
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('does not expose its global stack');
+});
+
 it('logscope:doctor warns when TrustProxies is not in the global stack', function (): void {
     app(Kernel::class)->setGlobalMiddleware([CaptureRequestContext::class]);
 
