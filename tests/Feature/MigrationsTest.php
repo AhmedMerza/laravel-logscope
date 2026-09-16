@@ -148,6 +148,32 @@ it('rolls each migration back to the schema it started from', function (string $
     }
 })->with(logScopeTables());
 
+// The two migrations whose drop is optional look the index up instead of
+// deriving its name, so an index created under a name Blueprint wouldn't
+// generate today still gets dropped. Deriving the name matched it by columns
+// and then failed on the name (#55).
+it('rolls back an index that carries a non-canonical name', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+
+    if (DB::connection()->getDriverName() !== 'pgsql') {
+        test()->markTestSkipped('ALTER INDEX ... RENAME TO is Postgres-only.');
+    }
+
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+
+    $migrations = __DIR__.'/../../database/migrations';
+    expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
+
+    $schema = str_contains($table, '.') ? substr($table, 0, strrpos($table, '.')).'.' : '';
+    $name = collect(Schema::getIndexes($table))->firstWhere('columns', ['status', 'occurred_at'])['name'];
+    DB::statement("alter index {$schema}{$name} rename to hand_rolled_status_idx");
+
+    expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
+        ->and(Schema::hasTable($table))->toBeFalse();
+})->with(logScopeTables());
+
 // An interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index behind that
 // the planner never uses, and `if not exists` skips straight past it. The
 // migrations repair it, but they find it by name — and Postgres resolves a bare

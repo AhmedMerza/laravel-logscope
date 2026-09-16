@@ -58,12 +58,16 @@ return new class extends Migration
                 $blueprint->dropIndex($this->indexToDrop($table, ['environment']));
             });
 
-            // The composite index may not exist on all databases. Asking is
-            // exact; catching every exception also hid a real failure here and
-            // left the drop with no test that could fail (#55).
-            if (Schema::hasIndex($table, ['environment', 'level'])) {
-                Schema::table($table, function (Blueprint $blueprint) use ($table) {
-                    $blueprint->dropIndex($this->indexToDrop($table, ['environment', 'level']));
+            // The composite index may not exist on all databases. Looking for
+            // the index itself is exact, where catching every exception hid a
+            // real failure here and left the drop with no test that could fail
+            // (#55). Dropping the name the table actually carries also covers
+            // an index created under a name Blueprint wouldn't generate today.
+            $composite = collect(Schema::getIndexes($table))->firstWhere('columns', ['environment', 'level']);
+
+            if ($composite) {
+                Schema::table($table, function (Blueprint $blueprint) use ($table, $composite) {
+                    $blueprint->dropIndex($this->qualifyIndex($table, $composite['name']));
                 });
             }
 
@@ -83,10 +87,9 @@ return new class extends Migration
      * grammar qualifies them itself. Blueprint only prefixes index names when
      * the connection sets prefix_indexes.
      *
-     * Each segment is wrapped on its own and handed over already quoted:
-     * Grammar::wrap() on a dotted string treats the first segment as a table
-     * and prepends the connection's table prefix, so a prefixed connection
-     * would look for the index under a schema that doesn't exist.
+     * These two indexes must exist — up() has already established this is a
+     * v0.5 table — so the name is derived rather than looked up, and a missing
+     * index still fails loudly.
      */
     private function indexToDrop(string $table, array $columns): array|Expression
     {
@@ -100,11 +103,29 @@ return new class extends Migration
             ? substr_replace($table, '.'.$connection->getTablePrefix(), strrpos($table, '.'), 1)
             : $table;
 
+        return $this->qualifyIndex($table, str_replace(['-', '.'], '_', strtolower($name.'_'.implode('_', $columns).'_index')));
+    }
+
+    /**
+     * Name an index in the table's own schema, for the same reason as above.
+     *
+     * Each segment is wrapped on its own and handed over already quoted:
+     * Grammar::wrap() on a dotted string treats the first segment as a table
+     * and prepends the connection's table prefix, so a prefixed connection
+     * would look for the index under a schema that doesn't exist.
+     */
+    private function qualifyIndex(string $table, string $name): string|Expression
+    {
+        $connection = Schema::getConnection();
+
+        if (! str_contains($table, '.') || $connection->getDriverName() !== 'pgsql') {
+            return $name;
+        }
+
         $grammar = $connection->getQueryGrammar();
 
         return $connection->raw(
-            $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'
-            .$grammar->wrap(str_replace(['-', '.'], '_', strtolower($name.'_'.implode('_', $columns).'_index')))
+            $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$grammar->wrap($name)
         );
     }
 
