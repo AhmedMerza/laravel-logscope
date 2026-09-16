@@ -58,13 +58,13 @@ return new class extends Migration
                 $blueprint->dropIndex($this->indexToDrop($table, ['environment']));
             });
 
-            // Try to drop composite index (may not exist on all databases)
-            try {
+            // The composite index may not exist on all databases. Asking is
+            // exact; catching every exception also hid a real failure here and
+            // left the drop with no test that could fail (#55).
+            if (Schema::hasIndex($table, ['environment', 'level'])) {
                 Schema::table($table, function (Blueprint $blueprint) use ($table) {
                     $blueprint->dropIndex($this->indexToDrop($table, ['environment', 'level']));
                 });
-            } catch (\Exception $e) {
-                // Index might not exist, ignore
             }
 
             Schema::table($table, function (Blueprint $table) {

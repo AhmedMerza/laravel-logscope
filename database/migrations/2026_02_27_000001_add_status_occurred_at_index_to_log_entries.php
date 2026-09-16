@@ -33,14 +33,16 @@ return new class extends Migration
         $table = config('logscope.table', 'log_entries');
 
         // up() may have returned early if the status column didn't exist,
-        // meaning the index was never created. Ignore if it doesn't exist.
-        try {
-            Schema::table($table, function (Blueprint $blueprint) use ($table) {
-                $blueprint->dropIndex($this->indexToDrop($table, ['status', 'occurred_at']));
-            });
-        } catch (\Exception $e) {
-            // Index was never created
+        // meaning the index was never created. Asking is exact: catching every
+        // exception instead swallowed two real failures during #55 and left
+        // the index in place while down() reported success.
+        if (! Schema::hasIndex($table, ['status', 'occurred_at'])) {
+            return;
         }
+
+        Schema::table($table, function (Blueprint $blueprint) use ($table) {
+            $blueprint->dropIndex($this->indexToDrop($table, ['status', 'occurred_at']));
+        });
     }
 
     /**
