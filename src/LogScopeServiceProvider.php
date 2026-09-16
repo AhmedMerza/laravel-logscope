@@ -260,7 +260,10 @@ class LogScopeServiceProvider extends ServiceProvider
 
         if (! method_exists($kernel, 'getGlobalMiddleware') || ! method_exists($kernel, 'setGlobalMiddleware')) {
             // Custom kernel without the Foundation stack accessors: take the
-            // front of the stack if it will have us, otherwise skip.
+            // front of the stack if it will have us, otherwise skip. The stack
+            // isn't readable here, so this can't place us after TrustProxies
+            // and can't dedupe a second boot — both are the kernel's own to
+            // handle. `logscope:doctor` reports the position it can't verify.
             if (method_exists($kernel, 'prependMiddleware')) {
                 $kernel->prependMiddleware(CaptureRequestContext::class);
             }
@@ -284,6 +287,13 @@ class LogScopeServiceProvider extends ServiceProvider
 
         array_splice($middleware, $trustProxies === false ? 0 : $trustProxies + 1, 0, [CaptureRequestContext::class]);
 
+        // Known and accepted: setGlobalMiddleware() calls syncMiddlewareToRouter(),
+        // which re-applies the kernel's middleware groups, priority and aliases over
+        // the router's. A group entry pushed straight onto the Router — rather than
+        // through the kernel — before we boot is therefore lost. It is the only
+        // public API for reordering the global stack, the window is a register()-phase
+        // push, and laravel-watchtower registers the same way, so both packages stay
+        // consistent. prependMiddleware() avoided this only by never reordering.
         $kernel->setGlobalMiddleware($middleware);
     }
 
