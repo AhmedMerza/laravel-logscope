@@ -230,6 +230,47 @@ it('logscope:doctor recognises a user-scheduled prune entry when auto_schedule i
     expect($output)->toContain('prune is scheduled by your app');
 });
 
+it('reports the header allowlist when capture is on', function (): void {
+    config([
+        'logscope.context.headers.enabled' => true,
+        'logscope.context.headers.allowlist' => ['content-type', 'x-request-id'],
+        'logscope.context.headers.max_value_length' => 250,
+    ]);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    expect($output)->toContain('Header capture')
+        ->and($output)->toContain('content-type')
+        ->and($output)->toContain('x-request-id')
+        ->and($output)->toContain('250');
+});
+
+it('warns that no headers are stored when capture is off', function (): void {
+    config(['logscope.context.headers.enabled' => false]);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    expect($output)->toContain('Header capture')
+        ->and($output)->toContain('disabled');
+});
+
+it('warns that an empty allowlist captures nothing', function (): void {
+    // Worth its own branch: enabled + empty reads like it works, and the
+    // allowlist is the only dial — there is no "capture everything" mode.
+    config([
+        'logscope.context.headers.enabled' => true,
+        'logscope.context.headers.allowlist' => [],
+    ]);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    expect($output)->toContain('Header capture')
+        ->and($output)->toContain('allowlist is empty');
+});
+
 it('logscope:test captures and verifies a log entry end-to-end', function (): void {
     $exit = Artisan::call('logscope:test');
     $output = Artisan::output();

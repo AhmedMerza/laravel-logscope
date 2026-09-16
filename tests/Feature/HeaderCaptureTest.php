@@ -13,6 +13,7 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\LogScope;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
@@ -84,6 +85,22 @@ it('cuts values over max_value_length and marks them truncated', function () {
         ->and($value)->not->toBe(str_repeat('a', 50));
 });
 
+it('keeps captured headers queue-serializable when a value is not valid UTF-8', function () {
+    // The bug this pins is invisible at the storage layer, because
+    // encodeHeaders() substitutes bad bytes on the way to the column. It
+    // bites earlier: the captured array rides in the `logscope` Context
+    // bag, which Laravel serializes into every job queued during the
+    // request, using exactly the encode below. Returning false there makes
+    // Laravel throw InvalidPayloadException — in the HOST app's own
+    // dispatch, not just ours.
+    $captured = app(ContextSanitizerInterface::class)->captureHeaders([
+        'referer' => ['https://shop.test/cart/'.chr(0xB1).chr(0x1F)],
+    ]);
+
+    expect(json_encode($captured, JSON_UNESCAPED_UNICODE))->not->toBeFalse()
+        ->and(mb_check_encoding($captured['referer'], 'UTF-8'))->toBeTrue();
+});
+
 it('survives a header value that is not valid UTF-8', function () {
     // Header bytes come from the client, so this is reachable by anyone.
     // Unencodable input used to make json_encode return false, which cast
@@ -109,6 +126,33 @@ it('stores null rather than an empty object for CLI-originated logs', function (
 
     expect(lastEntryHeaders())->toBeNull()
         ->and(LogEntry::query()->latest('occurred_at')->first()->getRawOriginal('headers'))->toBeNull();
+});
+
+it('captures headers in batch write mode, which bypasses the model cast', function () {
+    // batch is the shipped default, and it writes through LogEntry::insert()
+    // — so prepareData() hand-encodes the column and the Eloquent mutator
+    // never runs. The testing environment forces sync, so without this the
+    // package's own default path is never exercised with headers at all.
+    config([
+        'logscope.write_mode' => 'batch',
+        'logscope.context.headers.allowlist' => ['x-request-id'],
+    ]);
+
+    $this->get('/logscope-test/headers', ['X-Request-Id' => 'batched-1'])->assertOk();
+
+    LogScopeServiceProvider::flushLogBufferStatic();
+
+    $entry = LogEntry::query()->latest('occurred_at')->first();
+
+    // Assert this is the REAL row, not a failure marker. Without that, the
+    // test passes even when prepareData() stops encoding: insert() throws
+    // on the raw array, LogBuffer catches it per chunk, and FallbackWriter
+    // rewrites the row through Eloquent — where the mutator encodes headers
+    // correctly. The consolation row would satisfy a headers-only assertion.
+    expect($entry->message)->toBe('request logged')
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
+        ->and($entry->headers)->toBe(['x-request-id' => 'batched-1'])
+        ->and(json_decode($entry->getRawOriginal('headers'), true))->toBeArray();
 });
 
 it('stores null when capture is disabled', function () {

@@ -287,6 +287,33 @@ class ContextSanitizer implements ContextSanitizerInterface
     }
 
     /**
+     * Coerce a header value to valid UTF-8.
+     *
+     * Header bytes come from the client and need not be valid UTF-8. Left
+     * as-is they travel in the `logscope` Context bag, which Laravel
+     * serializes into every job queued during the request — and
+     * Queue::createPayload() encodes with plain
+     * json_encode($value, JSON_UNESCAPED_UNICODE), which returns false on
+     * a malformed sequence and makes Laravel throw InvalidPayloadException.
+     * That breaks the host application's own dispatches, not just ours.
+     *
+     * Cleaning here rather than at the storage encoder is what covers all
+     * three write modes: sync and batch encode at write time, but queue
+     * serializes the raw array long before it reaches LogEntry.
+     *
+     * mb_check_encoding first because this runs per header per log line:
+     * valid input (effectively all of it) skips the conversion entirely.
+     */
+    protected function toValidUtf8(string $value): string
+    {
+        if (mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+    }
+
+    /**
      * Check if a header name is sensitive.
      */
     protected function isSensitiveHeader(string $name): bool
@@ -335,9 +362,17 @@ class ContextSanitizer implements ContextSanitizerInterface
 
             // Redaction wins over the allowlist: listing authorization
             // explicitly still gets you [REDACTED], never the token.
-            $captured[$name] = $this->isSensitiveHeader($name)
-                ? '[REDACTED]'
-                : Str::limit(implode(', ', (array) $values), $maxLength, '…[truncated]');
+            if ($this->isSensitiveHeader($name)) {
+                $captured[$name] = '[REDACTED]';
+
+                continue;
+            }
+
+            $captured[$name] = Str::limit(
+                $this->toValidUtf8(implode(', ', (array) $values)),
+                $maxLength,
+                '…[truncated]'
+            );
         }
 
         return $captured === [] ? null : $captured;
