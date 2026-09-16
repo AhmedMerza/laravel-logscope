@@ -94,6 +94,37 @@ function resetLogScopeSchema(string $table): void
     }
 }
 
+// Give an index a name Blueprint would never generate. Postgres renames the
+// index itself and needs it qualified for the same reason the migrations do;
+// MySQL renames it through its table. False when the engine can't rename one in
+// place (SQLite), so a caller can skip rather than assert against a no-op.
+function renameLogScopeIndex(string $table, string $from, string $to): bool
+{
+    $grammar = DB::getQueryGrammar();
+    $driver = DB::connection()->getDriverName();
+
+    if ($driver === 'pgsql') {
+        $schema = str_contains($table, '.')
+            ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'
+            : '';
+
+        DB::statement(sprintf('alter index %s%s rename to %s', $schema, $grammar->wrap($from), $grammar->wrap($to)));
+
+        return true;
+    }
+
+    if (in_array($driver, ['mysql', 'mariadb'], true)) {
+        DB::statement(sprintf(
+            'alter table %s rename index %s to %s',
+            $grammar->wrapTable($table), $grammar->wrap($from), $grammar->wrap($to),
+        ));
+
+        return true;
+    }
+
+    return false;
+}
+
 // pg_index keyed on the schema the table actually lives in, so this sees an
 // index the migrations' own to_regclass() lookup would miss if it weren't
 // qualified. Null when no index of that name exists there at all.
@@ -154,11 +185,6 @@ it('rolls each migration back to the schema it started from', function (string $
 // and then failed on the name (#55).
 it('rolls back an index that carries a non-canonical name', function (string $table, string $prefix) {
     skipUnqualifiableTable($table);
-
-    if (DB::connection()->getDriverName() !== 'pgsql') {
-        test()->markTestSkipped('ALTER INDEX ... RENAME TO is Postgres-only.');
-    }
-
     config(['logscope.table' => $table]);
     useTablePrefix($prefix);
     resetLogScopeSchema($table);
@@ -166,9 +192,11 @@ it('rolls back an index that carries a non-canonical name', function (string $ta
     $migrations = __DIR__.'/../../database/migrations';
     expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
 
-    $schema = str_contains($table, '.') ? substr($table, 0, strrpos($table, '.')).'.' : '';
     $name = collect(Schema::getIndexes($table))->firstWhere('columns', ['status', 'occurred_at'])['name'];
-    DB::statement("alter index {$schema}{$name} rename to hand_rolled_status_idx");
+
+    if (! renameLogScopeIndex($table, $name, 'hand_rolled_status_idx')) {
+        test()->markTestSkipped('Renaming an index in place needs Postgres or MySQL.');
+    }
 
     expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
         ->and(Schema::hasTable($table))->toBeFalse();
@@ -253,6 +281,13 @@ it('converts a v0.5 install to the new schema and resets it', function (string $
         $table->text('note')->nullable();
     });
     DB::table('migrations')->insert(['migration' => '2026_01_22_000001_add_resolved_and_note_to_log_entries_table', 'batch' => 1]);
+
+    // 2026_01_24 looks its composite index up rather than deriving the name, so
+    // hand it one Blueprint would never generate. Its own copy of the lookup is
+    // separate from 2026_02_27's, so it needs its own coverage.
+    $composite = collect(Schema::getIndexes($table))->firstWhere('columns', ['environment', 'level'])['name'];
+    renameLogScopeIndex($table, $composite, 'hand_rolled_env_level_idx');
+
     DB::table($table)->insert([
         'id' => '01J00000000000000000000000', 'level' => 'error', 'message' => 'm', 'environment' => 'production',
         'resolved_at' => now(), 'resolved_by' => 'admin', 'occurred_at' => now(), 'created_at' => now(),
