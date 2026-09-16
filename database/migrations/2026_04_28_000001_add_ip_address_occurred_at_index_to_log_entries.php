@@ -53,15 +53,21 @@ return new class extends Migration
     {
         $name = $this->indexName($table, $columns);
 
+        // An index lives in its table's schema, but an unqualified name is
+        // resolved through search_path, which needn't include that schema.
+        $qualified = str_contains($table, '.')
+            ? DB::getQueryGrammar()->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
+            : $name;
+
         // An interrupted concurrent build leaves an INVALID index that the
         // planner never uses, and IF NOT EXISTS would skip past it.
         $invalid = DB::selectOne(
             'select not indisvalid as invalid from pg_index where indexrelid = to_regclass(?)',
-            [$name],
+            [$qualified],
         )?->invalid;
 
         if ($invalid) {
-            DB::statement("drop index concurrently {$name}");
+            DB::statement("drop index concurrently {$qualified}");
         }
 
         DB::statement(sprintf(
