@@ -34,11 +34,37 @@ return new class extends Migration
         // up() may have returned early if the status column didn't exist,
         // meaning the index was never created. Ignore if it doesn't exist.
         try {
-            Schema::table($table, function (Blueprint $table) {
-                $table->dropIndex(['status', 'occurred_at']);
+            Schema::table($table, function (Blueprint $blueprint) use ($table) {
+                $blueprint->dropIndex($this->indexToDrop($table, ['status', 'occurred_at']));
             });
         } catch (\Exception $e) {
             // Index was never created
         }
+    }
+
+    /**
+     * What to hand Blueprint::dropIndex(). Postgres compiles a bare name to
+     * `drop index <name>` and resolves it through search_path, which needn't
+     * contain the schema of a schema-qualified logscope.table (#55); the index
+     * lives in the table's schema, so name it there. Without this the catch
+     * above swallowed the "does not exist" error and left the index behind.
+     * Only Postgres needs it: MySQL scopes index names to their table, and
+     * SQLite's grammar qualifies them itself. Blueprint only prefixes index
+     * names when the connection sets prefix_indexes.
+     */
+    private function indexToDrop(string $table, array $columns): array|string
+    {
+        $connection = Schema::getConnection();
+
+        if (! str_contains($table, '.') || $connection->getDriverName() !== 'pgsql') {
+            return $columns;
+        }
+
+        $name = $connection->getConfig('prefix_indexes')
+            ? substr_replace($table, '.'.$connection->getTablePrefix(), strrpos($table, '.'), 1)
+            : $table;
+
+        return substr($table, 0, strrpos($table, '.')).'.'
+            .str_replace(['-', '.'], '_', strtolower($name.'_'.implode('_', $columns).'_index'));
     }
 };

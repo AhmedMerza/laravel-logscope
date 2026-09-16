@@ -39,9 +39,28 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
-            $table->dropIndex(['ip_address', 'occurred_at']);
+        $table = config('logscope.table', 'log_entries');
+
+        Schema::table($table, function (Blueprint $blueprint) use ($table) {
+            $blueprint->dropIndex($this->indexToDrop($table, ['ip_address', 'occurred_at']));
         });
+    }
+
+    /**
+     * What to hand Blueprint::dropIndex(). Postgres compiles a bare name to
+     * `drop index <name>` and resolves it through search_path, which needn't
+     * contain the schema of a schema-qualified logscope.table (#55); the index
+     * lives in the table's schema, so name it there. Only Postgres needs this:
+     * MySQL scopes index names to their table, and SQLite's grammar qualifies
+     * them itself.
+     */
+    private function indexToDrop(string $table, array $columns): array|string
+    {
+        if (! str_contains($table, '.') || Schema::getConnection()->getDriverName() !== 'pgsql') {
+            return $columns;
+        }
+
+        return substr($table, 0, strrpos($table, '.')).'.'.$this->indexName($table, $columns);
     }
 
     /**

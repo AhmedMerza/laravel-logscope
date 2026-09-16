@@ -85,12 +85,14 @@ return new class extends Migration
     private function swapInStringColumn(string $table): void
     {
         if (in_array(Schema::getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            [$schema, $name] = $this->schemaAndTable($table);
+
             // CHANGE rather than RENAME COLUMN, which needs MySQL 8.0.3+ /
             // MariaDB 10.5.2+. Restating the current type keeps it a rename.
             // Aliased: MySQL 8 returns information_schema columns uppercased.
             $currentType = DB::selectOne(
-                'select column_type as type from information_schema.columns where table_schema = database() and table_name = ? and column_name = ?',
-                [Schema::getConnection()->getTablePrefix().$table, 'user_id'],
+                'select column_type as type from information_schema.columns where table_schema = coalesce(?, database()) and table_name = ? and column_name = ?',
+                [$schema, $name, 'user_id'],
             )->type;
 
             // Indexes are moved separately: in this statement they would force
@@ -105,9 +107,9 @@ return new class extends Migration
         }
 
         DB::transaction(function () use ($table) {
-            Schema::table($table, function (Blueprint $blueprint) {
-                $blueprint->dropIndex(['user_id']);
-                $blueprint->dropIndex(['user_id', 'occurred_at']);
+            Schema::table($table, function (Blueprint $blueprint) use ($table) {
+                $blueprint->dropIndex($this->indexToDrop($table, ['user_id']));
+                $blueprint->dropIndex($this->indexToDrop($table, ['user_id', 'occurred_at']));
                 $blueprint->renameColumn('user_id', 'user_id_legacy');
             });
 
@@ -131,9 +133,11 @@ return new class extends Migration
      */
     private function moveMySqlIndexes(string $table): void
     {
+        [$schema, $name] = $this->schemaAndTable($table);
+
         $indexed = DB::selectOne(
-            'select column_name as name from information_schema.statistics where table_schema = database() and table_name = ? and index_name = ? and seq_in_index = 1',
-            [Schema::getConnection()->getTablePrefix().$table, $this->indexName($table, ['user_id'])],
+            'select column_name as name from information_schema.statistics where table_schema = coalesce(?, database()) and table_name = ? and index_name = ? and seq_in_index = 1',
+            [$schema, $name, $this->indexName($table, ['user_id'])],
         );
 
         if ($indexed?->name === 'user_id') {
@@ -156,15 +160,21 @@ return new class extends Migration
         foreach ([['user_id'], ['user_id', 'occurred_at']] as $columns) {
             $name = $this->indexName($table, $columns);
 
+            // An index lives in its table's schema, but an unqualified name is
+            // resolved through search_path, which needn't include that schema.
+            $qualified = str_contains($table, '.')
+                ? DB::getQueryGrammar()->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
+                : $name;
+
             // An interrupted concurrent build leaves an INVALID index that the
             // planner never uses, and IF NOT EXISTS would skip past it.
             $invalid = DB::selectOne(
                 'select not indisvalid as invalid from pg_index where indexrelid = to_regclass(?)',
-                [$name],
+                [$qualified],
             )?->invalid;
 
             if ($invalid) {
-                DB::statement("drop index concurrently {$name}");
+                DB::statement("drop index concurrently {$qualified}");
             }
 
             DB::statement(sprintf(
@@ -192,6 +202,43 @@ return new class extends Migration
                     ->whereIn('id', $rows->pluck('id'))
                     ->update(['user_id' => DB::raw(DB::getQueryGrammar()->wrap('user_id_legacy'))]);
             });
+    }
+
+    /**
+     * What to hand Blueprint::dropIndex(). Postgres compiles a bare name to
+     * `drop index <name>` and resolves it through search_path, which needn't
+     * contain the schema of a schema-qualified logscope.table (#55); the index
+     * lives in the table's schema, so name it there. Only Postgres needs this:
+     * MySQL scopes index names to their table, and SQLite's grammar qualifies
+     * them itself. Everything else passes the columns and lets Blueprint name
+     * the index, which keeps the prefix_indexes handling in one place.
+     */
+    private function indexToDrop(string $table, array $columns): array|string
+    {
+        if (! str_contains($table, '.') || Schema::getConnection()->getDriverName() !== 'pgsql') {
+            return $columns;
+        }
+
+        return substr($table, 0, strrpos($table, '.')).'.'.$this->indexName($table, $columns);
+    }
+
+    /**
+     * information_schema keys on the schema and the bare table name, so a
+     * schema-qualified logscope.table has to be split before it is looked up
+     * (#55). A null schema means the connection's own database. Laravel
+     * applies the table prefix to the last segment only.
+     */
+    private function schemaAndTable(string $table): array
+    {
+        $prefix = Schema::getConnection()->getTablePrefix();
+
+        if (! str_contains($table, '.')) {
+            return [null, $prefix.$table];
+        }
+
+        $split = strrpos($table, '.');
+
+        return [substr($table, 0, $split), $prefix.substr($table, $split + 1)];
     }
 
     /**

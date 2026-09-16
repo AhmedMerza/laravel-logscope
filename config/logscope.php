@@ -10,6 +10,10 @@ return [
     | Configure the database table name used by LogScope. You can customize
     | this if it conflicts with existing tables in your application.
     |
+    | On Postgres and MySQL this may be schema-qualified ("logs.app_logs"),
+    | including a schema the connection's search_path doesn't list. Create
+    | the schema yourself first. SQLite takes a plain table name only.
+    |
     */
 
     'table' => env('LOGSCOPE_TABLE', 'log_entries'),
