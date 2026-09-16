@@ -45,7 +45,7 @@ return new class extends Migration
         }
 
         Schema::table($table, function (Blueprint $blueprint) use ($table, $index) {
-            $blueprint->dropIndex($this->indexToDrop($table, $index['name']));
+            $blueprint->dropIndex($this->qualifyIndex($table, $index['name']));
         });
     }
 
@@ -62,7 +62,7 @@ return new class extends Migration
      * and prepends the connection's table prefix, so a prefixed connection
      * would look for the index under a schema that doesn't exist.
      */
-    private function indexToDrop(string $table, string $name): string|Expression
+    private function qualifyIndex(string $table, string $name): string|Expression
     {
         $connection = Schema::getConnection();
 
