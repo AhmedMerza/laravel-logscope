@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 
@@ -142,6 +145,74 @@ it('logscope:doctor warns when middleware is disabled', function (): void {
 
     expect($output)->toContain('Middleware');
     expect($output)->toContain('disabled');
+});
+
+it('logscope:doctor passes when CaptureRequestContext sits after TrustProxies', function (): void {
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('after TrustProxies');
+});
+
+it('logscope:doctor fails when CaptureRequestContext runs before TrustProxies', function (): void {
+    // The #54 ordering, as apps that registered the middleware themselves
+    // may still have it.
+    app(Kernel::class)->setGlobalMiddleware([
+        CaptureRequestContext::class,
+        TrustProxies::class,
+    ]);
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('before TrustProxies');
+});
+
+it('logscope:doctor fails when CaptureRequestContext is not in the global stack at all', function (): void {
+    // The branch that flips doctor's exit code: something replaced the stack
+    // after LogScope booted, so no request context is captured at all.
+    app(Kernel::class)->setGlobalMiddleware([TrustProxies::class]);
+
+    Artisan::call('logscope:doctor');
+
+    // Name the subject: the TrustProxies-absent warning below ends in the same
+    // "is not in the global stack", so the bare substring can't tell the two
+    // branches apart and would pass on either.
+    expect(Artisan::output())->toContain('CaptureRequestContext is not in the global stack');
+});
+
+it('logscope:doctor warns when the kernel can only be prepended to', function (): void {
+    // No stack accessors but prependMiddleware exists, so registerMiddleware()
+    // did register — at the front, ahead of TrustProxies. Wrong position, not
+    // absent.
+    app()->instance(Kernel::class, new class
+    {
+        public function prependMiddleware($middleware) {}
+    });
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('could only prepend');
+});
+
+it('logscope:doctor fails when the kernel exposes no middleware API at all', function (): void {
+    // Neither accessor nor prependMiddleware: registerMiddleware() registered
+    // NOTHING. Every context field is missing, not just ip_address — reporting
+    // that as a proxy-IP warning would understate it.
+    app()->instance(Kernel::class, new class
+    {
+        // intentionally empty — no middleware API whatsoever
+    });
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('exposes no middleware API');
+});
+
+it('logscope:doctor warns when TrustProxies is not in the global stack', function (): void {
+    app(Kernel::class)->setGlobalMiddleware([CaptureRequestContext::class]);
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('TrustProxies is not in the global stack');
 });
 
 it('logscope:doctor recognises a user-scheduled prune entry when auto_schedule is off', function (): void {
