@@ -9,6 +9,11 @@ declare(strict_types=1);
 // trusted-proxy list, so while the middleware was prepended to the global
 // stack every log entry behind a load balancer recorded the balancer's
 // address as ip_address.
+//
+// Only the FIRST test here distinguishes the fix from the bug — revert the
+// ordering and it fails. The second is the over-trust guard: an untrusted
+// peer's forwarded header must never win, which held before the fix too.
+// "Both green" is not by itself proof the ordering is right.
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -39,6 +44,15 @@ beforeEach(function () {
 
         return 'ok';
     });
+});
+
+afterEach(function () {
+    // TrustProxies::handle() leaves the trusted list set on Symfony's static
+    // for the rest of the process. Laravel's own teardown calls
+    // TrustProxies::flushState(), which clears only that middleware's statics
+    // — not Request's. Clean up after ourselves so a later test can't
+    // silently start trusting 10.0.0.5 depending on suite order.
+    Request::setTrustedProxies([], Request::HEADER_X_FORWARDED_FOR);
 });
 
 it('records the client IP when a trusted proxy forwards the request', function () {
