@@ -94,6 +94,20 @@ function resetLogScopeSchema(string $table): void
     }
 }
 
+// pg_index keyed on the schema the table actually lives in, so this sees an
+// index the migrations' own to_regclass() lookup would miss if it weren't
+// qualified. Null when no index of that name exists there at all.
+function logScopeIndexIsValid(string $table, string $name): ?bool
+{
+    return DB::selectOne(
+        'select i.indisvalid from pg_index i'
+        .' join pg_class c on c.oid = i.indexrelid'
+        .' join pg_namespace n on n.oid = c.relnamespace'
+        .' where n.nspname = ? and c.relname = ?',
+        [str_contains($table, '.') ? substr($table, 0, strrpos($table, '.')) : 'public', $name],
+    )?->indisvalid;
+}
+
 function logScopeSchema(string $table): ?array
 {
     if (! Schema::hasTable($table)) {
@@ -132,6 +146,60 @@ it('rolls each migration back to the schema it started from', function (string $
         expect(Artisan::call('migrate:rollback', ['--step' => 1]))->toBe(0)
             ->and(logScopeSchema($table))->toBe($schema, "rolling back {$migration}");
     }
+})->with(logScopeTables());
+
+// An interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index behind that
+// the planner never uses, and `if not exists` skips straight past it. The
+// migrations repair it, but they find it by name — and Postgres resolves a bare
+// name through search_path, so for a schema-qualified table the repair never
+// fired and migrate still reported success (#48, #55).
+it('rebuilds an index left INVALID by an interrupted concurrent build', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+
+    if (DB::connection()->getDriverName() !== 'pgsql') {
+        test()->markTestSkipped('CREATE INDEX CONCURRENTLY and INVALID indexes are Postgres-only.');
+    }
+
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+
+    $migrations = __DIR__.'/../../database/migrations';
+    expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
+
+    $name = collect(Schema::getIndexes($table))->firstWhere('columns', ['ip_address', 'occurred_at'])['name'];
+    $grammar = DB::getQueryGrammar();
+    $qualified = str_contains($table, '.')
+        ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$grammar->wrap($name)
+        : $grammar->wrap($name);
+
+    // Replace the good index with the wreckage of an interrupted build: a
+    // unique build over duplicate rows fails and leaves an INVALID index.
+    DB::statement("drop index {$qualified}");
+    foreach (['01J00000000000000000000001', '01J00000000000000000000002'] as $id) {
+        DB::table($table)->insert([
+            'id' => $id, 'level' => 'error', 'message' => 'duplicate',
+            'ip_address' => '203.0.113.9', 'occurred_at' => '2026-01-01 00:00:00',
+            'created_at' => '2026-01-01 00:00:00',
+        ]);
+    }
+
+    try {
+        DB::statement(sprintf(
+            'create unique index concurrently %s on %s (ip_address, occurred_at)',
+            $grammar->wrap($name),
+            $grammar->wrapTable($table),
+        ));
+    } catch (Throwable) {
+        // Expected — that is what leaves the index INVALID.
+    }
+
+    expect(logScopeIndexIsValid($table, $name))->toBeFalse();
+
+    // Re-running the migration has to find it and build it again.
+    (require $migrations.'/2026_04_28_000001_add_ip_address_occurred_at_index_to_log_entries.php')->up();
+
+    expect(logScopeIndexIsValid($table, $name))->toBeTrue();
 })->with(logScopeTables());
 
 // 2026_01_24's down() is empty because a converted v0.5 table is identical to

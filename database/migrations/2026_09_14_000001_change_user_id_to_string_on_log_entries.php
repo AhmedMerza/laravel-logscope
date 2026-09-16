@@ -158,13 +158,17 @@ return new class extends Migration
      */
     private function createIndexesConcurrently(string $table): void
     {
+        $grammar = DB::getQueryGrammar();
+
         foreach ([['user_id'], ['user_id', 'occurred_at']] as $columns) {
-            $name = $this->indexName($table, $columns);
+            $name = $grammar->wrap($this->indexName($table, $columns));
 
             // An index lives in its table's schema, but an unqualified name is
             // resolved through search_path, which needn't include that schema.
+            // Each part is wrapped on its own: wrap() on a dotted string would
+            // read the schema as a table and prefix it.
             $qualified = str_contains($table, '.')
-                ? DB::getQueryGrammar()->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
+                ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
                 : $name;
 
             // An interrupted concurrent build leaves an INVALID index that the
@@ -181,7 +185,7 @@ return new class extends Migration
             DB::statement(sprintf(
                 'create index concurrently if not exists %s on %s (%s)',
                 $name,
-                DB::getQueryGrammar()->wrapTable($table),
+                $grammar->wrapTable($table),
                 implode(', ', $columns),
             ));
         }
