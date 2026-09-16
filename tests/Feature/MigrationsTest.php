@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 // Each migration's down() must put the table back exactly as its up() found
-// it, on the default table name and a custom one. 2026_01_24's down() undid
-// changes its up() never made, so rolling back failed on every install and
-// DatabaseMigrations broke after each test (#41). 2026_04_28 hard-coded
-// log_entries, so migrate failed when logscope.table was set (#42).
+// it, on the default table name, a custom one, and a schema-qualified one.
+// 2026_01_24's down() undid changes its up() never made, so rolling back
+// failed on every install and DatabaseMigrations broke after each test (#41).
+// 2026_04_28 hard-coded log_entries, so migrate failed when logscope.table
+// was set (#42). Several migrations dropped indexes by a bare name, which
+// Postgres resolves through search_path instead of the table's own schema,
+// so a schema-qualified table couldn't be rolled back — and 2026_09_14
+// couldn't be migrated at all, on either engine (#55).
 //
 // Migrations are the most engine-specific code here, so this runs on Postgres
 // or MySQL the same way as tests/Transactions (see TransactionTestCase). It
@@ -24,6 +28,116 @@ beforeEach(function () {
 
     Artisan::call('db:wipe', ['--force' => true]);
 });
+
+// #55 is about how Postgres resolves a bare index name through search_path,
+// and how MySQL keys information_schema on the database. SQLite has neither —
+// a qualified name there means an ATTACHed database — so the default SQLite
+// run skips that case and CI covers it on both real engines.
+function skipUnqualifiableTable(string $table): void
+{
+    if (str_contains($table, '.') && DB::connection()->getDriverName() === 'sqlite') {
+        test()->markTestSkipped('A schema-qualified table needs Postgres or MySQL (#55).');
+    }
+}
+
+// [table, connection table prefix]. The prefixed case also sets prefix_indexes,
+// so it covers the index naming a qualified table goes through as well.
+function logScopeTables(): array
+{
+    return [
+        'default table' => ['log_entries', ''],
+        'custom table' => ['app_logs', ''],
+        'schema-qualified' => ['logs.app_logs', ''],
+        'schema-qualified, prefixed connection' => ['logs.app_logs', 'app_'],
+    ];
+}
+
+// A table prefix on the connection is what catches a qualified index name
+// built as one dotted string: Grammar::wrap() treats the first segment of a
+// dotted identifier as a table, so it would prefix the schema and look for the
+// index somewhere that doesn't exist (#55).
+function useTablePrefix(string $prefix): void
+{
+    if ($prefix === '') {
+        return;
+    }
+
+    $connection = config('database.default');
+
+    config([
+        "database.connections.{$connection}.prefix" => $prefix,
+        "database.connections.{$connection}.prefix_indexes" => true,
+    ]);
+
+    DB::purge($connection);
+}
+
+// A schema-qualified logscope.table puts the table, and so its indexes, in a
+// schema the connection's search_path needn't contain (#55). db:wipe doesn't
+// reach that schema, so drop and recreate it to get a clean slate.
+function resetLogScopeSchema(string $table): void
+{
+    if (! str_contains($table, '.')) {
+        return;
+    }
+
+    $schema = substr($table, 0, strrpos($table, '.'));
+
+    $statements = match (DB::connection()->getDriverName()) {
+        'pgsql' => ["drop schema if exists {$schema} cascade", "create schema {$schema}"],
+        'mysql', 'mariadb' => ["drop database if exists {$schema}", "create database {$schema}"],
+        default => [],
+    };
+
+    foreach ($statements as $statement) {
+        DB::statement($statement);
+    }
+}
+
+// Give an index a name Blueprint would never generate. Postgres renames the
+// index itself and needs it qualified for the same reason the migrations do;
+// MySQL renames it through its table. False when the engine can't rename one in
+// place (SQLite), so a caller can skip rather than assert against a no-op.
+function renameLogScopeIndex(string $table, string $from, string $to): bool
+{
+    $grammar = DB::getQueryGrammar();
+    $driver = DB::connection()->getDriverName();
+
+    if ($driver === 'pgsql') {
+        $schema = str_contains($table, '.')
+            ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'
+            : '';
+
+        DB::statement(sprintf('alter index %s%s rename to %s', $schema, $grammar->wrap($from), $grammar->wrap($to)));
+
+        return true;
+    }
+
+    if (in_array($driver, ['mysql', 'mariadb'], true)) {
+        DB::statement(sprintf(
+            'alter table %s rename index %s to %s',
+            $grammar->wrapTable($table), $grammar->wrap($from), $grammar->wrap($to),
+        ));
+
+        return true;
+    }
+
+    return false;
+}
+
+// pg_index keyed on the schema the table actually lives in, so this sees an
+// index the migrations' own to_regclass() lookup would miss if it weren't
+// qualified. Null when no index of that name exists there at all.
+function logScopeIndexIsValid(string $table, string $name): ?bool
+{
+    return DB::selectOne(
+        'select i.indisvalid from pg_index i'
+        .' join pg_class c on c.oid = i.indexrelid'
+        .' join pg_namespace n on n.oid = c.relnamespace'
+        .' where n.nspname = ? and c.relname = ?',
+        [str_contains($table, '.') ? substr($table, 0, strrpos($table, '.')) : 'public', $name],
+    )?->indisvalid;
+}
 
 function logScopeSchema(string $table): ?array
 {
@@ -43,8 +157,11 @@ function logScopeSchema(string $table): ?array
     ];
 }
 
-it('rolls each migration back to the schema it started from', function (string $table) {
+it('rolls each migration back to the schema it started from', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
     config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
 
     $before = [];
 
@@ -60,17 +177,98 @@ it('rolls each migration back to the schema it started from', function (string $
         expect(Artisan::call('migrate:rollback', ['--step' => 1]))->toBe(0)
             ->and(logScopeSchema($table))->toBe($schema, "rolling back {$migration}");
     }
-})->with(['log_entries', 'app_logs']);
+})->with(logScopeTables());
+
+// The two migrations whose drop is optional look the index up instead of
+// deriving its name, so an index created under a name Blueprint wouldn't
+// generate today still gets dropped. Deriving the name matched it by columns
+// and then failed on the name (#55).
+it('rolls back an index that carries a non-canonical name', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+
+    $migrations = __DIR__.'/../../database/migrations';
+    expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
+
+    $name = collect(Schema::getIndexes($table))->firstWhere('columns', ['status', 'occurred_at'])['name'];
+
+    if (! renameLogScopeIndex($table, $name, 'hand_rolled_status_idx')) {
+        test()->markTestSkipped('Renaming an index in place needs Postgres or MySQL.');
+    }
+
+    expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
+        ->and(Schema::hasTable($table))->toBeFalse();
+})->with(logScopeTables());
+
+// An interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index behind that
+// the planner never uses, and `if not exists` skips straight past it. The
+// migrations repair it, but they find it by name — and Postgres resolves a bare
+// name through search_path, so for a schema-qualified table the repair never
+// fired and migrate still reported success (#48, #55).
+it('rebuilds an index left INVALID by an interrupted concurrent build', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+
+    if (DB::connection()->getDriverName() !== 'pgsql') {
+        test()->markTestSkipped('CREATE INDEX CONCURRENTLY and INVALID indexes are Postgres-only.');
+    }
+
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+
+    $migrations = __DIR__.'/../../database/migrations';
+    expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
+
+    $name = collect(Schema::getIndexes($table))->firstWhere('columns', ['ip_address', 'occurred_at'])['name'];
+    $grammar = DB::getQueryGrammar();
+    $qualified = str_contains($table, '.')
+        ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$grammar->wrap($name)
+        : $grammar->wrap($name);
+
+    // Replace the good index with the wreckage of an interrupted build: a
+    // unique build over duplicate rows fails and leaves an INVALID index.
+    DB::statement("drop index {$qualified}");
+    foreach (['01J00000000000000000000001', '01J00000000000000000000002'] as $id) {
+        DB::table($table)->insert([
+            'id' => $id, 'level' => 'error', 'message' => 'duplicate',
+            'ip_address' => '203.0.113.9', 'occurred_at' => '2026-01-01 00:00:00',
+            'created_at' => '2026-01-01 00:00:00',
+        ]);
+    }
+
+    try {
+        DB::statement(sprintf(
+            'create unique index concurrently %s on %s (ip_address, occurred_at)',
+            $grammar->wrap($name),
+            $grammar->wrapTable($table),
+        ));
+    } catch (Throwable) {
+        // Expected — that is what leaves the index INVALID.
+    }
+
+    expect(logScopeIndexIsValid($table, $name))->toBeFalse();
+
+    // Re-running the migration has to find it and build it again.
+    (require $migrations.'/2026_04_28_000001_add_ip_address_occurred_at_index_to_log_entries.php')->up();
+
+    expect(logScopeIndexIsValid($table, $name))->toBeTrue();
+})->with(logScopeTables());
 
 // 2026_01_24's down() is empty because a converted v0.5 table is identical to
 // a new install's. Pin that, and that such an install still resets.
-it('converts a v0.5 install to the new schema and resets it', function (string $table) {
+it('converts a v0.5 install to the new schema and resets it', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
     config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
     $migrations = __DIR__.'/../../database/migrations';
 
     Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]);
     $fresh = logScopeSchema($table);
     Artisan::call('db:wipe', ['--force' => true]);
+    resetLogScopeSchema($table);
 
     // v0.5.2: 2026_01_12 also created environment, and the old 2026_01_22
     // added resolved_at, resolved_by and note.
@@ -83,6 +281,13 @@ it('converts a v0.5 install to the new schema and resets it', function (string $
         $table->text('note')->nullable();
     });
     DB::table('migrations')->insert(['migration' => '2026_01_22_000001_add_resolved_and_note_to_log_entries_table', 'batch' => 1]);
+
+    // 2026_01_24 looks its composite index up rather than deriving the name, so
+    // hand it one Blueprint would never generate. Its own copy of the lookup is
+    // separate from 2026_02_27's, so it needs its own coverage.
+    $composite = collect(Schema::getIndexes($table))->firstWhere('columns', ['environment', 'level'])['name'];
+    renameLogScopeIndex($table, $composite, 'hand_rolled_env_level_idx');
+
     DB::table($table)->insert([
         'id' => '01J00000000000000000000000', 'level' => 'error', 'message' => 'm', 'environment' => 'production',
         'resolved_at' => now(), 'resolved_by' => 'admin', 'occurred_at' => now(), 'created_at' => now(),
@@ -95,4 +300,4 @@ it('converts a v0.5 install to the new schema and resets it', function (string $
 
     expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
         ->and(Schema::hasTable($table))->toBeFalse();
-})->with(['log_entries', 'app_logs']);
+})->with(logScopeTables());

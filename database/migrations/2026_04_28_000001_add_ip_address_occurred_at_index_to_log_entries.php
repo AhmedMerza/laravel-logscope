@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -39,9 +40,40 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table(config('logscope.table', 'log_entries'), function (Blueprint $table) {
-            $table->dropIndex(['ip_address', 'occurred_at']);
+        $table = config('logscope.table', 'log_entries');
+
+        Schema::table($table, function (Blueprint $blueprint) use ($table) {
+            $blueprint->dropIndex($this->indexToDrop($table, ['ip_address', 'occurred_at']));
         });
+    }
+
+    /**
+     * What to hand Blueprint::dropIndex(). Postgres compiles a bare name to
+     * `drop index <name>` and resolves it through search_path, which needn't
+     * contain the schema of a schema-qualified logscope.table (#55); the index
+     * lives in the table's schema, so name it there. Only Postgres needs this:
+     * MySQL scopes index names to their table, and SQLite's grammar qualifies
+     * them itself.
+     *
+     * Each segment is wrapped on its own and handed over already quoted:
+     * Grammar::wrap() on a dotted string treats the first segment as a table
+     * and prepends the connection's table prefix, so a prefixed connection
+     * would look for the index under a schema that doesn't exist.
+     */
+    private function indexToDrop(string $table, array $columns): array|Expression
+    {
+        $connection = Schema::getConnection();
+
+        if (! str_contains($table, '.') || $connection->getDriverName() !== 'pgsql') {
+            return $columns;
+        }
+
+        $grammar = $connection->getQueryGrammar();
+
+        return $connection->raw(
+            $grammar->wrap(substr($table, 0, strrpos($table, '.')))
+            .'.'.$grammar->wrap($this->indexName($table, $columns))
+        );
     }
 
     /**
@@ -51,12 +83,15 @@ return new class extends Migration
      */
     private function createIndexConcurrently(string $table, array $columns): void
     {
-        $name = $this->indexName($table, $columns);
+        $grammar = DB::getQueryGrammar();
+        $name = $grammar->wrap($this->indexName($table, $columns));
 
         // An index lives in its table's schema, but an unqualified name is
         // resolved through search_path, which needn't include that schema.
+        // Each part is wrapped on its own: wrap() on a dotted string would read
+        // the schema as a table and prefix it.
         $qualified = str_contains($table, '.')
-            ? DB::getQueryGrammar()->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
+            ? $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'.$name
             : $name;
 
         // An interrupted concurrent build leaves an INVALID index that the
@@ -73,7 +108,7 @@ return new class extends Migration
         DB::statement(sprintf(
             'create index concurrently if not exists %s on %s (%s)',
             $name,
-            DB::getQueryGrammar()->wrapTable($table),
+            $grammar->wrapTable($table),
             implode(', ', $columns),
         ));
     }
