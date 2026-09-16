@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 
@@ -142,6 +145,33 @@ it('logscope:doctor warns when middleware is disabled', function (): void {
 
     expect($output)->toContain('Middleware');
     expect($output)->toContain('disabled');
+});
+
+it('logscope:doctor passes when CaptureRequestContext sits after TrustProxies', function (): void {
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('after TrustProxies');
+});
+
+it('logscope:doctor fails when CaptureRequestContext runs before TrustProxies', function (): void {
+    // The #54 ordering, as apps that registered the middleware themselves
+    // may still have it.
+    app(Kernel::class)->setGlobalMiddleware([
+        CaptureRequestContext::class,
+        TrustProxies::class,
+    ]);
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('before TrustProxies');
+});
+
+it('logscope:doctor warns when TrustProxies is not in the global stack', function (): void {
+    app(Kernel::class)->setGlobalMiddleware([CaptureRequestContext::class]);
+
+    Artisan::call('logscope:doctor');
+
+    expect(Artisan::output())->toContain('TrustProxies is not in the global stack');
 });
 
 it('logscope:doctor recognises a user-scheduled prune entry when auto_schedule is off', function (): void {

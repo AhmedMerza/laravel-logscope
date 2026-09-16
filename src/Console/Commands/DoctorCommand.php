@@ -7,9 +7,11 @@ namespace LogScope\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use LogScope\Services\WriteFailureLogger;
@@ -157,13 +159,39 @@ class DoctorCommand extends Command
             return;
         }
 
-        if (! method_exists($kernel, 'prependMiddleware')) {
-            $this->markWarn('Middleware', 'HTTP kernel does not support prependMiddleware() — context middleware not registered');
+        if (! method_exists($kernel, 'getGlobalMiddleware')) {
+            $this->markWarn('Middleware', 'HTTP kernel does not expose its global stack — cannot verify where CaptureRequestContext runs');
 
             return;
         }
 
-        $this->markPass('Middleware', 'CaptureRequestContext prepended to global stack');
+        $middleware = $kernel->getGlobalMiddleware();
+        $capture = array_search(CaptureRequestContext::class, $middleware, true);
+
+        if ($capture === false) {
+            $this->markFail('Middleware', 'CaptureRequestContext is not in the global stack — log entries will lack trace_id/ip_address/url');
+
+            return;
+        }
+
+        // is_a() also matches an app's own subclass, e.g. App\Http\Middleware\TrustProxies
+        $trustProxies = collect($middleware)->search(
+            fn ($class) => is_string($class) && is_a($class, TrustProxies::class, true)
+        );
+
+        if ($trustProxies === false) {
+            $this->markWarn('Middleware', 'CaptureRequestContext registered, but TrustProxies is not in the global stack — behind a proxy, ip_address is the proxy\'s address');
+
+            return;
+        }
+
+        if ($capture < $trustProxies) {
+            $this->markFail('Middleware', 'CaptureRequestContext runs before TrustProxies — behind a proxy, ip_address is the proxy\'s address');
+
+            return;
+        }
+
+        $this->markPass('Middleware', 'CaptureRequestContext registered after TrustProxies in the global stack');
     }
 
     protected function checkRetention(): void
