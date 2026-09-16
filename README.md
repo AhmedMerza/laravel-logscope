@@ -367,7 +367,9 @@ Type directly in the search box using `field:value` syntax:
 | `text` | `error` | Search in all fields |
 | `-text` | `-deprecated` | Exclude from all fields |
 
-**Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`
+**Searchable fields:** `message`, `source`, `context`, `level`, `channel`, `user_id`, `ip_address`, `url`, `trace_id`, `http_method`, `headers`
+
+`headers:` matches the stored header JSON, so it finds names as well as values — `headers:application/xml` finds a content type, `headers:x-request-id` finds every row that carried that header at all. Headers are deliberately left out of plain-text search, so an ordinary search never scans the JSON column.
 
 #### How multi-word and quoted searches behave
 
@@ -733,6 +735,39 @@ Configure in `config/logscope.php`:
 ],
 ```
 
+### Request Headers
+
+Each entry can carry the request's headers in its own `headers` column — often the whole answer when debugging production: a content-type mismatch, `X-Forwarded-For` behind a proxy, which API client sent the request. CLI-originated logs store `null`.
+
+Capture is **allowlist-only**. There is no "capture everything" mode, because that is where the risk lives: unknown vendor auth headers, `php-auth-pw`, and a table that grows fast. Add what you need:
+
+```php
+'context' => [
+    'headers' => [
+        'enabled' => true,
+
+        // Matched case-insensitively. Add your own here.
+        'allowlist' => [
+            'content-type', 'accept', 'referer',
+            'x-forwarded-for', 'x-request-id', 'origin',
+        ],
+
+        // Longer values are cut and end in …[truncated]
+        'max_value_length' => 500,
+    ],
+],
+```
+
+The allowlist is the only dial: everything it captures is shown in the detail panel and is searchable. If a header turns out to be noise, take it off the allowlist — that stops storing it, rather than storing it and hiding it.
+
+Anything matching `sensitive_headers` is stored as `[REDACTED]` **even when you allowlist it explicitly** — allowlisting `authorization` gets you the header's presence, never the token. `user-agent` is absent from the defaults on purpose: it already has its own column.
+
+Headers are stored per row, not per request, so a request that logs 20 lines stores its headers 20 times. With the default allowlist that is a few hundred bytes a row — and it is the other reason there is no "capture everything" mode.
+
+In the dashboard, headers appear in their own **Headers** section above Context, colored like the JSON viewer. Each row has a funnel button that pivots the list to a `headers:` search for that value; the values themselves are plain selectable text, so you can copy them.
+
+Run `php artisan logscope:doctor` to see whether capture is on and what is allowlisted.
+
 ### Publishing Assets
 
 ```bash
@@ -781,6 +816,7 @@ LOGSCOPE_CACHE_TTL=60
 # Context Sanitization
 LOGSCOPE_EXPAND_OBJECTS=true
 LOGSCOPE_REDACT_SENSITIVE=true
+LOGSCOPE_CAPTURE_HEADERS=true
 ```
 
 ---

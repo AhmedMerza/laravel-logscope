@@ -38,6 +38,7 @@ class DoctorCommand extends Command
         $this->checkWriteMode();
         $this->checkMiddleware();
         $this->checkRetention();
+        $this->checkHeaderCapture();
         $this->checkAuthResolution();
         $this->checkOctaneIntegration();
         $this->checkBuiltAssets();
@@ -243,6 +244,27 @@ class DoctorCommand extends Command
 
         // $detection === null: we couldn't check without side effects.
         $this->markWarn('Retention', "{$days}-day window — auto_schedule is off; confirm you've wired `logscope:prune` in your console kernel or set retention.auto_schedule=true");
+    }
+
+    protected function checkHeaderCapture(): void
+    {
+        if (! (bool) config('logscope.context.headers.enabled', true)) {
+            $this->markWarn('Header capture', 'disabled — entries store no `headers`; set context.headers.enabled=true to capture them');
+
+            return;
+        }
+
+        $allowlist = (array) config('logscope.context.headers.allowlist', []);
+
+        if ($allowlist === []) {
+            $this->markWarn('Header capture', 'enabled but the allowlist is empty — nothing will be captured; there is no "capture everything" mode by design');
+
+            return;
+        }
+
+        $max = (int) config('logscope.context.headers.max_value_length', 500);
+
+        $this->markPass('Header capture', count($allowlist).' allowlisted, values cut at '.$max.': '.implode(', ', $allowlist));
     }
 
     /**
