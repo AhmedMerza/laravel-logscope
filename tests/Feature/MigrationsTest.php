@@ -40,6 +40,38 @@ function skipUnqualifiableTable(string $table): void
     }
 }
 
+// [table, connection table prefix]. The prefixed case also sets prefix_indexes,
+// so it covers the index naming a qualified table goes through as well.
+function logScopeTables(): array
+{
+    return [
+        'default table' => ['log_entries', ''],
+        'custom table' => ['app_logs', ''],
+        'schema-qualified' => ['logs.app_logs', ''],
+        'schema-qualified, prefixed connection' => ['logs.app_logs', 'app_'],
+    ];
+}
+
+// A table prefix on the connection is what catches a qualified index name
+// built as one dotted string: Grammar::wrap() treats the first segment of a
+// dotted identifier as a table, so it would prefix the schema and look for the
+// index somewhere that doesn't exist (#55).
+function useTablePrefix(string $prefix): void
+{
+    if ($prefix === '') {
+        return;
+    }
+
+    $connection = config('database.default');
+
+    config([
+        "database.connections.{$connection}.prefix" => $prefix,
+        "database.connections.{$connection}.prefix_indexes" => true,
+    ]);
+
+    DB::purge($connection);
+}
+
 // A schema-qualified logscope.table puts the table, and so its indexes, in a
 // schema the connection's search_path needn't contain (#55). db:wipe doesn't
 // reach that schema, so drop and recreate it to get a clean slate.
@@ -80,9 +112,10 @@ function logScopeSchema(string $table): ?array
     ];
 }
 
-it('rolls each migration back to the schema it started from', function (string $table) {
+it('rolls each migration back to the schema it started from', function (string $table, string $prefix) {
     skipUnqualifiableTable($table);
     config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
     resetLogScopeSchema($table);
 
     $before = [];
@@ -99,13 +132,14 @@ it('rolls each migration back to the schema it started from', function (string $
         expect(Artisan::call('migrate:rollback', ['--step' => 1]))->toBe(0)
             ->and(logScopeSchema($table))->toBe($schema, "rolling back {$migration}");
     }
-})->with(['log_entries', 'app_logs', 'logs.app_logs']);
+})->with(logScopeTables());
 
 // 2026_01_24's down() is empty because a converted v0.5 table is identical to
 // a new install's. Pin that, and that such an install still resets.
-it('converts a v0.5 install to the new schema and resets it', function (string $table) {
+it('converts a v0.5 install to the new schema and resets it', function (string $table, string $prefix) {
     skipUnqualifiableTable($table);
     config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
     resetLogScopeSchema($table);
     $migrations = __DIR__.'/../../database/migrations';
 
@@ -137,4 +171,4 @@ it('converts a v0.5 install to the new schema and resets it', function (string $
 
     expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
         ->and(Schema::hasTable($table))->toBeFalse();
-})->with(['log_entries', 'app_logs', 'logs.app_logs']);
+})->with(logScopeTables());

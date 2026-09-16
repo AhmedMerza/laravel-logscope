@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -81,8 +82,13 @@ return new class extends Migration
      * Postgres needs it: MySQL scopes index names to their table, and SQLite's
      * grammar qualifies them itself. Blueprint only prefixes index names when
      * the connection sets prefix_indexes.
+     *
+     * Each segment is wrapped on its own and handed over already quoted:
+     * Grammar::wrap() on a dotted string treats the first segment as a table
+     * and prepends the connection's table prefix, so a prefixed connection
+     * would look for the index under a schema that doesn't exist.
      */
-    private function indexToDrop(string $table, array $columns): array|string
+    private function indexToDrop(string $table, array $columns): array|Expression
     {
         $connection = Schema::getConnection();
 
@@ -94,8 +100,12 @@ return new class extends Migration
             ? substr_replace($table, '.'.$connection->getTablePrefix(), strrpos($table, '.'), 1)
             : $table;
 
-        return substr($table, 0, strrpos($table, '.')).'.'
-            .str_replace(['-', '.'], '_', strtolower($name.'_'.implode('_', $columns).'_index'));
+        $grammar = $connection->getQueryGrammar();
+
+        return $connection->raw(
+            $grammar->wrap(substr($table, 0, strrpos($table, '.'))).'.'
+            .$grammar->wrap(str_replace(['-', '.'], '_', strtolower($name.'_'.implode('_', $columns).'_index')))
+        );
     }
 
     /**
