@@ -276,7 +276,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         $result = [];
 
         foreach ($headers as $name => $values) {
-            if (Str::contains($name, $this->sensitiveHeaders, ignoreCase: true)) {
+            if ($this->isSensitiveHeader((string) $name)) {
                 $result[$name] = ['[REDACTED]'];
             } else {
                 $result[$name] = $values;
@@ -284,6 +284,98 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Coerce a header value to valid UTF-8.
+     *
+     * Header bytes come from the client and need not be valid UTF-8. Left
+     * as-is they travel in the `logscope` Context bag, which Laravel
+     * serializes into every job queued during the request — and
+     * Queue::createPayload() encodes with plain
+     * json_encode($value, JSON_UNESCAPED_UNICODE), which returns false on
+     * a malformed sequence and makes Laravel throw InvalidPayloadException.
+     * That breaks the host application's own dispatches, not just ours.
+     *
+     * Cleaning here rather than at the storage encoder is what covers all
+     * three write modes: sync and batch encode at write time, but queue
+     * serializes the raw array long before it reaches LogEntry.
+     *
+     * mb_check_encoding first because this runs per header per log line:
+     * valid input (effectively all of it) skips the conversion entirely.
+     */
+    protected function toValidUtf8(string $value): string
+    {
+        if (mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+    }
+
+    /**
+     * Check if a header name is sensitive.
+     */
+    protected function isSensitiveHeader(string $name): bool
+    {
+        return Str::contains($name, $this->sensitiveHeaders, ignoreCase: true);
+    }
+
+    /**
+     * Reduce a request's headers to the configured allowlist, for the
+     * entry's own `headers` column.
+     *
+     * Names are lowercased, repeated headers are joined with ", ", and
+     * values are flattened to strings — the column is read by humans in
+     * the detail panel and substring-matched by `headers:` search, and
+     * Symfony's name => [values] shape serves neither.
+     *
+     * Returns null rather than an empty array when capture is off or
+     * nothing matched, so an HTTP row with no allowlisted headers reads
+     * the same as a CLI row: no headers to show.
+     */
+    public function captureHeaders(array $headers): ?array
+    {
+        if (! config('logscope.context.headers.enabled', true)) {
+            return null;
+        }
+
+        $allowlist = array_map(
+            static fn ($name): string => strtolower((string) $name),
+            (array) config('logscope.context.headers.allowlist', [])
+        );
+
+        if ($allowlist === []) {
+            return null;
+        }
+
+        $maxLength = (int) config('logscope.context.headers.max_value_length', 500);
+
+        $captured = [];
+
+        foreach ($headers as $name => $values) {
+            $name = strtolower((string) $name);
+
+            if (! in_array($name, $allowlist, true)) {
+                continue;
+            }
+
+            // Redaction wins over the allowlist: listing authorization
+            // explicitly still gets you [REDACTED], never the token.
+            if ($this->isSensitiveHeader($name)) {
+                $captured[$name] = '[REDACTED]';
+
+                continue;
+            }
+
+            $captured[$name] = Str::limit(
+                $this->toValidUtf8(implode(', ', (array) $values)),
+                $maxLength,
+                '…[truncated]'
+            );
+        }
+
+        return $captured === [] ? null : $captured;
     }
 
     /**

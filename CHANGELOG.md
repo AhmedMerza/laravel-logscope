@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Entries can now carry the request's headers** (#30). Run `php artisan migrate` for the new nullable `headers` column. Capture is allowlist-only and off-limits to secrets: `content-type`, `accept`, `referer`, `x-forwarded-for`, `x-request-id` and `origin` are captured by default, anything matching `context.sensitive_headers` is stored as `[REDACTED]` even if you allowlist it explicitly, and values over `context.headers.max_value_length` (500) are cut and end in `…[truncated]`. There is deliberately no "capture everything" mode — unknown vendor auth headers, `php-auth-pw` and table growth all live there. Headers are stored per row, so a request that logs 20 lines stores them 20 times; with the default allowlist that is a few hundred bytes a row. CLI-originated logs store `null`. The detail panel shows them in their own section above Context, each row with a button that pivots the list to a `headers:` search, and `headers:<value>` matches the stored JSON — names as well as values, so `headers:x-request-id` finds every row that carried that header. Plain-text search does not scan the column. Set `LOGSCOPE_CAPTURE_HEADERS=false` to turn the whole thing off; `logscope:doctor` reports whether it is on and what is allowlisted.
+
 ### Changed
+
+- **`ContextSanitizerInterface` gained a `captureHeaders()` method** (#30). **Breaking only if you bound your own implementation** of `LogScope\Contracts\ContextSanitizerInterface` in the container — that class must now implement `captureHeaders(array $headers): ?array` or PHP will fatal on resolution. The interface is not documented as an extension point and the package's own `ContextSanitizer` is what ships, so almost no one is affected; if you are, the shipped implementation at `src/Services/ContextSanitizer.php` is the reference.
 
 - **LogScope now requires Laravel 11 or later** (#52). `composer.json` allowed Laravel 10, but LogScope has never worked on it. Since v0.1.0 it has used Laravel's `Context` facade, which Laravel 11 added. On Laravel 10 every web request failed with `Class "Illuminate\Support\Facades\Context" not found` (unless `LOGSCOPE_MIDDLEWARE_ENABLED=false`), and log entries weren't saved. Composer no longer installs LogScope on Laravel 10. Nothing changes on Laravel 11 or 12.
 

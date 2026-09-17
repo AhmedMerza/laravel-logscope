@@ -20,6 +20,7 @@
                     <option value="message">Message</option>
                     <option value="context">Context</option>
                     <option value="source">Source</option>
+                    <option value="headers">Headers</option>
                 </select>
                 <button @click="searches[0].exclude = !searches[0].exclude; cursor = null; cursorStack = []; fetchLogs()"
                     class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0 hidden md:flex items-center"
@@ -231,6 +232,7 @@
                 <option value="message">Message</option>
                 <option value="context">Context</option>
                 <option value="source">Source</option>
+                <option value="headers">Headers</option>
             </select>
             <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; cursor = null; cursorStack = []; fetchLogs()"
                 class="h-8 px-2 rounded-md text-xs font-bold font-mono transition-colors border"

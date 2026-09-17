@@ -30,4 +30,11 @@ interface ContextSanitizerInterface
      * Sanitize a URL by redacting sensitive query parameters.
      */
     public function sanitizeUrl(string $url): string;
+
+    /**
+     * Reduce a request's headers to the configured allowlist.
+     *
+     * Returns null when capture is disabled or nothing matched.
+     */
+    public function captureHeaders(array $headers): ?array;
 }

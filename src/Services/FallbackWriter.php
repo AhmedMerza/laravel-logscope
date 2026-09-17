@@ -135,6 +135,7 @@ class FallbackWriter
             'user_agent' => $requestContext['user_agent'] ?? null,
             'http_method' => $requestContext['http_method'] ?? null,
             'url' => $requestContext['url'] ?? null,
+            'headers' => $requestContext['headers'] ?? null,
         ], $e, $where);
     }
 
@@ -206,6 +207,7 @@ class FallbackWriter
             'user_agent' => $data['user_agent'] ?? null,
             'http_method' => $data['http_method'] ?? null,
             'url' => $data['url'] ?? null,
+            'headers' => $data['headers'] ?? null,
             'occurred_at' => $data['occurred_at'] ?? now(),
             'context' => [
                 '_logscope_write_failure' => [

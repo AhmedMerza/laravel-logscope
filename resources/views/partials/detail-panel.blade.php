@@ -68,6 +68,33 @@
                 x-text="selectedLog?.message"></pre>
         </div>
 
+        <!-- Headers -->
+        <div x-show="selectedLog?.headers">
+            <div class="flex items-center justify-between mb-2">
+                <p class="section-header">Headers</p>
+                <button @click="copyHeaders()"
+                    class="copy-btn p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors"
+                    title="Copy all headers">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm font-mono space-y-1">
+                <template x-for="header in headerRows()" :key="header.name">
+                    <div class="flex items-start gap-2 group/header">
+                        <span class="json-key shrink-0" x-text="header.name + ':'"></span>
+                        <span class="json-string break-all flex-1" x-text="header.value"></span>
+                        <button @click="searchByHeader(header.value)"
+                            :title="'Filter by ' + header.name"
+                            class="shrink-0 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity opacity-100 md:opacity-0 md:group-hover/header:opacity-100 focus:opacity-100">
+                            @include('logscope::partials.icon-filter')
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Context -->
         <div x-show="selectedLog?.context && Object.keys(selectedLog?.context || {}).length > 0">
             <div class="flex items-center justify-between mb-2">
@@ -90,29 +117,47 @@
         <div x-show="selectedLog?.trace_id || selectedLog?.user_id || selectedLog?.ip_address || selectedLog?.url">
             <p class="section-header mb-2">Request Context</p>
             <div class="space-y-2">
+                {{-- Values are plain text, not buttons: you can't drag-select
+                     text inside a <button>, and these are exactly the values
+                     people copy. The funnel button does the pivot instead. --}}
                 <!-- Trace ID -->
-                <div x-show="selectedLog?.trace_id">
-                    <button @click="filterByTraceId(selectedLog?.trace_id)"
-                        class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-violet-500 hover:bg-[var(--surface-3)] text-left break-all transition-colors group">
-                        <span class="text-xs text-[var(--text-muted)] block">Trace ID</span>
-                        <span x-text="selectedLog?.trace_id" class="text-xs font-mono text-violet-400 group-hover:text-violet-300"></span>
-                    </button>
+                <div x-show="selectedLog?.trace_id"
+                    class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-violet-500 group/trace">
+                    <span class="text-xs text-[var(--text-muted)] block">Trace ID</span>
+                    <div class="flex items-start gap-2">
+                        <span x-text="selectedLog?.trace_id" class="text-xs font-mono text-violet-400 break-all flex-1"></span>
+                        <button @click="filterByTraceId(selectedLog?.trace_id)"
+                            title="Filter by this trace ID"
+                            class="shrink-0 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity opacity-100 md:opacity-0 md:group-hover/trace:opacity-100 focus:opacity-100">
+                            @include('logscope::partials.icon-filter')
+                        </button>
+                    </div>
                 </div>
                 <!-- User ID -->
-                <div x-show="selectedLog?.user_id">
-                    <button @click="filterByUserId(selectedLog?.user_id)"
-                        class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-cyan-500 hover:bg-[var(--surface-3)] text-left transition-colors group">
-                        <span class="text-xs text-[var(--text-muted)] block">User ID</span>
-                        <span x-text="selectedLog?.user_id" class="text-sm font-mono text-cyan-400 group-hover:text-cyan-300"></span>
-                    </button>
+                <div x-show="selectedLog?.user_id"
+                    class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-cyan-500 group/user">
+                    <span class="text-xs text-[var(--text-muted)] block">User ID</span>
+                    <div class="flex items-start gap-2">
+                        <span x-text="selectedLog?.user_id" class="text-sm font-mono text-cyan-400 break-all flex-1"></span>
+                        <button @click="filterByUserId(selectedLog?.user_id)"
+                            title="Filter by this user ID"
+                            class="shrink-0 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity opacity-100 md:opacity-0 md:group-hover/user:opacity-100 focus:opacity-100">
+                            @include('logscope::partials.icon-filter')
+                        </button>
+                    </div>
                 </div>
                 <!-- IP Address -->
-                <div x-show="selectedLog?.ip_address">
-                    <button @click="filterByIpAddress(selectedLog?.ip_address)"
-                        class="w-full p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-amber-500 hover:bg-[var(--surface-3)] text-left transition-colors group">
-                        <span class="text-xs text-[var(--text-muted)] block">IP Address</span>
-                        <span x-text="selectedLog?.ip_address" class="text-sm font-mono text-amber-400 group-hover:text-amber-300"></span>
-                    </button>
+                <div x-show="selectedLog?.ip_address"
+                    class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] border-l-4 border-l-amber-500 group/ip">
+                    <span class="text-xs text-[var(--text-muted)] block">IP Address</span>
+                    <div class="flex items-start gap-2">
+                        <span x-text="selectedLog?.ip_address" class="text-sm font-mono text-amber-400 break-all flex-1"></span>
+                        <button @click="filterByIpAddress(selectedLog?.ip_address)"
+                            title="Filter by this IP address"
+                            class="shrink-0 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] transition-opacity opacity-100 md:opacity-0 md:group-hover/ip:opacity-100 focus:opacity-100">
+                            @include('logscope::partials.icon-filter')
+                        </button>
+                    </div>
                 </div>
                 <!-- HTTP Method & URL -->
                 <div x-show="selectedLog?.http_method || selectedLog?.url" class="p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">

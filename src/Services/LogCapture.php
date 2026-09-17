@@ -128,6 +128,7 @@ class LogCapture
             'user_agent' => $requestContext['user_agent'] ?? null,
             'http_method' => $requestContext['http_method'] ?? null,
             'url' => $requestContext['url'] ?? null,
+            'headers' => $requestContext['headers'] ?? null,
             'occurred_at' => now(),
         ];
     }

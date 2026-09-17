@@ -427,6 +427,13 @@ return [
     |                       will be replaced with [REDACTED].
     |                       Entries are added to the defaults, never replace them.
     |
+    | 'headers' - Capture request headers onto each entry's own column.
+    |             Allowlist only: there is no "capture everything" mode, because
+    |             that is where the risk lives (unknown vendor auth headers,
+    |             php-auth-pw, table growth). Add what you need to 'allowlist'.
+    |             Anything matching sensitive_headers is stored as [REDACTED]
+    |             even when you allowlist it explicitly.
+    |
     */
 
     'context' => [
@@ -440,6 +447,21 @@ return [
 
         // Added to the defaults: auth, cookie, token, key, secret, password, session
         'sensitive_headers' => [],
+
+        'headers' => [
+            'enabled' => env('LOGSCOPE_CAPTURE_HEADERS', true),
+
+            // Matched case-insensitively. user-agent is absent on purpose:
+            // it already has its own column.
+            'allowlist' => [
+                'content-type', 'accept', 'referer',
+                'x-forwarded-for', 'x-request-id', 'origin',
+            ],
+
+            // Longer values are cut and end in …[truncated], so a trimmed
+            // value is never mistaken for the real one.
+            'max_value_length' => 500,
+        ],
     ],
 
     /*

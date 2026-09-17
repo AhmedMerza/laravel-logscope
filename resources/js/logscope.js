@@ -356,6 +356,25 @@ function logScope() {
             this.debouncedFetchLogs();
         },
 
+        // Every captured header, in capture order. There's no second noise
+        // filter here on purpose: the allowlist already decides what is
+        // worth storing, so anything in this column was asked for.
+        headerRows() {
+            const headers = this.selectedLog?.headers;
+            if (!headers) return [];
+
+            return Object.entries(headers).map(([name, value]) => ({ name, value }));
+        },
+
+        // headers: is a substring match over the stored JSON, so this finds
+        // every row that carried the same value — the pivot the panel is for.
+        searchByHeader(value) {
+            if (!value) return;
+            this.resetFiltersForPivot();
+            this.searches = [{ field: 'headers', value: String(value), exclude: false }];
+            this.debouncedFetchLogs();
+        },
+
         toggleLevel(level) {
             const inInclude = this.filters.levels.indexOf(level);
             const inExclude = this.filters.excludeLevels.indexOf(level);
@@ -989,6 +1008,22 @@ function logScope() {
                 const json = JSON.stringify(this.selectedLog.context, null, 2);
                 await navigator.clipboard.writeText(json);
                 this.showToast('Context copied to clipboard', 'success', 2000);
+            } catch (err) {
+                this.showToast('Failed to copy to clipboard', 'error');
+            }
+        },
+
+        // Headers copy as `name: value` lines rather than JSON — they're a
+        // flat string map, and that's the shape you paste into a ticket.
+        async copyHeaders() {
+            if (!this.selectedLog?.headers) return;
+
+            try {
+                const text = Object.entries(this.selectedLog.headers)
+                    .map(([name, value]) => `${name}: ${value}`)
+                    .join('\n');
+                await navigator.clipboard.writeText(text);
+                this.showToast('Headers copied to clipboard', 'success', 2000);
             } catch (err) {
                 this.showToast('Failed to copy to clipboard', 'error');
             }

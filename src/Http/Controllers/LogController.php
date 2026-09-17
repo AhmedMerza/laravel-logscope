@@ -239,7 +239,10 @@ class LogController extends Controller
         ];
 
         if (config('logscope.pagination.eager_load_detail', true)) {
-            array_splice($listColumns, 2, 0, ['message', 'context']);
+            // headers rides with the other detail-panel-only fields: when
+            // eager loading is off, the panel falls back to /logs/{id},
+            // which returns the whole model including headers.
+            array_splice($listColumns, 2, 0, ['message', 'context', 'headers']);
         }
 
         $items = $query->select($listColumns)->limit($perPage + 1)->get();
@@ -604,6 +607,12 @@ class LogController extends Controller
             'url',
             'trace_id',
             'http_method',
+            // Matches the stored JSON, so names as well as values:
+            // headers:application/xml finds a content type, headers:origin
+            // finds every row that carried an Origin header at all (#30).
+            // Deliberately absent from the 'any' column list below, so
+            // ordinary searches don't LIKE over a JSON column.
+            'headers',
         ];
     }
 
