@@ -828,7 +828,7 @@ LOGSCOPE_CAPTURE_HEADERS=true
 Block malicious IPs directly from the LogScope UI and sync the blacklist across all your environments automatically. (Previously named `ahmedmerza/logscope-guard`.)
 
 ```bash
-composer require ahmedmerza/laravel-watchtower
+composer require ahmedmerza/watchtower
 php artisan watchtower:install
 ```
 
