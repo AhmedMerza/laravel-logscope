@@ -194,7 +194,10 @@ describe('headers search', function () {
         $response->assertOk();
 
         expect($response->json('data'))->toHaveCount(1)
-            ->and($response->json('data.0.message'))->toBe('xml client');
+            ->and($response->json('data.0.message'))->toBe('xml client')
+            // The list payload must carry headers, or the detail panel
+            // falls back to a second request per row (#30).
+            ->and($response->json('data.0.headers'))->toBe(['content-type' => 'application/xml']);
     });
 
     it('does not scan headers in plain-text search', function () {

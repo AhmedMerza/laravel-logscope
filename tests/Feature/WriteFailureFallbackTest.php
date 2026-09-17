@@ -105,6 +105,31 @@ it('preserves trace_id from request context on the fallback row', function () {
         ->and($entry->trace_id)->toBe('trace-abc-123');
 });
 
+it('preserves captured headers on the fallback row', function () {
+    // The fallback row exists to explain an outage, so it should carry the
+    // same request evidence as a normal row (#30).
+    //
+    // This pins buildPayload()'s copy — the replay path, where $data was
+    // already built upstream and the persist failed. Verified by deleting
+    // that line and watching this go red. recordFromEvent()'s own
+    // passthrough stays unpinned: it only runs when the failure happens
+    // before $data exists (LogCapture.php:97), which needs buildLogData()
+    // itself to throw.
+    poisonNormalInserts();
+
+    Context::add('logscope', [
+        'trace_id' => 'trace-headers-1',
+        'headers' => ['x-request-id' => 'req-on-fallback'],
+    ]);
+
+    Log::error('original message');
+
+    $entry = LogEntry::query()->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->headers)->toBe(['x-request-id' => 'req-on-fallback']);
+});
+
 it('does not write a fallback row when persist_fallback is disabled', function () {
     config(['logscope.write_failure.persist_fallback' => false]);
     poisonNormalInserts();
