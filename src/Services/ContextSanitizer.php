@@ -314,6 +314,38 @@ class ContextSanitizer implements ContextSanitizerInterface
     }
 
     /**
+     * Coerce every string in a request-context bag to valid UTF-8.
+     *
+     * CaptureRequestContext builds its bag out of request data, and any of
+     * it can be raw client bytes. Laravel copies the Context bag into every
+     * job the HOST application queues during that request, so a single bad
+     * byte makes the host's own dispatch throw InvalidPayloadException,
+     * with nothing in the trace to say a logging middleware caused it.
+     *
+     * Guarding the whole bag rather than the fields known to carry client
+     * bytes is deliberate. #30 fixed this for captured headers; #63 found
+     * it again on the user_agent line directly above them. Every field
+     * added to the bag later is another chance to forget, and the guard
+     * costs one mb_check_encoding per string.
+     *
+     * Keys are left alone: the only ones sourced from a request are header
+     * names, and captureHeaders() keeps a name only when it matches the
+     * configured allowlist exactly — so a kept key came from config.
+     */
+    public function toValidUtf8Deep(array $bag): array
+    {
+        foreach ($bag as $key => $value) {
+            if (is_string($value)) {
+                $bag[$key] = $this->toValidUtf8($value);
+            } elseif (is_array($value)) {
+                $bag[$key] = $this->toValidUtf8Deep($value);
+            }
+        }
+
+        return $bag;
+    }
+
+    /**
      * Check if a header name is sensitive.
      */
     protected function isSensitiveHeader(string $name): bool

@@ -443,3 +443,28 @@ describe('extractSourceLine', function () {
         expect($result)->toBe($callerLine);
     });
 });
+
+describe('toValidUtf8Deep', function () {
+    it('cleans strings at every depth and leaves everything else alone', function () {
+        // 0xB1 is a continuation byte with no lead byte — the shape a broken
+        // client's User-Agent takes, and what json_encode() returns false on.
+        $bad = 'agent '.chr(0xB1);
+
+        $result = $this->sanitizer->toValidUtf8Deep([
+            'trace_id' => 'plain-ascii',
+            'user_agent' => $bad,
+            'headers' => ['referer' => $bad],
+            'user_id' => 42,
+            'ip_address' => null,
+        ]);
+
+        expect(json_encode($result, JSON_UNESCAPED_UNICODE))->not->toBeFalse()
+            ->and(mb_check_encoding($result['user_agent'], 'UTF-8'))->toBeTrue()
+            ->and(mb_check_encoding($result['headers']['referer'], 'UTF-8'))->toBeTrue()
+            // Substituted, not dropped.
+            ->and($result['user_agent'])->toStartWith('agent ')
+            ->and($result['trace_id'])->toBe('plain-ascii')
+            ->and($result['user_id'])->toBe(42)
+            ->and($result['ip_address'])->toBeNull();
+    });
+});
