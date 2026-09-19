@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-09-19
+
+**Upgrading from 1.x:** run `php artisan migrate` — this release adds the `headers` column and converts `user_id`.
+
+One breaking change affects ordinary use: the API now returns `user_id` as a string, so a consumer comparing it to a number stops matching. Four more are listed under **Changed**, each narrow — two fail loudly at boot if you bound your own `ContextSanitizerInterface`, one affects code that writes `LogEntry` rows directly, and one drops Laravel 10, which never worked.
+
 ### Added
 
 - **Entries can now carry the request's headers** (#30). Run `php artisan migrate` for the new nullable `headers` column. Capture is allowlist-only and off-limits to secrets: `content-type`, `accept`, `referer`, `x-forwarded-for`, `x-request-id` and `origin` are captured by default, anything matching `context.sensitive_headers` is stored as `[REDACTED]` even if you allowlist it explicitly, and values over `context.headers.max_value_length` (500) are cut and end in `…[truncated]`. There is deliberately no "capture everything" mode — unknown vendor auth headers, `php-auth-pw` and table growth all live there. Headers are stored per row, so a request that logs 20 lines stores them 20 times; with the default allowlist that is a few hundred bytes a row. CLI-originated logs store `null`. The detail panel shows them in their own section above Context, each row with a button that pivots the list to a `headers:` search, and `headers:<value>` matches the stored JSON — names as well as values, so `headers:x-request-id` finds every row that carried that header. Plain-text search does not scan the column. Set `LOGSCOPE_CAPTURE_HEADERS=false` to turn the whole thing off; `logscope:doctor` reports whether it is on and what is allowlisted.
