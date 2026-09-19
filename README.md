@@ -253,11 +253,26 @@ LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
 
 ```env
 # Filter out noisy logs
-LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip "is deprecated" messages (default: true)
+LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip PHP deprecation notices (default: true)
 LOGSCOPE_IGNORE_NULL_CHANNEL=false # Skip logs without a channel (default: false)
 ```
 
-> **Note:** `null_channel` defaults to `false` because `Log::build()` (dynamic loggers) produce logs without a channel. Setting this to `true` would filter out those logs.
+**How the deprecations filter decides.** It does *not* drop anything containing the words "is deprecated" — that was the behaviour before v1.5.5, and it silently swallowed real logs like `Log::warning('Account 42 is deprecated for billing')`. A log is now ignored if either:
+
+1. its channel is listed in `ignore.deprecation_channels` (default `['deprecations']`, Laravel's standard channel for `E_DEPRECATED`), or
+2. its message matches Laravel's wrapped runtime-deprecation format — the one ending `is deprecated in <file> on line <N>`.
+
+The second check exists because Laravel creates the `deprecations` channel lazily, on the first deprecation, which is after LogScope's channel processor registers — so the channel name alone caught nothing (v1.5.5–v1.5.6). Requiring the `on line <N>` suffix is what keeps it from matching business logs again.
+
+If your app routes deprecations through a differently-named channel, add it in `config/logscope.php`:
+
+```php
+'ignore' => [
+    'deprecation_channels' => ['deprecations', 'php-warnings'],
+],
+```
+
+> **⚠️ Think before enabling `null_channel`.** Logs with no channel are not just `Log::build()` dynamic loggers — they also include Laravel's own framework-level error reporter, which routes uncaught exceptions through a stack that may not carry the channel processor. **Enabling this will drop unhandled exceptions in many apps.** Only turn it on if you know exactly what flows through the no-channel path in your app.
 
 ### Cache TTL
 
@@ -608,6 +623,11 @@ php artisan logscope:doctor --json
 # Smoke-test the capture pipeline end-to-end
 php artisan logscope:test
 php artisan logscope:test --keep   # leave the test entry in the table
+
+# Fill the dashboard with sample entries (local evaluation)
+php artisan logscope:seed
+php artisan logscope:seed 200 --level=error
+php artisan logscope:seed --realistic   # emit through Laravel's logger, not direct inserts
 ```
 
 > **Note:** The import command is a one-time migration for existing log files. After setup, new logs are captured automatically.
@@ -615,6 +635,8 @@ php artisan logscope:test --keep   # leave the test entry in the table
 `logscope:doctor` checks the table, capture mode, write mode (including queue connection), middleware wiring, retention + schedule status, authorization resolution path, Octane integration, built assets, and any cached write-failure breadcrumb. Run it after install or whenever something feels off.
 
 `logscope:test` emits a uniquely-tagged log through the configured capture path, forces a sync write for the duration of the test, and verifies the entry lands in `log_entries`. Useful as a one-shot post-install sanity check.
+
+`logscope:seed` generates sample entries so you can see the dashboard populated before your app has produced any real logs. `--realistic` routes them through Laravel's logger instead of inserting rows directly, which exercises the actual capture path. It writes fabricated data into `log_entries` — keep it out of production.
 
 ---
 
