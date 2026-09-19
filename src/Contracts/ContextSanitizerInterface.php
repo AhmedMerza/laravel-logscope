@@ -37,4 +37,13 @@ interface ContextSanitizerInterface
      * Returns null when capture is disabled or nothing matched.
      */
     public function captureHeaders(array $headers): ?array;
+
+    /**
+     * Coerce every string in a request-context bag to valid UTF-8.
+     *
+     * Laravel serializes the Context bag into every job the host
+     * application queues, and json_encode() returns false on a malformed
+     * byte — which Laravel reports as InvalidPayloadException.
+     */
+    public function toValidUtf8Deep(array $bag): array;
 }
