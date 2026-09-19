@@ -18,10 +18,13 @@ declare(strict_types=1);
 // to record a bad request is the line that arrives with no detail — which
 // is why every assertion below checks for the REAL row, not just any row.
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
 
@@ -82,6 +85,38 @@ it('stores the real context in batch mode, which bypasses the model mutator', fu
         // Load-bearing: without it the test passes on the consolation row.
         // insert() fails on the unencodable array, LogBuffer catches it per
         // chunk, and FallbackWriter rewrites the row through Eloquent.
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
+        ->and($entry->context['agent'])->toStartWith('Mozilla/5.0 ');
+});
+
+it('stores the real context in queue mode, which serializes before storage', function () {
+    // The boundary the storage encoder cannot reach. Laravel encodes the
+    // whole job payload inside dispatch(), so a malformed byte throws
+    // InvalidPayloadException in the CALLER — no job is ever queued, and
+    // FallbackWriter writes the consolation row synchronously instead.
+    config(['logscope.write_mode' => 'queue', 'queue.default' => 'database']);
+
+    Schema::dropIfExists('jobs');
+    Schema::create('jobs', function (Blueprint $table) {
+        $table->id();
+        $table->string('queue')->index();
+        $table->longText('payload');
+        $table->unsignedTinyInteger('attempts');
+        $table->unsignedInteger('reserved_at')->nullable();
+        $table->unsignedInteger('available_at');
+        $table->unsignedInteger('created_at');
+    });
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    // Dispatch has to have survived for there to be a job at all.
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    $this->artisan('queue:work', ['--once' => true]);
+
+    $entry = LogEntry::query()->where('message', 'rejected request')->latest('occurred_at')->first();
+
+    expect($entry)->not->toBeNull()
         ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
         ->and($entry->context['agent'])->toStartWith('Mozilla/5.0 ');
 });

@@ -328,21 +328,34 @@ class ContextSanitizer implements ContextSanitizerInterface
      * added to the bag later is another chance to forget, and the guard
      * costs one mb_check_encoding per string.
      *
-     * Keys are left alone: the only ones sourced from a request are header
-     * names, and captureHeaders() keeps a name only when it matches the
-     * configured allowlist exactly — so a kept key came from config.
+     * Keys are cleaned too, which #63 did not need. Its bag's only
+     * request-sourced keys are header names kept by captureHeaders(), which
+     * matches an allowlist exactly — so a kept key came from config. #67
+     * gave this method a second caller whose keys are not: a log entry's
+     * own context can hold a Request, and sanitizeHeaders() copies those
+     * header names in verbatim with no allowlist at all.
+     *
+     * Two malformed keys can therefore collapse into one, last value
+     * winning. That is what json_encode() does with them anyway, and the
+     * alternative is losing the whole array.
      */
     public function toValidUtf8Deep(array $bag): array
     {
+        $clean = [];
+
         foreach ($bag as $key => $value) {
+            $key = is_string($key) ? $this->toValidUtf8($key) : $key;
+
             if (is_string($value)) {
-                $bag[$key] = $this->toValidUtf8($value);
+                $clean[$key] = $this->toValidUtf8($value);
             } elseif (is_array($value)) {
-                $bag[$key] = $this->toValidUtf8Deep($value);
+                $clean[$key] = $this->toValidUtf8Deep($value);
+            } else {
+                $clean[$key] = $value;
             }
         }
 
-        return $bag;
+        return $clean;
     }
 
     /**

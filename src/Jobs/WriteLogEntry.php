@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Models\LogEntry;
 use LogScope\Services\FallbackWriter;
 use LogScope\Services\TransactionSavepoint;
@@ -23,10 +24,24 @@ class WriteLogEntry implements ShouldQueue
 
     /**
      * Create a new job instance.
+     *
+     * $data is coerced to valid UTF-8 here because Laravel encodes the
+     * whole payload at dispatch, long before handle() reaches LogEntry's
+     * encoder. A malformed byte anywhere in it — most easily the log
+     * call's own context, `['agent' => $request->userAgent()]` — makes
+     * Queue::createPayload() throw InvalidPayloadException in the caller,
+     * so `queue` write mode degraded the entry to a _logscope_write_failure
+     * marker while `sync` and `batch` stored it fine (#67).
+     *
+     * The whole array rather than `context` alone, for the reason #63 gives
+     * for the Context bag: every field added later is another chance to
+     * forget, and the guard costs one mb_check_encoding per string.
      */
     public function __construct(
         public array $data
     ) {
+        $this->data = app(ContextSanitizerInterface::class)->toValidUtf8Deep($data);
+
         $this->onQueue(config('logscope.queue.name', 'default'));
 
         if ($connection = config('logscope.queue.connection')) {
