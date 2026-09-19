@@ -39,11 +39,20 @@ interface ContextSanitizerInterface
     public function captureHeaders(array $headers): ?array;
 
     /**
-     * Coerce every string in a request-context bag to valid UTF-8.
+     * Coerce every string in an array — keys as well as values, at every
+     * depth — to valid UTF-8.
      *
      * Laravel serializes the Context bag into every job the host
      * application queues, and json_encode() returns false on a malformed
      * byte — which Laravel reports as InvalidPayloadException.
+     *
+     * Keys are part of the contract, not an implementation detail (#67).
+     * LogScope also calls this on a queued log entry's own data, whose
+     * context can hold a Request: sanitizeHeaders() copies header names in
+     * verbatim with no allowlist, so they are attacker-controlled and
+     * become JSON object keys. An implementation that cleans only values
+     * resolves and runs fine, and silently lets a malformed header name
+     * break dispatch for the host application.
      */
     public function toValidUtf8Deep(array $bag): array;
 }
