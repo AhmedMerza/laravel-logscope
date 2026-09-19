@@ -190,7 +190,7 @@ class ImportCommand extends Command
             $limits['message_preview_length'] ?? 500
         );
 
-        $contextJson = json_encode($entry['context'] ?? []);
+        $contextJson = LogEntry::encodeContext($entry['context'] ?? []);
         $contextPreview = LogEntry::createPreview(
             $contextJson,
             $limits['context_preview_length'] ?? 500
@@ -210,7 +210,7 @@ class ImportCommand extends Command
             'level' => $entry['level'],
             'message' => $entry['message'],
             'message_preview' => $messagePreview,
-            'context' => json_encode($entry['context'] ?? []),
+            'context' => $contextJson,
             'context_preview' => $contextPreview,
             'channel' => $entry['channel'] ?? 'import',
             'environment' => $entry['environment'] ?? app()->environment(),

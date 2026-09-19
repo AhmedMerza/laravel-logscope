@@ -36,7 +36,6 @@ class LogEntry extends Model
     protected function casts(): array
     {
         return [
-            'context' => 'array',
             'occurred_at' => 'datetime',
             'created_at' => 'datetime',
             'status_changed_at' => 'datetime',
@@ -80,6 +79,48 @@ class LogEntry extends Model
             $headers,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
         );
+    }
+
+    /**
+     * Log context (#67).
+     *
+     * Not a plain 'array' cast. That cast encodes with bare json_encode(),
+     * which returns false on a malformed UTF-8 byte; Laravel turns the
+     * false into a JsonEncodingException, LogCapture catches it, and
+     * FallbackWriter rewrites the row with a _logscope_write_failure
+     * marker — so the one log line written to record a bad request is the
+     * line that arrives with no detail.
+     */
+    protected function context(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?array => $value === null ? null : json_decode($value, true),
+            set: fn (?array $value): ?string => $value === null ? null : static::encodeContext($value),
+        );
+    }
+
+    /**
+     * Encode context for storage. Shared with prepareData() and
+     * ImportCommand, which write through insert() and so never reach the
+     * mutator above — #67 found three bare json_encode() calls on this one
+     * column, which is why they now share an encoder rather than a flag.
+     *
+     * JSON_INVALID_UTF8_SUBSTITUTE is load-bearing here for the same reason
+     * as encodeHeaders(), and reached far more often: any ordinary
+     * Log::warning('…', ['agent' => $request->userAgent()]) puts raw client
+     * bytes in this column. The flag substitutes inside object keys as well
+     * as values, which is what covers the header names sanitizeHeaders()
+     * copies in verbatim — unlike captureHeaders(), it has no allowlist, so
+     * those keys are attacker-controlled.
+     *
+     * No escaping flags, deliberately unlike encodeHeaders(): the 'array'
+     * cast this replaces used none, and `context:` search is a substring
+     * LIKE over these bytes. Valid input stays byte-identical to what
+     * previous versions stored.
+     */
+    public static function encodeContext(array $context): string
+    {
+        return (string) json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function getTable(): string
@@ -443,14 +484,14 @@ class LogEntry extends Model
 
         // Generate context preview, handle truncation, then JSON-encode for insert()
         if (isset($attributes['context']) && is_array($attributes['context'])) {
-            $contextJson = json_encode($attributes['context']);
+            $contextJson = static::encodeContext($attributes['context']);
             $maxPreview = $limits['context_preview_length'] ?? 500;
             $truncateAt = $limits['truncate_at'] ?? 1000000;
 
             $attributes['context_preview'] = static::createPreview($contextJson, $maxPreview);
 
             if (strlen($contextJson) > $truncateAt) {
-                $attributes['context'] = json_encode(['_truncated' => true, '_original_size' => strlen($contextJson)]);
+                $attributes['context'] = static::encodeContext(['_truncated' => true, '_original_size' => strlen($contextJson)]);
                 $attributes['is_truncated'] = true;
             } else {
                 $attributes['context'] = $contextJson;
@@ -530,7 +571,7 @@ class LogEntry extends Model
 
         // Generate context preview
         if (isset($attributes['context']) && is_array($attributes['context'])) {
-            $contextJson = json_encode($attributes['context']);
+            $contextJson = static::encodeContext($attributes['context']);
             $maxPreview = $limits['context_preview_length'] ?? 500;
             $maxInline = $limits['context_inline_max'] ?? 32000;
             $truncateAt = $limits['truncate_at'] ?? 1000000;
