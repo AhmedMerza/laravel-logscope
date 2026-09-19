@@ -1,0 +1,272 @@
+<?php
+
+declare(strict_types=1);
+
+// Tests for issue #67 — a raw client byte reaching the log entry's own
+// `context` column.
+//
+// Third surface for the same root cause: #30 fixed it for the `headers`
+// column, #63 for the request-context bag Laravel serializes into queued
+// jobs. This one is the most commonly reached of the three, because it
+// fires on ordinary application logging rather than on request capture —
+// any Log::warning('…', ['agent' => $request->userAgent()]) will do it.
+//
+// The failure is self-inflicted rather than host-visible: the request still
+// returns 200, but json_encode() returns false, createPreview() raises a
+// TypeError, and FallbackWriter rewrites the row with a
+// _logscope_write_failure marker. So the one log line written specifically
+// to record a bad request is the line that arrives with no detail — which
+// is why every assertion below checks for the REAL row, not just any row.
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use LogScope\LogScopeServiceProvider;
+use LogScope\Models\LogEntry;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->artisan('migrate', ['--path' => __DIR__.'/../../database/migrations']);
+
+    LogScopeServiceProvider::resetBufferState();
+    LogEntry::query()->delete();
+});
+
+/**
+ * A User-Agent as a broken HTTP client or scanner sends it: 0xB1 is a
+ * continuation byte with no lead byte, so the string is not valid UTF-8 and
+ * json_encode() returns false on it.
+ */
+function malformedAgent(): string
+{
+    return 'Mozilla/5.0 '.chr(0xB1).chr(0x1F);
+}
+
+function createJobsTable(): void
+{
+    Schema::dropIfExists('jobs');
+    Schema::create('jobs', function (Blueprint $table) {
+        $table->id();
+        $table->string('queue')->index();
+        $table->longText('payload');
+        $table->unsignedTinyInteger('attempts');
+        $table->unsignedInteger('reserved_at')->nullable();
+        $table->unsignedInteger('available_at');
+        $table->unsignedInteger('created_at');
+    });
+}
+
+/**
+ * The entry a log call actually produced — never the _logscope_write_failure
+ * row FallbackWriter substitutes when the write fails.
+ *
+ * The marker check lives here rather than in each test on purpose. That row
+ * keeps the original message and replaces only the context, and its own
+ * context is clean ASCII that encodes to perfectly valid JSON — so a test
+ * that asserts "the column holds valid JSON" and forgets the marker check
+ * passes against the very bug it exists to pin. Two of these tests did
+ * exactly that until review caught it.
+ */
+function realEntry(string $message = 'rejected request'): LogEntry
+{
+    $entry = LogEntry::query()->where('message', $message)->latest('occurred_at')->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure');
+
+    return $entry;
+}
+
+it('stores the real context in sync mode rather than a failure marker', function () {
+    config(['logscope.write_mode' => 'sync']);
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    $entry = realEntry();
+
+    // Substituted, not dropped: the readable part of the agent survives.
+    expect($entry->context['agent'])->toStartWith('Mozilla/5.0 ')
+        ->and(mb_check_encoding($entry->context['agent'], 'UTF-8'))->toBeTrue();
+});
+
+it('stores the real context in batch mode, which bypasses the model mutator', function () {
+    // batch is the shipped default and writes through LogEntry::insert(), so
+    // prepareData() hand-encodes the column and the mutator never runs. The
+    // testing environment forces sync, so without this the package's own
+    // default path is never exercised with a malformed byte at all.
+    config(['logscope.write_mode' => 'batch']);
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    LogScopeServiceProvider::flushLogBufferStatic();
+
+    // realEntry() rejects the consolation row for us — load-bearing here:
+    // insert() fails on the unencodable array, LogBuffer catches it per
+    // chunk, and FallbackWriter rewrites the row through Eloquent, where
+    // the mutator would encode it correctly.
+    expect(realEntry()->context['agent'])->toStartWith('Mozilla/5.0 ');
+});
+
+it('stores the real context in queue mode, which serializes before storage', function () {
+    // The boundary the storage encoder cannot reach. Laravel encodes the
+    // whole job payload inside dispatch(), so a malformed byte throws
+    // InvalidPayloadException in the CALLER — no job is ever queued, and
+    // FallbackWriter writes the consolation row synchronously instead.
+    config(['logscope.write_mode' => 'queue', 'queue.default' => 'database']);
+    createJobsTable();
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    // Dispatch has to have survived for there to be a job at all.
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    $this->artisan('queue:work', ['--once' => true]);
+
+    $entry = LogEntry::query()->where('message', 'rejected request')->latest('occurred_at')->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
+        ->and($entry->context['agent'])->toStartWith('Mozilla/5.0 ');
+});
+
+it('cleans a malformed header NAME in queue mode, where the key reaches the payload', function () {
+    // The key-coercion path specifically. sanitizeHeaders() has no allowlist,
+    // so header names land in context as JSON object keys — and in queue mode
+    // those keys are encoded into the payload by dispatch(), before any
+    // storage encoder exists to substitute them. The sync-mode header-name
+    // test below cannot reach this: it never constructs a job.
+    config(['logscope.write_mode' => 'queue', 'queue.default' => 'database']);
+    createJobsTable();
+
+    Route::get('/logscope-test/queue-bad-key', function (Request $request) {
+        $request->headers->set('X-Trace-'.chr(0xB1), 'abc');
+
+        Log::error('order failed', ['request' => $request]);
+
+        return 'ok';
+    });
+
+    $this->get('/logscope-test/queue-bad-key')->assertOk();
+
+    // Without the key coercion, dispatch() throws and no job is queued.
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    $this->artisan('queue:work', ['--once' => true]);
+
+    expect(realEntry('order failed')->context)->toHaveKey('request');
+});
+
+it('reads a legacy row whose context column holds scalar JSON without throwing', function () {
+    // The 'array' cast this Attribute replaces encoded a non-array assignment
+    // into scalar JSON — a string became the double-encoded "\"…\"" — so rows
+    // of that shape exist in databases written by earlier versions. Typing the
+    // getter ?array would make every read of one a TypeError, which is a 500
+    // on the dashboard rather than a logging failure. insert() bypasses the
+    // mutator, which is how such a row is written here.
+    foreach (['"some string"', '123', 'true', '', 'null'] as $i => $raw) {
+        LogEntry::insert([
+            'id' => strtolower((string) Str::ulid()),
+            'level' => 'info',
+            'message' => "legacy row {$i}",
+            'context' => $raw,
+            'occurred_at' => now(),
+            'created_at' => now(),
+        ]);
+    }
+
+    $entries = LogEntry::query()->where('message', 'like', 'legacy row%')->get();
+
+    expect($entries)->toHaveCount(5)
+        ->and($entries->firstWhere('message', 'legacy row 0')->context)->toBe('some string')
+        ->and($entries->firstWhere('message', 'legacy row 1')->context)->toBe(123)
+        ->and($entries->firstWhere('message', 'legacy row 2')->context)->toBeTrue()
+        ->and($entries->firstWhere('message', 'legacy row 3')->context)->toBeNull()
+        ->and($entries->firstWhere('message', 'legacy row 4')->context)->toBeNull();
+});
+
+it('stores valid JSON in the column itself, not an empty string', function () {
+    // sqlite accepts '' in a json column; MySQL and Postgres reject it
+    // outright, so an assertion on the decoded attribute alone would pass
+    // here and fail the insert on the databases people actually deploy.
+    config(['logscope.write_mode' => 'sync']);
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    $raw = realEntry()->getRawOriginal('context');
+
+    expect($raw)->not->toBe('')
+        ->and(json_decode($raw, true))->toBeArray()
+        ->and(json_last_error())->toBe(JSON_ERROR_NONE)
+        // The bytes themselves, not just "some valid JSON": the marker row
+        // this used to accept is also valid JSON.
+        ->and(json_decode($raw, true))->toHaveKey('agent');
+});
+
+it('keeps the context preview a string when the context cannot be cleanly encoded', function () {
+    // createPreview(string $content) raised a TypeError on the false that
+    // json_encode() returned — the actual reported crash.
+    config(['logscope.write_mode' => 'sync']);
+
+    Log::warning('rejected request', ['agent' => malformedAgent()]);
+
+    $preview = realEntry()->context_preview;
+
+    expect($preview)->toBeString()->not->toBe('')
+        // Observe the preview of the REAL context. Asserting only "a
+        // non-empty string" was satisfied by the marker row's own preview.
+        ->and($preview)->toContain('agent');
+});
+
+it('survives a malformed byte in a header NAME, not just a value', function () {
+    // sanitizeHeaders() — reached when a Request object is logged — has no
+    // allowlist, unlike captureHeaders(). The header *names* are therefore
+    // attacker-controlled and become JSON object keys inside context, where
+    // a bad byte breaks json_encode() exactly as one in a value does.
+    config(['logscope.write_mode' => 'sync']);
+
+    Route::get('/logscope-test/bad-header-name', function (Request $request) {
+        // Set on the inbound request rather than sent over the wire: the
+        // test HTTP layer normalises names on the way in, and the point
+        // under test is what sanitizeHeaders() does with one, not whether
+        // Symfony will carry it.
+        $request->headers->set('X-Trace-'.chr(0xB1), 'abc');
+
+        Log::error('order failed', ['request' => $request]);
+
+        return 'ok';
+    });
+
+    $this->get('/logscope-test/bad-header-name')->assertOk();
+
+    $entry = LogEntry::query()->where('message', 'order failed')->latest('occurred_at')->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
+        ->and(json_decode($entry->getRawOriginal('context'), true))->toBeArray()
+        ->and(json_last_error())->toBe(JSON_ERROR_NONE);
+});
+
+it('writes a real row for a logged Request carrying a malformed header value', function () {
+    config(['logscope.write_mode' => 'sync']);
+
+    Route::get('/logscope-test/context-utf8', function (Request $request) {
+        Log::error('order failed', ['request' => $request]);
+
+        return 'ok';
+    });
+
+    $this->get('/logscope-test/context-utf8', ['Referer' => 'https://shop.test/'.chr(0xB1)])
+        ->assertOk();
+
+    $entry = LogEntry::query()->where('message', 'order failed')->latest('occurred_at')->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->context)->not->toHaveKey('_logscope_write_failure')
+        ->and($entry->context)->toHaveKey('request');
+});

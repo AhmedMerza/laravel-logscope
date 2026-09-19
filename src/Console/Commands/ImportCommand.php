@@ -190,7 +190,12 @@ class ImportCommand extends Command
             $limits['message_preview_length'] ?? 500
         );
 
-        $contextJson = json_encode($entry['context'] ?? []);
+        // Shares LogEntry's encoder so this call site can't drift from the
+        // other two (#67). Defensive rather than load-bearing, and untested
+        // for that reason: LogParser decodes a line's context with
+        // JSON_THROW_ON_ERROR, which throws on a malformed byte and leaves
+        // those bytes in the message, so `context` never carries one here.
+        $contextJson = LogEntry::encodeContext($entry['context'] ?? []);
         $contextPreview = LogEntry::createPreview(
             $contextJson,
             $limits['context_preview_length'] ?? 500
@@ -210,7 +215,7 @@ class ImportCommand extends Command
             'level' => $entry['level'],
             'message' => $entry['message'],
             'message_preview' => $messagePreview,
-            'context' => json_encode($entry['context'] ?? []),
+            'context' => $contextJson,
             'context_preview' => $contextPreview,
             'channel' => $entry['channel'] ?? 'import',
             'environment' => $entry['environment'] ?? app()->environment(),

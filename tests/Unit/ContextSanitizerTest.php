@@ -467,4 +467,39 @@ describe('toValidUtf8Deep', function () {
             ->and($result['user_id'])->toBe(42)
             ->and($result['ip_address'])->toBeNull();
     });
+
+    it('cleans malformed bytes in keys, not only in values (#67)', function () {
+        // #63 deliberately left keys alone: the only request-sourced keys in
+        // its bag are header names kept by captureHeaders(), which matches an
+        // allowlist exactly. #67 gave this method a second caller whose keys
+        // carry no such guarantee — WriteLogEntry's payload can hold a
+        // Request, and sanitizeHeaders() copies header names in verbatim.
+        $result = $this->sanitizer->toValidUtf8Deep([
+            'x-trace-'.chr(0xB1) => 'abc',
+            'nested' => ['x-other-'.chr(0xB1) => 'def'],
+        ]);
+
+        expect(json_encode($result, JSON_UNESCAPED_UNICODE))->not->toBeFalse();
+
+        foreach (array_keys($result) as $key) {
+            expect(mb_check_encoding((string) $key, 'UTF-8'))->toBeTrue();
+        }
+
+        foreach (array_keys($result['nested']) as $key) {
+            expect(mb_check_encoding((string) $key, 'UTF-8'))->toBeTrue();
+        }
+    });
+
+    it('collapses two keys that clean to the same string, last value winning', function () {
+        // The documented trade-off, pinned so it stays a decision rather than
+        // becoming a surprise: json_encode() collapses them the same way, and
+        // the alternative is losing the whole array.
+        $result = $this->sanitizer->toValidUtf8Deep([
+            'dup'.chr(0xB1) => 'first',
+            'dup'.chr(0xB2) => 'second',
+        ]);
+
+        expect($result)->toHaveCount(1)
+            ->and(array_values($result))->toBe(['second']);
+    });
 });
