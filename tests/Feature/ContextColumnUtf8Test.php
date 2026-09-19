@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
 
@@ -159,6 +160,34 @@ it('cleans a malformed header NAME in queue mode, where the key reaches the payl
     $this->artisan('queue:work', ['--once' => true]);
 
     expect(realEntry('order failed')->context)->toHaveKey('request');
+});
+
+it('reads a legacy row whose context column holds scalar JSON without throwing', function () {
+    // The 'array' cast this Attribute replaces encoded a non-array assignment
+    // into scalar JSON — a string became the double-encoded "\"…\"" — so rows
+    // of that shape exist in databases written by earlier versions. Typing the
+    // getter ?array would make every read of one a TypeError, which is a 500
+    // on the dashboard rather than a logging failure. insert() bypasses the
+    // mutator, which is how such a row is written here.
+    foreach (['"some string"', '123', 'true', '', 'null'] as $i => $raw) {
+        LogEntry::insert([
+            'id' => strtolower((string) Str::ulid()),
+            'level' => 'info',
+            'message' => "legacy row {$i}",
+            'context' => $raw,
+            'occurred_at' => now(),
+            'created_at' => now(),
+        ]);
+    }
+
+    $entries = LogEntry::query()->where('message', 'like', 'legacy row%')->get();
+
+    expect($entries)->toHaveCount(5)
+        ->and($entries->firstWhere('message', 'legacy row 0')->context)->toBe('some string')
+        ->and($entries->firstWhere('message', 'legacy row 1')->context)->toBe(123)
+        ->and($entries->firstWhere('message', 'legacy row 2')->context)->toBeTrue()
+        ->and($entries->firstWhere('message', 'legacy row 3')->context)->toBeNull()
+        ->and($entries->firstWhere('message', 'legacy row 4')->context)->toBeNull();
 });
 
 it('stores valid JSON in the column itself, not an empty string', function () {

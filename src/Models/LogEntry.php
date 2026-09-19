@@ -94,7 +94,14 @@ class LogEntry extends Model
     protected function context(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value): ?array => $value === null ? null : json_decode($value, true),
+            // Deliberately not typed ?array, unlike the setter. The column can
+            // already hold scalar JSON: under the 'array' cast this replaces,
+            // assigning a string stored the double-encoded "\"…\"", and
+            // json_decode() hands that back as a string. Declaring ?array here
+            // turns every read of such a legacy row into a TypeError — a 500
+            // on the dashboard — where the old cast returned the value. Reads
+            // stay exactly as permissive as they were; only writes are guarded.
+            get: fn (?string $value): mixed => $value === null ? null : json_decode($value, true),
             set: fn (?array $value): ?string => $value === null ? null : static::encodeContext($value),
         );
     }
