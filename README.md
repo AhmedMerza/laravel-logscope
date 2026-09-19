@@ -27,7 +27,7 @@ Visit `/logscope` in your browser. That's it!
 
 On Postgres, a failed log write inside a transaction used to roll back the application's own writes, and `DB::commit()` still returned normally — so the loss was silent (#40). Behind a load balancer, `ip_address` recorded the proxy instead of the client, which also meant Watchtower blocked the proxy (#54). Both are fixed. Entries can now carry the request's headers in their own allowlisted column (#30).
 
-Breaking: the API returns `user_id` as a string (#26), Laravel 11 is the minimum (#52), and `ContextSanitizerInterface` gained two methods — which only affects you if you bound your own implementation.
+Breaking: the API returns `user_id` as a string (#26) — the one change likely to reach your code. Four narrower ones are in the changelog: Laravel 11 is now the minimum (#52), and `ContextSanitizerInterface` gained two methods, which only matters if you bound your own implementation.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 

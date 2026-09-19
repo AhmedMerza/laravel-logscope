@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] — 2026-09-19
 
-**Upgrading from 1.x:** run `php artisan migrate` — this release adds the `headers` column and converts `user_id`. Five changes are breaking, all under **Changed** below. The one most likely to reach your own code is `user_id`: the API now returns it as a string, so a consumer comparing it to a number stops matching.
+**Upgrading from 1.x:** run `php artisan migrate` — this release adds the `headers` column and converts `user_id`.
+
+One breaking change affects ordinary use: the API now returns `user_id` as a string, so a consumer comparing it to a number stops matching. Four more are listed under **Changed**, each narrow — two fail loudly at boot if you bound your own `ContextSanitizerInterface`, one affects code that writes `LogEntry` rows directly, and one drops Laravel 10, which never worked.
 
 ### Added
 
