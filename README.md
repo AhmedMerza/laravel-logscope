@@ -753,7 +753,9 @@ Log::error('Payment failed', ['card_number' => $card, 'amount' => 500]);
 // Context: { "card_number": "[REDACTED]", "amount": 500 }
 ```
 
-Keys match as a **fragment**, ignoring case and separators — so one entry covers every spelling: `card_number` redacts `card_number`, `card-number`, `cardNumber`, `CardNumber` and `card_numbers`, and `token` redacts `access_token`, `APIToken` and `refresh_tokens`.
+Keys are matched **per word**, ignoring case and separators — so one entry covers every spelling. `card_number` redacts `card_number`, `card-number`, `cardNumber`, `CardNumber` and `card_numbers`; `token` redacts `access_token`, `APIToken` and `refresh_tokens`.
+
+Matching a one-word entry inside a single word is what keeps ordinary keys readable: `class_name` and `cv_video` are left alone, where collapsing the whole key would have made them match `ssn` and `cvv`.
 
 That is deliberately broad, because a missed secret is invisible and a redacted field is not. When a field of your own reads `[REDACTED]` and shouldn't, name it in `sensitive_keys_except` rather than narrowing `sensitive_keys`:
 

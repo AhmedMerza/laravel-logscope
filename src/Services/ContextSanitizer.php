@@ -31,19 +31,49 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected bool $redactSensitive;
 
     /**
-     * Keys to redact from log context for security.
+     * Single-word sensitive fragments, matched inside one key word.
+     *
+     * @var list<string>
      */
-    protected array $sensitiveKeys;
+    protected array $sensitiveWords;
 
     /**
-     * Key fragments that cancel a sensitive-key match.
+     * Multi-word sensitive fragments, joined, matched across the key.
+     *
+     * @var list<string>
      */
-    protected array $sensitiveKeysExcept;
+    protected array $sensitivePhrases;
+
+    /**
+     * Word runs that cancel the part of a key they cover.
+     *
+     * @var list<list<string>>
+     */
+    protected array $exceptRuns;
 
     /**
      * Headers to redact from request data.
      */
     protected array $sensitiveHeaders;
+
+    /**
+     * Longest key the matcher will examine before redacting on sight.
+     *
+     * Key names arrive from request bodies, so their length is effectively
+     * chosen by the client, and splitting one into words costs time linear
+     * in it. No real field name comes close to this.
+     */
+    protected const MAX_KEY_LENGTH = 256;
+
+    /**
+     * Shortest usable exclusion fragment.
+     *
+     * An exclusion removes whole words, so a one- or two-character entry
+     * ('e') removes nearly every word of every key and silently switches
+     * redaction off. Sensitive fragments get no such floor on purpose:
+     * over-matching is the safe direction, under-matching is not.
+     */
+    protected const MIN_EXCEPT_LENGTH = 3;
 
     /**
      * Default sensitive keys.
@@ -104,18 +134,39 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         // Use config if provided, otherwise use defaults
         $configKeys = (array) config('logscope.context.sensitive_keys', []);
-        $this->sensitiveKeys = $this->usableFragments(
-            $configKeys !== [] ? $configKeys : self::DEFAULT_SENSITIVE_KEYS
-        );
+        $fragments = $this->wordRuns($configKeys !== [] ? $configKeys : self::DEFAULT_SENSITIVE_KEYS);
+
+        // A configured list whose entries are all blank ('', '---', or the
+        // [''] that explode(',', env('…', '')) yields when the variable is
+        // unset) leaves nothing to match with, and a matcher with no
+        // fragments redacts nothing at all. Falling back to the defaults
+        // keeps a misconfiguration loud — too much [REDACTED] — rather than
+        // silent, which here means secrets in the clear.
+        if ($fragments === []) {
+            $fragments = $this->wordRuns(self::DEFAULT_SENSITIVE_KEYS);
+        }
+
+        $this->sensitiveWords = array_values(array_map(
+            static fn (array $run): string => $run[0],
+            array_filter($fragments, static fn (array $run): bool => count($run) === 1)
+        ));
+
+        $this->sensitivePhrases = array_values(array_map(
+            static fn (array $run): string => implode('', $run),
+            array_filter($fragments, static fn (array $run): bool => count($run) > 1)
+        ));
 
         // Exclusions add to the defaults rather than replacing them. The
         // shipped entries are known false positives of the key list, and an
         // app that has to name one of its own should not have to re-list
         // LogScope's to keep them.
-        $this->sensitiveKeysExcept = $this->usableFragments([
-            ...self::DEFAULT_SENSITIVE_KEYS_EXCEPT,
-            ...(array) config('logscope.context.sensitive_keys_except', []),
-        ]);
+        $this->exceptRuns = array_values(array_filter(
+            $this->wordRuns([
+                ...self::DEFAULT_SENSITIVE_KEYS_EXCEPT,
+                ...(array) config('logscope.context.sensitive_keys_except', []),
+            ]),
+            static fn (array $run): bool => strlen(implode('', $run)) >= self::MIN_EXCEPT_LENGTH
+        ));
 
         // Headers add to the defaults rather than replacing them: keys can be
         // replaced to escape false positives (token → prompt_tokens), but no
@@ -282,7 +333,7 @@ class ContextSanitizer implements ContextSanitizerInterface
             'url' => $this->sanitizeUrl($request->fullUrl()),
             'path' => $request->path(),
             'query' => $this->redactSensitive($request->query()),
-            // all(), not except($this->sensitiveKeys): redaction covers these
+            // all(), not except(...): redaction covers these
             // keys now, and dropping them outright made a sensitive field
             // vanish from the entry while a nested one showed [REDACTED].
             // A reader cannot tell an absent field from one never sent.
@@ -330,63 +381,146 @@ class ContextSanitizer implements ContextSanitizerInterface
     /**
      * Check if a key is sensitive.
      *
-     * Fragment matching, cancelled by an explicit exclusion list. A key is
-     * sensitive when it contains a sensitive fragment anywhere, unless it
-     * also contains an excluded one.
+     * The key is split into words, the words an exclusion covers are
+     * removed, and what remains is matched two ways: a single-word fragment
+     * ('ssn', 'token') must appear inside ONE word, while a multi-word one
+     * ('card_number') is matched across the words joined together.
      *
-     * Matching whole words instead was tried in #77 and reverted: it read as
-     * more precise but silently stopped redacting access_tokens,
-     * card_numbers, passwords and APIToken, all of which the fragment match
-     * had always caught. A logging package's redaction has to fail towards
-     * [REDACTED] — an over-redacted field is visible and one config line
-     * away from fixed, while a missed one is a secret in the database that
-     * nobody finds.
+     * That split is the whole design, and each half pays for a bug found in
+     * review (#77):
+     *
+     * - Matching whole words only, so that 'token' missed 'prompt_tokens',
+     *   also missed access_tokens, card_numbers, passwords and APIToken.
+     *   Matching a fragment inside a word keeps all of those.
+     * - Matching a fragment across the whole key with separators stripped
+     *   glued unrelated words together: class_name became 'classname',
+     *   which contains 'ssn'. Confining a single-word fragment to one word
+     *   stops that, while a multi-word fragment still spans the join so
+     *   cardNumber, card-number and card.number all match card_number.
+     *
+     * Redaction fails towards [REDACTED]: an over-redacted field is visible
+     * and one config line away from fixed, a missed one is a secret in the
+     * database that nobody goes looking for.
      */
     protected function isSensitiveKey(string $key): bool
     {
-        $key = $this->normalizeKey($key);
+        // A field name this long is not a field name. Tokenizing costs time
+        // linear in a length the client chooses, and truncating first would
+        // hand that client a long prefix to hide the fragment behind, so an
+        // over-long key is simply treated as sensitive.
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
+            return true;
+        }
 
-        // Exclusions win, since they exist precisely to rescue keys the
-        // fragment list matches (token → prompt_tokens).
-        if ($this->sensitiveKeysExcept !== [] && Str::contains($key, $this->sensitiveKeysExcept)) {
+        $words = $this->withoutExcluded($this->words($key));
+
+        if ($words === []) {
             return false;
         }
 
-        return Str::contains($key, $this->sensitiveKeys);
+        foreach ($words as $word) {
+            foreach ($this->sensitiveWords as $fragment) {
+                if (str_contains($word, $fragment)) {
+                    return true;
+                }
+            }
+        }
+
+        if ($this->sensitivePhrases === []) {
+            return false;
+        }
+
+        $joined = implode('', $words);
+
+        foreach ($this->sensitivePhrases as $phrase) {
+            if (str_contains($joined, $phrase)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * Reduce a key to lowercase alphanumerics for matching.
+     * Drop the words an exclusion covers, leaving the rest to be matched.
      *
-     * Separators are dropped from both the key and the configured fragments,
-     * so one entry covers every spelling an application might use:
-     * card_number matches card_number, card-number, card.number, cardNumber
-     * and CardNumber alike. Without it a multi-word entry only ever matches
-     * its own punctuation, and 'cardNumber' — the commonest spelling in a
-     * JSON payload — is stored in clear.
+     * Removing rather than cancelling is what keeps one excluded term from
+     * clearing an unrelated secret elsewhere in the same key: before this,
+     * `prompt_tokens_password` contained an exclusion and a sensitive
+     * fragment, the exclusion was checked first, and the password was
+     * stored in the clear (#77). Now `prompt_tokens` takes its two words
+     * with it and `password` is still there to match.
+     *
+     * A single-word exclusion removes any word containing it, so 'tokenizer'
+     * also covers 'tokenizers'.
+     *
+     * @param  list<string>  $words
+     * @return list<string>
      */
-    protected function normalizeKey(string $key): string
+    protected function withoutExcluded(array $words): array
     {
-        return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '', $key) ?? $key);
+        foreach ($this->exceptRuns as $run) {
+            if (count($run) === 1) {
+                $words = array_values(array_filter(
+                    $words,
+                    static fn (string $word): bool => ! str_contains($word, $run[0])
+                ));
+
+                continue;
+            }
+
+            for ($i = 0; $i + count($run) <= count($words); $i++) {
+                if (array_slice($words, $i, count($run)) === $run) {
+                    array_splice($words, $i, count($run));
+                    $i--;
+                }
+            }
+        }
+
+        return $words;
     }
 
     /**
-     * Normalize configured entries, dropping any that would match every key.
+     * Split a key into its lowercase words.
      *
-     * A fragment that normalizes to '' (an empty entry, whitespace, '---') is
-     * a substring of every string. Left in the sensitive list it redacts the
-     * whole context; left in the exclusion list it cancels redaction entirely
-     * — a silent fail-open from one stray comma in an env-driven list.
-     * Neither is recoverable at match time, so they are dropped here.
+     * Separators and camelCase boundaries both divide words, so user_id,
+     * user-id, user.id and userId all give ['user', 'id']. An acronym run
+     * is deliberately left whole — APIToken gives ['apitoken'], and the
+     * fragment match inside a word finds 'token' in it anyway.
      *
      * @return list<string>
      */
-    protected function usableFragments(array $fragments): array
+    protected function words(string $key): array
     {
+        $spaced = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key) ?? $key;
+
         return array_values(array_filter(
-            array_map(fn ($fragment): string => $this->normalizeKey((string) $fragment), $fragments),
-            static fn (string $fragment): bool => $fragment !== ''
+            preg_split('/[^a-z0-9]+/', strtolower($spaced)) ?: [],
+            static fn (string $word): bool => $word !== ''
         ));
+    }
+
+    /**
+     * Split configured fragments into word runs, dropping the empty ones.
+     *
+     * An entry with no word characters at all ('', '   ', '---') would
+     * otherwise become an empty run, and an empty run matches every key.
+     *
+     * @return list<list<string>>
+     */
+    protected function wordRuns(array $fragments): array
+    {
+        $runs = [];
+
+        foreach ($fragments as $fragment) {
+            $words = $this->words((string) $fragment);
+
+            if ($words !== []) {
+                $runs[] = $words;
+            }
+        }
+
+        return $runs;
     }
 
     /**

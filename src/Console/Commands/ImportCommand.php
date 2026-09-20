@@ -227,7 +227,9 @@ class ImportCommand extends Command
             'context' => $contextJson,
             'context_preview' => $contextPreview,
             'channel' => $entry['channel'] ?? 'import',
-            'environment' => $entry['environment'] ?? app()->environment(),
+            // No 'environment' key: migration 2026_01_24_000001 dropped that
+            // column, and inserting it threw on every import. Found by the
+            // first test ever written for this command (#77).
             'source' => $entry['source'],
             'source_line' => $entry['source_line'],
             'occurred_at' => $entry['occurred_at'],

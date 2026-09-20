@@ -421,19 +421,26 @@ return [
     |                    anywhere in an entry's context: arrays you log
     |                    yourself, objects expanded into arrays, and expanded
     |                    Request objects alike, at any depth.
-    |                    Matched as a fragment, case-insensitively: 'token'
-    |                    redacts token, access_token, accessToken, APIToken
-    |                    and access_tokens.
+    |                    Matched per word, ignoring case and separators:
+    |                    'token' redacts token, access_token, accessToken,
+    |                    APIToken and access_tokens, while 'card_number'
+    |                    also redacts cardNumber and card.number.
+    |                    A one-word entry only matches inside a single word,
+    |                    so 'ssn' does not redact class_name.
+    |                    Keys over 256 characters are redacted unexamined.
     |                    Set to [] to use defaults, or provide your own list.
     |                    Your list REPLACES the defaults, it does not add
-    |                    to them.
+    |                    to them. A list that is empty (or all blank) falls
+    |                    back to the defaults rather than redacting nothing.
     |
-    | 'sensitive_keys_except' - Keys that look sensitive by fragment but are
-    |                    not, so they keep their values. Checked first, so an
-    |                    entry here always wins.
+    | 'sensitive_keys_except' - Keys that look sensitive but are not, so they
+    |                    keep their values. An entry removes the words it
+    |                    covers, so 'prompt_tokens' keeps prompt_tokens but
+    |                    still lets prompt_tokens_password redact.
     |                    Entries ADD to the defaults (prompt_tokens,
     |                    completion_tokens, total_tokens, token_count,
     |                    tokenizer), so naming your own keeps LogScope's.
+    |                    Entries under 3 characters are ignored.
     |                    This is the dial to reach for when a field of yours
     |                    reads [REDACTED] and should not — widening it is
     |                    always safer than narrowing 'sensitive_keys'.
