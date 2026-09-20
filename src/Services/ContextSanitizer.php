@@ -31,9 +31,17 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected bool $redactSensitive;
 
     /**
-     * Keys to redact from request data for security.
+     * Keys to redact from log context for security.
      */
     protected array $sensitiveKeys;
+
+    /**
+     * The same keys pre-split into word segments, which is what matching
+     * actually compares against.
+     *
+     * @var list<list<string>>
+     */
+    protected array $sensitiveKeySegments;
 
     /**
      * Headers to redact from request data.
@@ -82,6 +90,14 @@ class ContextSanitizer implements ContextSanitizerInterface
         $configKeys = config('logscope.context.sensitive_keys', []);
         $this->sensitiveKeys = ! empty($configKeys) ? $configKeys : self::DEFAULT_SENSITIVE_KEYS;
 
+        // Split once here rather than per key per log line. Entries that hold
+        // no word characters at all ('', '---') are dropped: their segment
+        // list is empty, and an empty needle matches every key.
+        $this->sensitiveKeySegments = array_values(array_filter(array_map(
+            fn ($key): array => $this->segments((string) $key),
+            $this->sensitiveKeys
+        )));
+
         // Headers add to the defaults rather than replacing them: keys can be
         // replaced to escape false positives (token → prompt_tokens), but no
         // header is worth losing authorization/cookie redaction over.
@@ -92,7 +108,8 @@ class ContextSanitizer implements ContextSanitizerInterface
     /**
      * Sanitize context array for storage.
      *
-     * Converts objects and exceptions to JSON-safe representations.
+     * Converts objects and exceptions to JSON-safe representations, and
+     * replaces the value of any sensitive key with [REDACTED].
      */
     public function sanitize(array $context): array
     {
@@ -104,7 +121,9 @@ class ContextSanitizer implements ContextSanitizerInterface
                 continue;
             }
 
-            $sanitized[$key] = $this->sanitizeValue($value);
+            $sanitized[$key] = $this->shouldRedactKey($key)
+                ? '[REDACTED]'
+                : $this->sanitizeValue($value);
         }
 
         return $sanitized;
@@ -147,12 +166,18 @@ class ContextSanitizer implements ContextSanitizerInterface
 
     /**
      * Sanitize an array recursively.
+     *
+     * Redaction happens here rather than only on the Request path, so it
+     * reaches every array the application logs itself and every object
+     * expanded into one — a DTO's $password property included.
      */
     protected function sanitizeArray(array $value, int $depth = 0): array
     {
         $result = [];
         foreach ($value as $key => $item) {
-            $result[$key] = $this->sanitizeValue($item, $depth + 1);
+            $result[$key] = $this->shouldRedactKey($key)
+                ? '[REDACTED]'
+                : $this->sanitizeValue($item, $depth + 1);
         }
 
         return $result;
@@ -261,11 +286,68 @@ class ContextSanitizer implements ContextSanitizerInterface
     }
 
     /**
+     * Whether this context key's value must be replaced with [REDACTED].
+     *
+     * Integer keys are never sensitive — they are list positions, not names —
+     * and skipping them keeps the segment splitting off the hot path for
+     * large lists.
+     */
+    protected function shouldRedactKey(mixed $key): bool
+    {
+        return $this->redactSensitive
+            && is_string($key)
+            && $this->isSensitiveKey($key);
+    }
+
+    /**
      * Check if a key is sensitive.
+     *
+     * Matches on whole word segments rather than raw substrings: a key is
+     * sensitive when a sensitive key's segments appear in it as a contiguous
+     * run. So access_token, accessToken and user.password all redact, while
+     * prompt_tokens, total_tokens and lesson (which contains 'ssn') do not.
+     *
+     * Substring matching is what confined redaction to expanded Request
+     * objects in the first place — false positives were tolerable on a
+     * request body, not on arbitrary context. Matching precisely is what
+     * makes the wider reach affordable (#76).
      */
     protected function isSensitiveKey(string $key): bool
     {
-        return Str::contains($key, $this->sensitiveKeys, ignoreCase: true);
+        $segments = $this->segments($key);
+
+        foreach ($this->sensitiveKeySegments as $sensitive) {
+            $span = count($sensitive);
+
+            for ($i = 0, $last = count($segments) - $span; $i <= $last; $i++) {
+                if (array_slice($segments, $i, $span) === $sensitive) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Split a key into its lowercase word segments.
+     *
+     * access_token, access-token, access.token, "access token" and
+     * accessToken all give ['access', 'token'], so a sensitive key matches
+     * however the application spells its own.
+     *
+     * @return list<string>
+     */
+    protected function segments(string $key): array
+    {
+        // camelCase and PascalCase carry no separator, so introduce one at
+        // each lower-to-upper boundary before splitting on non-word runs.
+        $spaced = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key) ?? $key;
+
+        return array_values(array_filter(
+            preg_split('/[^a-z0-9]+/', strtolower($spaced)) ?: [],
+            static fn (string $segment): bool => $segment !== ''
+        ));
     }
 
     /**

@@ -743,12 +743,17 @@ Log::info('User action', ['user' => $user]);
 // Context: { "user": { "name": "John", "email": "..." } }
 ```
 
-**Sensitive data is automatically redacted** (password, token, api_key, credit_card, etc.):
+**Sensitive data is automatically redacted** (password, token, api_key, credit_card, etc.) — anywhere in an entry's context, at any depth:
 
 ```php
 Log::info('Login', ['request' => $request]);
 // Input: { "email": "john@example.com", "password": "[REDACTED]" }
+
+Log::error('Payment failed', ['card_number' => $card, 'amount' => 500]);
+// Context: { "card_number": "[REDACTED]", "amount": 500 }
 ```
+
+Keys match on whole words, case- and separator-insensitively: `token` redacts `token`, `access_token`, `accessToken` and `access-token` — but not `prompt_tokens` or `tokenizer`, where it is only a fragment.
 
 Configure in `config/logscope.php`:
 
@@ -756,7 +761,7 @@ Configure in `config/logscope.php`:
 'context' => [
     'expand_objects' => true,      // Set false to show [Object: ClassName]
     'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
-    'sensitive_keys' => [],        // Empty = use defaults, or provide your own list
+    'sensitive_keys' => [],        // Empty = use defaults; your own list replaces them
     'sensitive_headers' => [],     // Name fragments added to the defaults (auth, cookie, token, key, ...)
 ],
 ```

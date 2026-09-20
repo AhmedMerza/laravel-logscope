@@ -312,6 +312,90 @@ describe('request redaction', function () {
     });
 });
 
+describe('context redaction', function () {
+    it('redacts a sensitive key at the top level of logged context', function () {
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
+
+        expect($result['password'])->toBe('[REDACTED]')
+            ->and($result['user_id'])->toBe(7);
+    });
+
+    it('redacts sensitive keys nested inside a logged array', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'request' => ['card_number' => '4111', 'api_token' => 'secret-abc', 'amount' => 500],
+        ]);
+
+        expect($result['request']['card_number'])->toBe('[REDACTED]')
+            ->and($result['request']['api_token'])->toBe('[REDACTED]')
+            ->and($result['request']['amount'])->toBe(500);
+    });
+
+    it('redacts however the application spells the key', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'accessToken' => 'a',
+            'user-password' => 'b',
+            'API_KEY' => 'c',
+            'credit.card.number' => 'd',
+        ]);
+
+        expect($result)->toBe([
+            'accessToken' => '[REDACTED]',
+            'user-password' => '[REDACTED]',
+            'API_KEY' => '[REDACTED]',
+            'credit.card.number' => '[REDACTED]',
+        ]);
+    });
+
+    it('leaves keys that merely contain a sensitive word as a fragment', function () {
+        // The false positives that kept redaction off this path: 'token' is a
+        // segment of access_token but not of prompt_tokens, and 'ssn' is a
+        // substring of lesson but not a word in it.
+        $context = [
+            'prompt_tokens' => 150,
+            'total_tokens' => 400,
+            'tokenizer' => 'cl100k',
+            'lesson' => 'intro',
+            'passwordless' => true,
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('redacts a sensitive property of an expanded object', function () {
+        $user = new stdClass;
+        $user->email = 'a@b.test';
+        $user->password = 'hunter2';
+
+        $result = (new ContextSanitizer)->sanitize(['user' => $user]);
+
+        expect($result['user']['data']['password'])->toBe('[REDACTED]')
+            ->and($result['user']['data']['email'])->toBe('a@b.test');
+    });
+
+    it('redacts nothing when redact_sensitive is off', function () {
+        config(['logscope.context.redact_sensitive' => false]);
+
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2']);
+
+        expect($result['password'])->toBe('hunter2');
+    });
+
+    it('honours a configured key list on plain context, replacing the defaults', function () {
+        config(['logscope.context.sensitive_keys' => ['PIN']]);
+
+        $result = (new ContextSanitizer)->sanitize(['pin_code' => '1234', 'password' => 'hunter2']);
+
+        expect($result['pin_code'])->toBe('[REDACTED]')
+            ->and($result['password'])->toBe('hunter2');
+    });
+
+    it('leaves list positions alone', function () {
+        $context = ['tokens' => ['a', 'b']];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+});
+
 describe('extractSource', function () {
     it('returns null when no exception in context', function () {
         $context = ['message' => 'hello'];

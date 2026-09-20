@@ -417,10 +417,17 @@ return [
     | 'redact_sensitive' - When true, sensitive keys/headers are redacted.
     |                      Set to false to disable all redaction (not recommended).
     |
-    | 'sensitive_keys' - Keys that should be redacted in request data.
-    |                    Values containing these strings (case-insensitive)
-    |                    will be replaced with [REDACTED].
+    | 'sensitive_keys' - Keys whose values are replaced with [REDACTED],
+    |                    anywhere in an entry's context: arrays you log
+    |                    yourself, objects expanded into arrays, and expanded
+    |                    Request objects alike, at any depth.
+    |                    Matched on whole word segments, case- and
+    |                    separator-insensitively: 'token' redacts token,
+    |                    access_token, accessToken and access-token, but not
+    |                    prompt_tokens or tokenizer.
     |                    Set to [] to use defaults, or provide your own list.
+    |                    Your list REPLACES the defaults, it does not add
+    |                    to them.
     |
     | 'sensitive_headers' - Request header name fragments that should be redacted.
     |                       Headers containing these strings (case-insensitive)

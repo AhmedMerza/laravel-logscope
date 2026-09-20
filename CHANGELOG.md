@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`sensitive_keys` now redacts the arrays you log yourself, not only a logged `Request` object** (#76). `Log::error('payment failed', ['request' => $request->all()])` stored the password, card number and API token in clear, while the same call passing `$request` itself redacted them — and the unsafe form is the common one. Redaction was reached from exactly one place, the `Request` expansion, and nothing on the path a plain array takes ever called it; `sanitize()` also passed only the *value* down, never the key, so a top-level `['password' => …]` could not have matched even in principle. Redaction now happens where the keys are, which covers arrays you log yourself at any depth, objects expanded into arrays (a DTO's or model's `password` property included) and the `Request` expansion alike. The defaults are unchanged — `password`, `password_confirmation`, `secret`, `token`, `api_key`, `apikey`, `authorization`, `credit_card`, `card_number`, `cvv`, `ssn` — and `redact_sensitive => false` still turns all of it off. Existing rows are not rewritten: whatever was stored in clear stays in clear. See **Changed** below for the matching change that makes the wider reach affordable.
+
+### Changed
+
+- **Sensitive keys are matched on whole word segments rather than raw substrings** (#76). `token` still redacts `token`, `access_token`, `accessToken` and `access-token`, which all carry it as a word. It no longer redacts `prompt_tokens`, `total_tokens` or `tokenizer`, where it is only a fragment — and `ssn` no longer redacts `lesson`. This is what makes redacting all context affordable rather than annoying: substring matching over arbitrary context would have turned an LLM app's token counts into `[REDACTED]`, and false positives are the stated reason (v1.8.0) that a configured `sensitive_keys` replaces the defaults rather than adding to them. Matching stays case-insensitive and is now separator-insensitive. **If you relied on a fragment match** — a configured `card` catching `cardnumber` — list the whole word or the exact key. Request bodies narrow the same way: a `prompt_tokens` field inside a logged `Request` is now stored rather than redacted.
+
 ## [2.0.0] — 2026-09-19
 
 **Upgrading from 1.x:** run `php artisan migrate` — this release adds the `headers` column and converts `user_id`.
