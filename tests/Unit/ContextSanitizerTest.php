@@ -616,6 +616,40 @@ describe('compound keys split across array levels', function () {
             ->and($result['card'][1]['number'])->toBe('[REDACTED]');
     });
 
+    it('steps over a position PHP did not cast to an int (#81 review)', function () {
+        // PHP casts an array key to int only when it is a CANONICAL decimal,
+        // so card[0][number] arrives as an int while card[01][number],
+        // card[+1][number] and card[1.0][number] arrive as strings. Treating
+        // those as words split card from number and stored the card number
+        // in clear — from ordinary bracket syntax, no crafting needed.
+        $result = (new ContextSanitizer)->sanitize([
+            'card' => [
+                '01' => ['number' => '4111'],
+                '+1' => ['number' => '4222'],
+                '1.0' => ['number' => '4333'],
+                ' 2' => ['number' => '4444'],
+            ],
+        ]);
+
+        expect($result['card']['01']['number'])->toBe('[REDACTED]')
+            ->and($result['card']['+1']['number'])->toBe('[REDACTED]')
+            ->and($result['card']['1.0']['number'])->toBe('[REDACTED]')
+            ->and($result['card'][' 2']['number'])->toBe('[REDACTED]');
+    });
+
+    it('steps over a non-canonical position in a query string too (#81 review)', function () {
+        $url = (new ContextSanitizer)->sanitizeUrl('https://x.test/p?card[01][number]=4111');
+
+        expect(urldecode($url))->toContain('card[01][number]=[REDACTED]');
+    });
+
+    it('keeps a genuinely named key that merely starts with digits', function () {
+        // is_numeric() must not swallow a real field name.
+        $context = ['card' => ['2nd_holder' => 'Jo']];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
     it('carries the path into an expanded object (#80)', function () {
         $card = new stdClass;
         $card->number = '4111111111111111';
@@ -679,6 +713,197 @@ describe('compound keys split across array levels', function () {
 
         expect($result['billing']['card']['number'])->toBe('[REDACTED]')
             ->and($result['billing']['card']['brand'])->toBe('visa');
+    });
+
+    it('carries the path into every object-expansion branch (#81 review)', function () {
+        // The fallback branch had a test; JsonSerializable, Arrayable and
+        // Jsonable take different routes through sanitizeObject() and were
+        // threaded in the same commit, untested.
+        $arrayable = new class implements Illuminate\Contracts\Support\Arrayable
+        {
+            public function toArray(): array
+            {
+                return ['number' => '4111', 'brand' => 'visa'];
+            }
+        };
+
+        $jsonSerializable = new class implements JsonSerializable
+        {
+            public function jsonSerialize(): array
+            {
+                return ['key' => 'sk-live-1'];
+            }
+        };
+
+        $jsonable = new class implements Illuminate\Contracts\Support\Jsonable
+        {
+            public function toJson($options = 0): string
+            {
+                return '{"number":"4333"}';
+            }
+        };
+
+        $result = (new ContextSanitizer)->sanitize([
+            'card' => $arrayable,
+            'api' => $jsonSerializable,
+            'debit' => ['card' => $jsonable],
+        ]);
+
+        expect($result['card']['number'])->toBe('[REDACTED]')
+            ->and($result['card']['brand'])->toBe('visa')
+            ->and($result['api']['key'])->toBe('[REDACTED]')
+            ->and($result['debit']['card']['number'])->toBe('[REDACTED]');
+    });
+});
+
+describe('compound keys and the request boundary (#81 review)', function () {
+    it('carries the context key into a logged Request', function () {
+        // ['api' => ['key' => …]] and ['api' => $dto] both redact, so
+        // ['api' => $request] with ?key= must too. It did not: the Request
+        // branch of sanitizeValue() dropped the path it was handed.
+        $request = Illuminate\Http\Request::create('/x?key=SECRET', 'GET');
+
+        $result = (new ContextSanitizer)->sanitize(['api' => $request]);
+
+        expect($result['api']['query']['key'])->toBe('[REDACTED]');
+    });
+
+    it('carries the context key into a logged Request body', function () {
+        $request = Illuminate\Http\Request::create('/pay', 'POST', ['number' => '4111', 'brand' => 'visa']);
+
+        $result = (new ContextSanitizer)->sanitize(['card' => $request]);
+
+        expect($result['card']['input']['number'])->toBe('[REDACTED]')
+            ->and($result['card']['input']['brand'])->toBe('visa');
+    });
+
+    it('redacts the url of that same entry, not only its query', function () {
+        // Redacting `query` while leaving `url` intact leaves the secret
+        // readable one field away, in the same row.
+        $request = Illuminate\Http\Request::create('/x?key=SECRET', 'GET');
+
+        $result = (new ContextSanitizer)->sanitize(['api' => $request]);
+
+        expect(urldecode($result['api']['url']))->toContain('key=[REDACTED]')
+            ->and($result['api']['url'])->not->toContain('SECRET');
+    });
+});
+
+describe('path threading guards (#81 review)', function () {
+    it('survives truncation when the configured fragment is long', function () {
+        // The path is capped at longestPhrase - 1 characters. Every other
+        // test keeps it far below the cap, so an off-by-one here would go
+        // unnoticed. 'alphabetagammadeltanumber' is 25 chars; the ancestors
+        // reach 19 before the leaf completes the match.
+        config(['logscope.context.sensitive_keys' => ['alpha_beta_gamma_delta_number']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'alpha' => ['beta' => ['gamma' => ['delta' => ['number' => 'X', 'ok' => 1]]]],
+        ]);
+
+        expect($result['alpha']['beta']['gamma']['delta']['number'])->toBe('[REDACTED]')
+            ->and($result['alpha']['beta']['gamma']['delta']['ok'])->toBe(1);
+    });
+
+    it('still matches when a long ancestor is truncated away', function () {
+        $key = str_repeat('z', 40);
+
+        $result = (new ContextSanitizer)->sanitize([$key => ['card' => ['number' => 'X']]]);
+
+        expect($result[$key]['card']['number'])->toBe('[REDACTED]');
+    });
+
+    it('matches at the deepest level the depth cap still walks', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'a' => ['b' => ['c' => ['d' => ['card' => ['number' => 'X']]]]],
+        ]);
+
+        expect($result['a']['b']['c']['d']['card']['number'])->toBe('[REDACTED]');
+    });
+
+    it('leaks nothing past the depth cap', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'a' => ['b' => ['c' => ['d' => ['e' => ['f' => ['card_number' => 'SECRET']]]]]],
+        ]);
+
+        expect(json_encode($result))->not->toContain('SECRET');
+    });
+
+    it('builds no path at all when redaction is off', function () {
+        config(['logscope.context.redact_sensitive' => false]);
+
+        $context = ['card' => ['number' => '4111']];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('does not tokenize a key when redaction is off', function () {
+        // Reflection because the guard has no observable output: with
+        // redaction off the context comes back untouched either way. What it
+        // protects is real though — childPath() carries no MAX_KEY_LENGTH
+        // check, that lives in isSensitiveKey(), which this config never
+        // reaches. Without the guard a client-chosen key of any length was
+        // regex-split on every log line.
+        config(['logscope.context.redact_sensitive' => false]);
+
+        $sanitizer = new ContextSanitizer;
+        $childPath = new ReflectionMethod($sanitizer, 'childPath');
+        $childPath->setAccessible(true);
+
+        expect($childPath->invoke($sanitizer, '', 'card', ['number' => '4111']))->toBe('')
+            ->and($childPath->invoke($sanitizer, '', str_repeat('a', 300), ['x' => 1]))->toBe('');
+    });
+
+    it('skips the path when no multi-word fragment is configured', function () {
+        config(['logscope.context.sensitive_keys' => ['pin']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'card' => ['number' => '4111'],
+            'my' => ['pin' => '1234'],
+        ]);
+
+        expect($result['card']['number'])->toBe('4111')
+            ->and($result['my']['pin'])->toBe('[REDACTED]');
+    });
+
+    it('lets a multi-word exclusion cancel the flat key only, as documented', function () {
+        // config/logscope.php promises exactly this asymmetry. Nothing
+        // pinned it, and it is the kind of thing a later change silently
+        // flips in either direction.
+        config(['logscope.context.sensitive_keys_except' => ['credit_card']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'credit_card' => 'visa-1111',
+            'credit' => ['card' => '4111'],
+        ]);
+
+        expect($result['credit_card'])->toBe('visa-1111')
+            ->and($result['credit']['card'])->toBe('[REDACTED]');
+    });
+
+    it('treats a one-word exclusion the same flat and nested', function () {
+        // A single-word exclusion removes every word containing it, which
+        // the config comment warns about. The point here is that the split
+        // spelling behaves like the flat one rather than diverging.
+        config(['logscope.context.sensitive_keys_except' => ['card']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'card_number' => '4111',
+            'card' => ['number' => '4222'],
+        ]);
+
+        expect($result['card_number'])->toBe('4111')
+            ->and($result['card']['number'])->toBe('4222');
+    });
+
+    it('does not let an unrelated exclusion on an ancestor disable a deeper match', function () {
+        config(['logscope.context.sensitive_keys_except' => ['tokenizer']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'tokenizer' => ['card' => ['number' => '4111']],
+        ]);
+
+        expect($result['tokenizer']['card']['number'])->toBe('[REDACTED]');
     });
 });
 

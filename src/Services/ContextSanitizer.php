@@ -244,7 +244,7 @@ class ContextSanitizer implements ContextSanitizerInterface
             }
 
             if ($value instanceof Request) {
-                return $this->sanitizeRequest($value);
+                return $this->sanitizeRequest($value, $path);
             }
 
             return $this->sanitizeObject($value, $depth, $path);
@@ -357,20 +357,30 @@ class ContextSanitizer implements ContextSanitizerInterface
 
     /**
      * Sanitize a Request object to extract useful information.
+     *
+     * $path is the context key the Request was logged under, and it reaches
+     * the request's own fields the same way it reaches an expanded object's
+     * properties: ['api' => $request] with ?key=… has to redact, because
+     * ['api' => ['key' => …]] and ['api' => $dto] both do. The '_type',
+     * 'query' and 'input' keys below are LogScope's own, so they are not
+     * added to the path.
+     *
+     * The url gets it too. Without that, a secret redacted out of `query`
+     * would still be readable in the `url` of the same entry.
      */
-    protected function sanitizeRequest(Request $request): array
+    protected function sanitizeRequest(Request $request, string $path = ''): array
     {
         return [
             '_type' => 'request',
             'method' => $request->method(),
-            'url' => $this->sanitizeUrl($request->fullUrl()),
+            'url' => $this->redactUrl($request->fullUrl(), $path),
             'path' => $request->path(),
-            'query' => $this->redactSensitive($request->query()),
+            'query' => $this->redactSensitive($request->query(), $path),
             // all(), not except(...): redaction covers these
             // keys now, and dropping them outright made a sensitive field
             // vanish from the entry while a nested one showed [REDACTED].
             // A reader cannot tell an absent field from one never sent.
-            'input' => $this->redactSensitive($request->all()),
+            'input' => $this->redactSensitive($request->all(), $path),
             'headers' => $this->sanitizeHeaders($request->headers->all()),
         ];
     }
@@ -518,14 +528,29 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     protected function childPath(string $path, mixed $key, mixed $value): string
     {
-        if ($this->longestSensitivePhrase === 0 || ! is_array($value) && ! is_object($value)) {
+        // With redaction off nothing reads the path, and building one would
+        // tokenize a client-chosen key with no MAX_KEY_LENGTH check in front
+        // of it — that guard lives in isSensitiveKey(), which this config
+        // never reaches.
+        if (! $this->redactSensitive || $this->longestSensitivePhrase === 0) {
             return '';
         }
 
-        // An integer key is a list position, not part of a field's name, so
-        // it is stepped over rather than joined: ['card' => [0 => ['number'
-        // => …]]] still has to read as card + number.
-        if (is_string($key)) {
+        if (! is_array($value) && ! is_object($value)) {
+            return '';
+        }
+
+        // A numeric key is a list position, not part of a field's name, so it
+        // is stepped over rather than joined: ['card' => [0 => ['number' =>
+        // …]]] still has to read as card + number.
+        //
+        // is_numeric(), not is_string(): PHP casts an array key to int only
+        // when it is a CANONICAL decimal, so card[0][number] arrives as an
+        // int while card[01][number], card[+1][number] and card[1.0][number]
+        // all arrive as strings. Those are ordinary bracket syntax no client
+        // has to craft, and treating them as words broke the adjacency the
+        // compound needs — storing the card number in clear.
+        if (is_string($key) && ! is_numeric($key)) {
             $path .= implode('', $this->withoutExcluded($this->words($key)));
         }
 
@@ -798,6 +823,18 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     public function sanitizeUrl(string $url): string
     {
+        return $this->redactUrl($url);
+    }
+
+    /**
+     * Redact a URL's query parameters, optionally under an ancestor path.
+     *
+     * Split from sanitizeUrl() rather than given a second parameter because
+     * sanitizeUrl() is on ContextSanitizerInterface, and adding an argument
+     * there would break every third-party implementation of it.
+     */
+    protected function redactUrl(string $url, string $path = ''): string
+    {
         if (! $this->redactSensitive) {
             return $url;
         }
@@ -814,7 +851,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         parse_str($parsed['query'], $queryParams);
-        $sanitizedQuery = $this->redactSensitive($queryParams);
+        $sanitizedQuery = $this->redactSensitive($queryParams, $path);
 
         // Rebuild the URL with sanitized query string
         $newQuery = http_build_query($sanitizedQuery);
