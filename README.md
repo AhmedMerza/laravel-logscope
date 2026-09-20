@@ -753,18 +753,23 @@ Log::error('Payment failed', ['card_number' => $card, 'amount' => 500]);
 // Context: { "card_number": "[REDACTED]", "amount": 500 }
 ```
 
-Keys match on whole words, case- and separator-insensitively: `token` redacts `token`, `access_token`, `accessToken` and `access-token` — but not `prompt_tokens` or `tokenizer`, where it is only a fragment.
+Keys match as a **fragment**, ignoring case and separators — so one entry covers every spelling: `card_number` redacts `card_number`, `card-number`, `cardNumber`, `CardNumber` and `card_numbers`, and `token` redacts `access_token`, `APIToken` and `refresh_tokens`.
 
-Configure in `config/logscope.php`:
+That is deliberately broad, because a missed secret is invisible and a redacted field is not. When a field of your own reads `[REDACTED]` and shouldn't, name it in `sensitive_keys_except` rather than narrowing `sensitive_keys`:
 
 ```php
 'context' => [
     'expand_objects' => true,      // Set false to show [Object: ClassName]
     'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
     'sensitive_keys' => [],        // Empty = use defaults; your own list replaces them
+    'sensitive_keys_except' => [], // Keys to keep despite matching; adds to the defaults
     'sensitive_headers' => [],     // Name fragments added to the defaults (auth, cookie, token, key, ...)
 ],
 ```
+
+`sensitive_keys_except` ships with `prompt_tokens`, `completion_tokens`, `total_tokens`, `token_count` and `tokenizer` — the LLM-era fields that `token` would otherwise catch. Your entries add to those.
+
+Redaction matches **key names, not values**: a secret pasted into a log message, an exception message, or a URL path is stored as written.
 
 ### Request Headers
 

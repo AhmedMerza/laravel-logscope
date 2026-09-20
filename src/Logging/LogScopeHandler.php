@@ -6,6 +6,7 @@ namespace LogScope\Logging;
 
 use Illuminate\Support\Facades\Context;
 use LogScope\Concerns\ResolvesExceptionSource;
+use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use LogScope\Services\TransactionSavepoint;
@@ -153,105 +154,21 @@ class LogScopeHandler extends AbstractProcessingHandler
 
     /**
      * Sanitize context array for storage.
+     *
+     * Delegates to the shared ContextSanitizer rather than carrying its own
+     * copy. This handler used to duplicate the whole array/object walk, and
+     * the copy had no redaction at all: with `capture => channel`, or any
+     * stack containing the logscope channel (LogCapture defers via
+     * didHandleCurrentLog()), a logged password or a Request's Authorization
+     * header was stored in clear while the listener path redacted it (#77).
+     *
+     * Resolved per call rather than injected: the handler is constructed
+     * directly by applications (`new LogScopeHandler('foo')` in the README),
+     * so it cannot take constructor dependencies.
      */
     protected function sanitizeContext(array $context): array
     {
-        return $this->sanitizeArray($context);
-    }
-
-    /**
-     * Recursively sanitize array values.
-     */
-    protected function sanitizeArray(array $array, int $depth = 0): array
-    {
-        // Prevent infinite recursion
-        if ($depth > 10) {
-            return ['_truncated' => 'Max depth exceeded'];
-        }
-
-        $result = [];
-
-        foreach ($array as $key => $value) {
-            // Skip internal keys
-            if (str_starts_with((string) $key, '_logscope')) {
-                continue;
-            }
-
-            if (is_array($value)) {
-                $result[$key] = $this->sanitizeArray($value, $depth + 1);
-            } elseif (is_object($value)) {
-                $result[$key] = $this->sanitizeObject($value);
-            } elseif (is_resource($value)) {
-                $result[$key] = '[Resource]';
-            } elseif (is_string($value) && strlen($value) > 10000) {
-                $result[$key] = substr($value, 0, 10000).'... [truncated]';
-            } else {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Convert object to storable format.
-     */
-    protected function sanitizeObject(object $object): mixed
-    {
-        if ($object instanceof Throwable) {
-            $callerFrame = $this->callerFrameForException($object);
-
-            return [
-                '_type' => 'exception',
-                'class' => get_class($object),
-                'message' => $object->getMessage(),
-                'code' => $object->getCode(),
-                'file' => $callerFrame['file'] ?? $object->getFile(),
-                'line' => $callerFrame['line'] ?? $object->getLine(),
-                'trace' => $this->sanitizeTrace($object),
-            ];
-        }
-
-        // Handle enums — they don't implement any serialization interfaces
-        if ($object instanceof \BackedEnum) {
-            return [
-                '_type' => 'enum',
-                'class' => get_class($object),
-                'name' => $object->name,
-                'value' => $object->value,
-            ];
-        }
-
-        if ($object instanceof \UnitEnum) {
-            return [
-                '_type' => 'enum',
-                'class' => get_class($object),
-                'name' => $object->name,
-            ];
-        }
-
-        if ($object instanceof \DateTimeInterface) {
-            return $object->format('Y-m-d H:i:s.u');
-        }
-
-        if ($object instanceof \JsonSerializable) {
-            return $this->sanitizeArray((array) $object->jsonSerialize());
-        }
-
-        if ($object instanceof \Stringable) {
-            return (string) $object;
-        }
-
-        // For other objects, try to get public properties
-        try {
-            return [
-                '_type' => 'object',
-                'class' => get_class($object),
-                'data' => $this->sanitizeArray(get_object_vars($object)),
-            ];
-        } catch (Throwable) {
-            return '[Object: '.get_class($object).']';
-        }
+        return app(ContextSanitizerInterface::class)->sanitize($context);
     }
 
     /**
@@ -326,27 +243,4 @@ class LogScopeHandler extends AbstractProcessingHandler
         return null;
     }
 
-    /**
-     * Return up to 10 frames of the trace with `args` stripped to avoid
-     * leaking sensitive arguments (passwords, tokens) into stored logs.
-     *
-     * @return list<array{file?: string, line?: int, function?: string, class?: string, type?: string}>
-     */
-    protected function sanitizeTrace(Throwable $exception): array
-    {
-        $frames = array_slice($exception->getTrace(), 0, 10);
-        $sanitized = [];
-
-        foreach ($frames as $frame) {
-            $clean = [];
-            foreach (['file', 'line', 'function', 'class', 'type'] as $key) {
-                if (isset($frame[$key])) {
-                    $clean[$key] = $frame[$key];
-                }
-            }
-            $sanitized[] = $clean;
-        }
-
-        return $sanitized;
-    }
 }

@@ -421,13 +421,22 @@ return [
     |                    anywhere in an entry's context: arrays you log
     |                    yourself, objects expanded into arrays, and expanded
     |                    Request objects alike, at any depth.
-    |                    Matched on whole word segments, case- and
-    |                    separator-insensitively: 'token' redacts token,
-    |                    access_token, accessToken and access-token, but not
-    |                    prompt_tokens or tokenizer.
+    |                    Matched as a fragment, case-insensitively: 'token'
+    |                    redacts token, access_token, accessToken, APIToken
+    |                    and access_tokens.
     |                    Set to [] to use defaults, or provide your own list.
     |                    Your list REPLACES the defaults, it does not add
     |                    to them.
+    |
+    | 'sensitive_keys_except' - Keys that look sensitive by fragment but are
+    |                    not, so they keep their values. Checked first, so an
+    |                    entry here always wins.
+    |                    Entries ADD to the defaults (prompt_tokens,
+    |                    completion_tokens, total_tokens, token_count,
+    |                    tokenizer), so naming your own keeps LogScope's.
+    |                    This is the dial to reach for when a field of yours
+    |                    reads [REDACTED] and should not — widening it is
+    |                    always safer than narrowing 'sensitive_keys'.
     |
     | 'sensitive_headers' - Request header name fragments that should be redacted.
     |                       Headers containing these strings (case-insensitive)
@@ -451,6 +460,10 @@ return [
         // Defaults: password, password_confirmation, secret, token, api_key,
         //           apikey, authorization, credit_card, card_number, cvv, ssn
         'sensitive_keys' => [],
+
+        // Added to the defaults: prompt_tokens, completion_tokens,
+        // total_tokens, token_count, tokenizer
+        'sensitive_keys_except' => [],
 
         // Added to the defaults: auth, cookie, token, key, secret, password, session
         'sensitive_headers' => [],

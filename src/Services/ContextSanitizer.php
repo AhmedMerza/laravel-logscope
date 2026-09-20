@@ -36,12 +36,9 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected array $sensitiveKeys;
 
     /**
-     * The same keys pre-split into word segments, which is what matching
-     * actually compares against.
-     *
-     * @var list<list<string>>
+     * Key fragments that cancel a sensitive-key match.
      */
-    protected array $sensitiveKeySegments;
+    protected array $sensitiveKeysExcept;
 
     /**
      * Headers to redact from request data.
@@ -66,6 +63,25 @@ class ContextSanitizer implements ContextSanitizerInterface
     ];
 
     /**
+     * Default exclusions — keys the list above matches as a fragment but
+     * which carry no secret.
+     *
+     * Redaction matches fragments so that access_token, x-api-key and
+     * user_password are all covered without listing them. The cost is that
+     * 'token' also appears in an LLM app's token counts, which is what these
+     * cancel. Naming the exceptions is what keeps the match broad: the
+     * alternative tried in #77 — matching whole words only — silently stopped
+     * redacting access_tokens, card_numbers and APIToken.
+     */
+    protected const DEFAULT_SENSITIVE_KEYS_EXCEPT = [
+        'prompt_tokens',
+        'completion_tokens',
+        'total_tokens',
+        'token_count',
+        'tokenizer',
+    ];
+
+    /**
      * Default sensitive header name fragments.
      *
      * Matched anywhere in the header name, so custom headers (x-auth-token,
@@ -87,16 +103,19 @@ class ContextSanitizer implements ContextSanitizerInterface
         $this->redactSensitive = config('logscope.context.redact_sensitive', true);
 
         // Use config if provided, otherwise use defaults
-        $configKeys = config('logscope.context.sensitive_keys', []);
-        $this->sensitiveKeys = ! empty($configKeys) ? $configKeys : self::DEFAULT_SENSITIVE_KEYS;
+        $configKeys = (array) config('logscope.context.sensitive_keys', []);
+        $this->sensitiveKeys = $this->usableFragments(
+            $configKeys !== [] ? $configKeys : self::DEFAULT_SENSITIVE_KEYS
+        );
 
-        // Split once here rather than per key per log line. Entries that hold
-        // no word characters at all ('', '---') are dropped: their segment
-        // list is empty, and an empty needle matches every key.
-        $this->sensitiveKeySegments = array_values(array_filter(array_map(
-            fn ($key): array => $this->segments((string) $key),
-            $this->sensitiveKeys
-        )));
+        // Exclusions add to the defaults rather than replacing them. The
+        // shipped entries are known false positives of the key list, and an
+        // app that has to name one of its own should not have to re-list
+        // LogScope's to keep them.
+        $this->sensitiveKeysExcept = $this->usableFragments([
+            ...self::DEFAULT_SENSITIVE_KEYS_EXCEPT,
+            ...(array) config('logscope.context.sensitive_keys_except', []),
+        ]);
 
         // Headers add to the defaults rather than replacing them: keys can be
         // replaced to escape false positives (token → prompt_tokens), but no
@@ -159,6 +178,12 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         if (is_array($value)) {
             return $this->sanitizeArray($value, $depth);
+        }
+
+        // json_encode() cannot represent a resource, and an unencodable value
+        // costs the whole context column rather than the one field.
+        if (is_resource($value)) {
+            return '[Resource]';
         }
 
         return $value;
@@ -257,7 +282,11 @@ class ContextSanitizer implements ContextSanitizerInterface
             'url' => $this->sanitizeUrl($request->fullUrl()),
             'path' => $request->path(),
             'query' => $this->redactSensitive($request->query()),
-            'input' => $this->redactSensitive($request->except($this->sensitiveKeys)),
+            // all(), not except($this->sensitiveKeys): redaction covers these
+            // keys now, and dropping them outright made a sensitive field
+            // vanish from the entry while a nested one showed [REDACTED].
+            // A reader cannot tell an absent field from one never sent.
+            'input' => $this->redactSensitive($request->all()),
             'headers' => $this->sanitizeHeaders($request->headers->all()),
         ];
     }
@@ -289,8 +318,7 @@ class ContextSanitizer implements ContextSanitizerInterface
      * Whether this context key's value must be replaced with [REDACTED].
      *
      * Integer keys are never sensitive — they are list positions, not names —
-     * and skipping them keeps the segment splitting off the hot path for
-     * large lists.
+     * and skipping them keeps the matching off the hot path for large lists.
      */
     protected function shouldRedactKey(mixed $key): bool
     {
@@ -302,51 +330,62 @@ class ContextSanitizer implements ContextSanitizerInterface
     /**
      * Check if a key is sensitive.
      *
-     * Matches on whole word segments rather than raw substrings: a key is
-     * sensitive when a sensitive key's segments appear in it as a contiguous
-     * run. So access_token, accessToken and user.password all redact, while
-     * prompt_tokens, total_tokens and lesson (which contains 'ssn') do not.
+     * Fragment matching, cancelled by an explicit exclusion list. A key is
+     * sensitive when it contains a sensitive fragment anywhere, unless it
+     * also contains an excluded one.
      *
-     * Substring matching is what confined redaction to expanded Request
-     * objects in the first place — false positives were tolerable on a
-     * request body, not on arbitrary context. Matching precisely is what
-     * makes the wider reach affordable (#76).
+     * Matching whole words instead was tried in #77 and reverted: it read as
+     * more precise but silently stopped redacting access_tokens,
+     * card_numbers, passwords and APIToken, all of which the fragment match
+     * had always caught. A logging package's redaction has to fail towards
+     * [REDACTED] — an over-redacted field is visible and one config line
+     * away from fixed, while a missed one is a secret in the database that
+     * nobody finds.
      */
     protected function isSensitiveKey(string $key): bool
     {
-        $segments = $this->segments($key);
+        $key = $this->normalizeKey($key);
 
-        foreach ($this->sensitiveKeySegments as $sensitive) {
-            $span = count($sensitive);
-
-            for ($i = 0, $last = count($segments) - $span; $i <= $last; $i++) {
-                if (array_slice($segments, $i, $span) === $sensitive) {
-                    return true;
-                }
-            }
+        // Exclusions win, since they exist precisely to rescue keys the
+        // fragment list matches (token → prompt_tokens).
+        if ($this->sensitiveKeysExcept !== [] && Str::contains($key, $this->sensitiveKeysExcept)) {
+            return false;
         }
 
-        return false;
+        return Str::contains($key, $this->sensitiveKeys);
     }
 
     /**
-     * Split a key into its lowercase word segments.
+     * Reduce a key to lowercase alphanumerics for matching.
      *
-     * access_token, access-token, access.token, "access token" and
-     * accessToken all give ['access', 'token'], so a sensitive key matches
-     * however the application spells its own.
+     * Separators are dropped from both the key and the configured fragments,
+     * so one entry covers every spelling an application might use:
+     * card_number matches card_number, card-number, card.number, cardNumber
+     * and CardNumber alike. Without it a multi-word entry only ever matches
+     * its own punctuation, and 'cardNumber' — the commonest spelling in a
+     * JSON payload — is stored in clear.
+     */
+    protected function normalizeKey(string $key): string
+    {
+        return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '', $key) ?? $key);
+    }
+
+    /**
+     * Normalize configured entries, dropping any that would match every key.
+     *
+     * A fragment that normalizes to '' (an empty entry, whitespace, '---') is
+     * a substring of every string. Left in the sensitive list it redacts the
+     * whole context; left in the exclusion list it cancels redaction entirely
+     * — a silent fail-open from one stray comma in an env-driven list.
+     * Neither is recoverable at match time, so they are dropped here.
      *
      * @return list<string>
      */
-    protected function segments(string $key): array
+    protected function usableFragments(array $fragments): array
     {
-        // camelCase and PascalCase carry no separator, so introduce one at
-        // each lower-to-upper boundary before splitting on non-word runs.
-        $spaced = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key) ?? $key;
-
         return array_values(array_filter(
-            preg_split('/[^a-z0-9]+/', strtolower($spaced)) ?: [],
-            static fn (string $segment): bool => $segment !== ''
+            array_map(fn ($fragment): string => $this->normalizeKey((string) $fragment), $fragments),
+            static fn (string $fragment): bool => $fragment !== ''
         ));
     }
 

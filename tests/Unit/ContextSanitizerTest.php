@@ -346,19 +346,58 @@ describe('context redaction', function () {
         ]);
     });
 
-    it('leaves keys that merely contain a sensitive word as a fragment', function () {
-        // The false positives that kept redaction off this path: 'token' is a
-        // segment of access_token but not of prompt_tokens, and 'ssn' is a
-        // substring of lesson but not a word in it.
+    it('redacts plural and acronym spellings (#77 regression)', function () {
+        // Whole-word matching passed every other test in this block and still
+        // stored these in clear. They are the reason matching is a fragment.
+        $keys = [
+            'access_tokens', 'refresh_tokens', 'api_keys', 'card_numbers', 'passwords',
+            'APIToken', 'SSNNumber', 'IDToken', 'HTTPSecret', 'CVVCode',
+        ];
+
+        $result = (new ContextSanitizer)->sanitize(array_fill_keys($keys, 'SECRET'));
+
+        expect($result)->toBe(array_fill_keys($keys, '[REDACTED]'));
+    });
+
+    it('keeps keys named in the exclusion list', function () {
         $context = [
             'prompt_tokens' => 150,
-            'total_tokens' => 400,
+            'completion_tokens' => 50,
+            'total_tokens' => 200,
+            'token_count' => 12,
             'tokenizer' => 'cl100k',
-            'lesson' => 'intro',
-            'passwordless' => true,
         ];
 
         expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('adds configured exclusions to the defaults rather than replacing them', function () {
+        config(['logscope.context.sensitive_keys_except' => ['token_budget']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'token_budget' => 4096,
+            'prompt_tokens' => 150,
+            'access_token' => 'secret',
+        ]);
+
+        expect($result['token_budget'])->toBe(4096)
+            ->and($result['prompt_tokens'])->toBe(150)
+            ->and($result['access_token'])->toBe('[REDACTED]');
+    });
+
+    it('ignores blank entries instead of letting them match everything', function () {
+        // A stray comma in an env-driven list yields ''. In sensitive_keys that
+        // would redact the whole context; in the exclusion list it would cancel
+        // redaction entirely — a silent fail-open.
+        config([
+            'logscope.context.sensitive_keys' => ['', '   ', 'password'],
+            'logscope.context.sensitive_keys_except' => ['', '  '],
+        ]);
+
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
+
+        expect($result['password'])->toBe('[REDACTED]')
+            ->and($result['user_id'])->toBe(7);
     });
 
     it('redacts a sensitive property of an expanded object', function () {
@@ -390,7 +429,11 @@ describe('context redaction', function () {
     });
 
     it('leaves list positions alone', function () {
-        $context = ['tokens' => ['a', 'b']];
+        // Integer keys are list positions, never names. Configure a numeral as
+        // sensitive so this fails if shouldRedactKey()'s is_string guard goes.
+        config(['logscope.context.sensitive_keys' => ['1']]);
+
+        $context = ['items' => ['a', 'b', 'c']];
 
         expect((new ContextSanitizer)->sanitize($context))->toBe($context);
     });
