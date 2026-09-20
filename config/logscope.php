@@ -437,10 +437,14 @@ return [
     |                    and never spans levels, so 'ssn' redacts neither
     |                    class_name nor ['class' => ['name' => …]].
     |                    Keys over 256 characters are redacted unexamined.
-    |                    Set to [] to use defaults, or provide your own list.
-    |                    Your list REPLACES the defaults, it does not add
-    |                    to them. A list that is empty (or all blank) falls
-    |                    back to the defaults rather than redacting nothing.
+    |                    Entries ADD to the defaults, they never replace
+    |                    them, so adding one key keeps the other eleven.
+    |                    To stop a default redacting a field of yours, name
+    |                    that field in 'sensitive_keys_except' below — that
+    |                    is what it is for, and it is precise where dropping
+    |                    an entry from this list would not be.
+    |                    `php artisan logscope:doctor` prints the list that
+    |                    is actually in force.
     |
     | 'sensitive_keys_except' - Keys that look sensitive but are not, so they
     |                    keep their values. An entry removes the words it
@@ -479,9 +483,9 @@ return [
         'expand_objects' => env('LOGSCOPE_EXPAND_OBJECTS', true),
         'redact_sensitive' => env('LOGSCOPE_REDACT_SENSITIVE', true),
 
-        // Set to [] to use defaults, or provide your own list to override
-        // Defaults: password, password_confirmation, secret, token, api_key,
-        //           apikey, authorization, credit_card, card_number, cvv, ssn
+        // Added to the defaults: password, password_confirmation, secret,
+        // token, api_key, apikey, authorization, credit_card, card_number,
+        // cvv, ssn
         'sensitive_keys' => [],
 
         // Added to the defaults: prompt_tokens, completion_tokens,

@@ -299,9 +299,10 @@ describe('request redaction', function () {
             ->and($headers['cookie'])->toBe(['[REDACTED]']);
     });
 
-    it('replaces the default sensitive keys with configured ones, ignoring case', function () {
-        // Replacing (not merging) is the escape hatch for default false positives:
-        // the default 'token' would otherwise redact prompt_tokens.
+    it('adds a configured key to the defaults on request input, ignoring case', function () {
+        // prompt_tokens survives the default 'token' because of the shipped
+        // exclusion list, not because configuring a key dropped the default
+        // — that is the swap #79 made. The exclusion is the escape hatch now.
         config(['logscope.context.sensitive_keys' => ['PIN']]);
         $request = Request::create('/', 'POST', ['pin' => '1234', 'prompt_tokens' => '150']);
 
@@ -401,10 +402,13 @@ describe('context redaction', function () {
         expect((new ContextSanitizer)->sanitize($context))->toBe($context);
     });
 
-    it('falls back to the defaults when every configured key is blank (#77)', function () {
+    it('redacts the defaults when every configured key is blank (#77, #79)', function () {
         // explode(',', env('LOGSCOPE_SENSITIVE_KEYS', '')) yields [''] when
         // the variable is unset. Filtering that to an empty list left a
-        // matcher with no fragments, which redacts nothing at all.
+        // matcher with no fragments, which redacts nothing at all; #77 added
+        // a fallback for it. Merging retired the fallback rather than fixing
+        // it — the defaults are in the list unconditionally now — so this
+        // pins the outcome, which has to hold either way.
         config(['logscope.context.sensitive_keys' => ['', '   ', '---']]);
 
         $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
@@ -550,13 +554,30 @@ describe('context redaction', function () {
         expect($result['password'])->toBe('hunter2');
     });
 
-    it('honours a configured key list on plain context, replacing the defaults', function () {
+    it('adds a configured key to the defaults rather than replacing them (#79)', function () {
+        // The whole of #79: adding one key used to drop the other eleven,
+        // silently, in the one setting where failing open means secrets in
+        // clear. A configured key and a surviving default, together.
         config(['logscope.context.sensitive_keys' => ['PIN']]);
 
         $result = (new ContextSanitizer)->sanitize(['pin_code' => '1234', 'password' => 'hunter2']);
 
         expect($result['pin_code'])->toBe('[REDACTED]')
-            ->and($result['password'])->toBe('hunter2');
+            ->and($result['password'])->toBe('[REDACTED]');
+    });
+
+    it('ignores a configured key that repeats a default (#79)', function () {
+        // Writing out the full list you want is the obvious thing to do once
+        // entries merge, and it overlaps the defaults by construction. The
+        // matcher does not care; the effective list doctor prints does.
+        config(['logscope.context.sensitive_keys' => ['password', 'PIN']]);
+
+        $sanitizer = new ContextSanitizer;
+
+        expect($sanitizer->effectiveSensitiveKeys())
+            ->toContain('password')
+            ->toContain('pin')
+            ->and(array_count_values($sanitizer->effectiveSensitiveKeys())['password'])->toBe(1);
     });
 
     it('leaves list positions alone', function () {
@@ -887,20 +908,23 @@ describe('path threading guards (#81 review)', function () {
             ->and($childPath->invoke($sanitizer, '', str_repeat('a', 300), ['x' => 1]))->toBe('');
     });
 
-    it('builds no path when no multi-word fragment is configured', function () {
-        // Reflection for the same reason: isSensitiveKey() returns early on
-        // an empty phrase list before it ever reads the path, so this
-        // short-circuit has no observable output of its own either.
+    it('still threads a path when every configured key is single-word (#79)', function () {
+        // This used to pin the opposite: configure only 'pin', get no phrase
+        // list, and childPath() short-circuits. Merging made that state
+        // unreachable through config — the defaults always carry
+        // password_confirmation, api_key, credit_card and card_number — so
+        // what is worth pinning now is that adding a single word does not
+        // cost the compound defaults the path their cross-level match needs.
         config(['logscope.context.sensitive_keys' => ['pin']]);
 
         $sanitizer = new ContextSanitizer;
         $childPath = new ReflectionMethod($sanitizer, 'childPath');
         $childPath->setAccessible(true);
 
-        expect($childPath->invoke($sanitizer, '', 'card', ['number' => '4111']))->toBe('');
+        expect($childPath->invoke($sanitizer, '', 'card', ['number' => '4111']))->toBe('card');
     });
 
-    it('still matches a single-word fragment when no phrase is configured', function () {
+    it('keeps a compound default spanning levels alongside a configured word (#79)', function () {
         config(['logscope.context.sensitive_keys' => ['pin']]);
 
         $result = (new ContextSanitizer)->sanitize([
@@ -908,7 +932,8 @@ describe('path threading guards (#81 review)', function () {
             'my' => ['pin' => '1234'],
         ]);
 
-        expect($result['card']['number'])->toBe('4111')
+        // card_number is a default and still spans levels; pin is the addition.
+        expect($result['card']['number'])->toBe('[REDACTED]')
             ->and($result['my']['pin'])->toBe('[REDACTED]');
     });
 

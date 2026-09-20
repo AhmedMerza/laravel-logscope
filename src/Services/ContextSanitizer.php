@@ -45,6 +45,16 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected array $sensitivePhrases;
 
     /**
+     * The sensitive keys in force, defaults and config merged, for display.
+     *
+     * Kept alongside the matcher rather than rebuilt on demand so that what
+     * `logscope:doctor` prints and what actually redacts cannot drift.
+     *
+     * @var list<string>
+     */
+    protected array $effectiveSensitiveKeys;
+
+    /**
      * Length of the longest single-word fragment, to bound run joining.
      */
     protected int $longestSensitiveWord;
@@ -147,19 +157,36 @@ class ContextSanitizer implements ContextSanitizerInterface
         $this->expandObjects = config('logscope.context.expand_objects', true);
         $this->redactSensitive = config('logscope.context.redact_sensitive', true);
 
-        // Use config if provided, otherwise use defaults
+        // Configured keys ADD to the defaults, as sensitive_keys_except and
+        // sensitive_headers both do below. Replacing was the old behaviour
+        // and it failed open: 'sensitive_keys' => ['pin'] silently stopped
+        // redacting password, token, cvv and eight more, with nothing logged
+        // and nothing to read it back from (#79). The edit that triggered it
+        // is one a security-conscious operator is unusually likely to make,
+        // and the result was the opposite of the intent.
+        //
+        // Replacement existed as an escape hatch for a false positive —
+        // 'token' catching an LLM app's prompt_tokens — but that is now
+        // sensitive_keys_except's job, and it does it without costing eleven
+        // defaults. Dropping a default is still possible, it just names the
+        // field to keep instead of re-listing everything to lose.
+        //
+        // Merging also retires a failure mode of its own: a configured list
+        // that is empty, or whose entries are all blank ('', '---', or the
+        // [''] that explode(',', env('…', '')) yields for an unset variable),
+        // used to leave the matcher with no fragments and redact nothing at
+        // all. The defaults are unconditionally in the list now, so there is
+        // no longer a case to fall back from.
         $configKeys = (array) config('logscope.context.sensitive_keys', []);
-        $fragments = $this->wordRuns($configKeys !== [] ? $configKeys : self::DEFAULT_SENSITIVE_KEYS);
+        $fragments = $this->dedupeRuns($this->wordRuns([
+            ...self::DEFAULT_SENSITIVE_KEYS,
+            ...$configKeys,
+        ]));
 
-        // A configured list whose entries are all blank ('', '---', or the
-        // [''] that explode(',', env('…', '')) yields when the variable is
-        // unset) leaves nothing to match with, and a matcher with no
-        // fragments redacts nothing at all. Falling back to the defaults
-        // keeps a misconfiguration loud — too much [REDACTED] — rather than
-        // silent, which here means secrets in the clear.
-        if ($fragments === []) {
-            $fragments = $this->wordRuns(self::DEFAULT_SENSITIVE_KEYS);
-        }
+        $this->effectiveSensitiveKeys = array_map(
+            static fn (array $run): string => implode('_', $run),
+            $fragments
+        );
 
         $this->sensitiveWords = array_values(array_map(
             static fn (array $run): string => $run[0],
@@ -183,17 +210,17 @@ class ContextSanitizer implements ContextSanitizerInterface
         // shipped entries are known false positives of the key list, and an
         // app that has to name one of its own should not have to re-list
         // LogScope's to keep them.
-        $this->exceptRuns = array_values(array_filter(
+        $this->exceptRuns = $this->dedupeRuns(array_values(array_filter(
             $this->wordRuns([
                 ...self::DEFAULT_SENSITIVE_KEYS_EXCEPT,
                 ...(array) config('logscope.context.sensitive_keys_except', []),
             ]),
             static fn (array $run): bool => strlen(implode('', $run)) >= self::MIN_EXCEPT_LENGTH
-        ));
+        )));
 
-        // Headers add to the defaults rather than replacing them: keys can be
-        // replaced to escape false positives (token → prompt_tokens), but no
-        // header is worth losing authorization/cookie redaction over.
+        // Headers add to the defaults too. Every list in this block now does;
+        // they disagreed until #79, which is what made the odd one out so
+        // easy to misread.
         $configHeaders = (array) config('logscope.context.sensitive_headers', []);
         $this->sensitiveHeaders = [...self::DEFAULT_SENSITIVE_HEADERS, ...$configHeaders];
     }
@@ -532,6 +559,13 @@ class ContextSanitizer implements ContextSanitizerInterface
         // tokenize a client-chosen key with no MAX_KEY_LENGTH check in front
         // of it — that guard lives in isSensitiveKey(), which this config
         // never reaches.
+        //
+        // The phrase half no longer fires through configuration: since #79
+        // the defaults are always present, and four of them are compound
+        // (password_confirmation, api_key, credit_card, card_number). It
+        // stays because it states what the path is for, and because a
+        // default list that ever went all-single-word should short-circuit
+        // rather than tokenize keys nothing will read.
         if (! $this->redactSensitive || $this->longestSensitivePhrase === 0) {
             return '';
         }
@@ -661,6 +695,77 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         return $runs;
+    }
+
+    /**
+     * Drop runs that repeat one already in the list, keeping first position.
+     *
+     * Merging the configured keys into the defaults makes a repeat ordinary
+     * rather than a mistake: writing out the full list you want is the
+     * obvious thing to do, and it now overlaps the defaults by construction.
+     * The matcher is indifferent to a duplicate; the effective list
+     * `logscope:doctor` prints is not, and one that says password twice
+     * reads as a bug in the report.
+     *
+     * Runs are compared joined by underscores, not concatenated, so that
+     * card_number and cardnumber stay distinct — they match differently,
+     * the first spanning array levels and the second not.
+     *
+     * @param  list<list<string>>  $runs
+     * @return list<list<string>>
+     */
+    protected function dedupeRuns(array $runs): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($runs as $run) {
+            $joined = implode('_', $run);
+
+            if (isset($seen[$joined])) {
+                continue;
+            }
+
+            $seen[$joined] = true;
+            $unique[] = $run;
+        }
+
+        return $unique;
+    }
+
+    /**
+     * The sensitive keys actually in force, defaults and config merged.
+     *
+     * Exists so `logscope:doctor` can answer "what is redacted right now?"
+     * from the same list the matcher was built out of, rather than
+     * re-deriving the merge and drifting from it. Drift between the stated
+     * rule and the effective one is what #79 was.
+     *
+     * Entries read back normalised — the words the matcher found, joined by
+     * underscores — so a configured 'cardNumber' reports as card_number.
+     *
+     * @return list<string>
+     */
+    public function effectiveSensitiveKeys(): array
+    {
+        return $this->effectiveSensitiveKeys;
+    }
+
+    /**
+     * The exclusions actually in force, defaults and config merged.
+     *
+     * Entries below MIN_EXCEPT_LENGTH are already gone: they are dropped
+     * when the matcher is built, so what this returns is what cancels a
+     * match, not what was asked for.
+     *
+     * @return list<string>
+     */
+    public function effectiveSensitiveKeysExcept(): array
+    {
+        return array_map(
+            static fn (array $run): string => implode('_', $run),
+            $this->exceptRuns
+        );
     }
 
     /**

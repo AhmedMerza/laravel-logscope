@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Gate;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\ContextSanitizer;
 
 uses(RefreshDatabase::class);
 
@@ -269,6 +270,37 @@ it('warns that an empty allowlist captures nothing', function (): void {
 
     expect($output)->toContain('Header capture')
         ->and($output)->toContain('allowlist is empty');
+});
+
+it('reports the sensitive keys actually in force (#79)', function (): void {
+    // Until #79 nothing answered "what is redacted right now?", which is the
+    // question that would have caught sensitive_keys dropping its defaults.
+    config(['logscope.context.sensitive_keys' => ['pin']]);
+
+    // The sanitizer is a singleton built from config on first resolve, so a
+    // config change mid-process needs the instance dropped to mirror what a
+    // fresh `artisan` run does.
+    app()->forgetInstance(ContextSanitizer::class);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    // The configured key and the defaults it no longer replaces, together.
+    expect($output)->toContain('Redaction')
+        ->and($output)->toContain('pin')
+        ->and($output)->toContain('password')
+        ->and($output)->toContain('keys redacted');
+});
+
+it('warns when redaction is switched off entirely', function (): void {
+    config(['logscope.context.redact_sensitive' => false]);
+    app()->forgetInstance(ContextSanitizer::class);
+
+    Artisan::call('logscope:doctor');
+    $output = Artisan::output();
+
+    expect($output)->toContain('Redaction')
+        ->and($output)->toContain('stored exactly as logged');
 });
 
 it('logscope:test captures and verifies a log entry end-to-end', function (): void {
