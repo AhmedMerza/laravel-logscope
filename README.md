@@ -755,7 +755,16 @@ Log::error('Payment failed', ['card_number' => $card, 'amount' => 500]);
 
 Keys are matched **per word**, ignoring case and separators — so one entry covers every spelling. `card_number` redacts `card_number`, `card-number`, `cardNumber`, `CardNumber` and `card_numbers`; `token` redacts `access_token`, `APIToken` and `refresh_tokens`.
 
-Matching a one-word entry inside a single word is what keeps ordinary keys readable: `class_name` and `cv_video` are left alone, where collapsing the whole key would have made them match `ssn` and `cvv`.
+A multi-word entry also spans **array levels**, which is how a bracketed form field arrives:
+
+```php
+Log::error('Payment failed', ['card' => ['number' => $number, 'exp_month' => 12]]);
+// Context: { "card": { "number": "[REDACTED]", "exp_month": 12 } }
+
+// ?card[number]=4111 in a logged Request or URL is the same shape, and redacts too.
+```
+
+Matching a one-word entry inside a single word is what keeps ordinary keys readable: `class_name` and `cv_video` are left alone, where collapsing the whole key would have made them match `ssn` and `cvv`. One-word entries never span levels for the same reason, so `['class' => ['name' => …]]` is kept as well.
 
 That is deliberately broad, because a missed secret is invisible and a redacted field is not. When a field of your own reads `[REDACTED]` and shouldn't, name it in `sensitive_keys_except` rather than narrowing `sensitive_keys`:
 

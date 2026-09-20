@@ -570,6 +570,118 @@ describe('context redaction', function () {
     });
 });
 
+describe('compound keys split across array levels', function () {
+    it('redacts a compound name whose halves are one level apart (#80)', function () {
+        // card[number] is what Laravel makes of a bracketed form field and
+        // the shape Stripe and Braintree hand back, so this is how a card
+        // number actually reaches the log table. Matching the leaf key
+        // alone, 'number' contains no fragment and it was stored in clear.
+        $result = (new ContextSanitizer)->sanitize([
+            'card' => ['number' => '4111111111111111', 'exp_month' => 12],
+            'api' => ['key' => 'sk-live-51H9xQ'],
+            'credit' => ['card' => '4111'],
+        ]);
+
+        expect($result['card']['number'])->toBe('[REDACTED]')
+            ->and($result['api']['key'])->toBe('[REDACTED]')
+            ->and($result['credit']['card'])->toBe('[REDACTED]')
+            ->and($result['card']['exp_month'])->toBe(12);
+    });
+
+    it('does not let joining levels invent a match (#80)', function () {
+        // The hazard the path carries: gluing two innocent words makes them
+        // adjacent. class + name is 'classname', which contains 'ssn'. Only
+        // the multi-word fragments are matched against a path, so the
+        // one-word ones cannot fire on a join — flat class_name is kept for
+        // the same reason (#77).
+        $context = [
+            'class' => ['name' => 'App\\Jobs\\SyncOrders'],
+            'cv' => ['video' => 'intro.mp4'],
+            'process' => ['notes' => 'ok'],
+            'business' => ['name' => 'Acme'],
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('steps over list positions when joining the path (#80)', function () {
+        // A list of cards puts an integer between the two halves. It is a
+        // position, not part of the field's name, so it must not break the
+        // join the way another word would.
+        $result = (new ContextSanitizer)->sanitize([
+            'card' => [['number' => '4111'], ['number' => '4222']],
+        ]);
+
+        expect($result['card'][0]['number'])->toBe('[REDACTED]')
+            ->and($result['card'][1]['number'])->toBe('[REDACTED]');
+    });
+
+    it('carries the path into an expanded object (#80)', function () {
+        $card = new stdClass;
+        $card->number = '4111111111111111';
+        $card->brand = 'visa';
+
+        $result = (new ContextSanitizer)->sanitize(['card' => $card]);
+
+        expect($result['card']['data']['number'])->toBe('[REDACTED]')
+            ->and($result['card']['data']['brand'])->toBe('visa');
+    });
+
+    it('redacts a bracketed form field on the request input (#80)', function () {
+        $request = Request::create('/pay', 'POST', [
+            'card' => ['number' => '4111111111111111'],
+            'amount' => '500',
+        ]);
+
+        $input = (new ContextSanitizer)->sanitize(['request' => $request])['request']['input'];
+
+        expect($input['card']['number'])->toBe('[REDACTED]')
+            ->and($input['amount'])->toBe('500');
+    });
+
+    it('redacts a bracketed query parameter in a URL (#80)', function () {
+        $url = (new ContextSanitizer)->sanitizeUrl(
+            'https://x.test/pay?card[number]=4111&api[key]=sk-live&class[name]=Foo'
+        );
+
+        expect(urldecode($url))
+            ->toContain('card[number]=[REDACTED]')
+            ->toContain('api[key]=[REDACTED]')
+            ->toContain('class[name]=Foo');
+    });
+
+    it('redacts the whole subtree under a sensitive parent', function () {
+        // The property the path bound rests on: a parent that matches is
+        // replaced outright, so a path reaching a child is only ever built
+        // from ancestors already judged harmless.
+        $result = (new ContextSanitizer)->sanitize([
+            'password' => ['confirmation' => 'hunter2', 'strength' => 3],
+        ]);
+
+        expect($result['password'])->toBe('[REDACTED]');
+    });
+
+    it('still matches a compound name inside one key', function () {
+        // The path must not have displaced the original single-key match.
+        $keys = ['card_number', 'cardNumber', 'card.number', 'api_key', 'credit_card'];
+
+        $result = (new ContextSanitizer)->sanitize(array_fill_keys($keys, 'SECRET'));
+
+        expect($result)->toBe(array_fill_keys($keys, '[REDACTED]'));
+    });
+
+    it('matches a configured compound of more than two words across levels', function () {
+        config(['logscope.context.sensitive_keys' => ['billing_card_number']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'billing' => ['card' => ['number' => '4111', 'brand' => 'visa']],
+        ]);
+
+        expect($result['billing']['card']['number'])->toBe('[REDACTED]')
+            ->and($result['billing']['card']['brand'])->toBe('visa');
+    });
+});
+
 describe('extractSource', function () {
     it('returns null when no exception in context', function () {
         $context = ['message' => 'hello'];
