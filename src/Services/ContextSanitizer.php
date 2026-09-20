@@ -50,6 +50,12 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected int $longestSensitiveWord;
 
     /**
+     * Length of the longest multi-word fragment, to bound the key path
+     * carried down into nested arrays.
+     */
+    protected int $longestSensitivePhrase;
+
+    /**
      * Word runs that cancel the part of a key they cover.
      *
      * @var list<list<string>>
@@ -169,6 +175,10 @@ class ContextSanitizer implements ContextSanitizerInterface
             ? 0
             : max(array_map(strlen(...), $this->sensitiveWords));
 
+        $this->longestSensitivePhrase = $this->sensitivePhrases === []
+            ? 0
+            : max(array_map(strlen(...), $this->sensitivePhrases));
+
         // Exclusions add to the defaults rather than replacing them. The
         // shipped entries are known false positives of the key list, and an
         // app that has to name one of its own should not have to re-list
@@ -206,7 +216,7 @@ class ContextSanitizer implements ContextSanitizerInterface
 
             $sanitized[$key] = $this->shouldRedactKey($key)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($value);
+                : $this->sanitizeValue($value, 0, $this->childPath('', $key, $value));
         }
 
         return $sanitized;
@@ -215,7 +225,7 @@ class ContextSanitizer implements ContextSanitizerInterface
     /**
      * Sanitize a single value.
      */
-    protected function sanitizeValue(mixed $value, int $depth = 0): mixed
+    protected function sanitizeValue(mixed $value, int $depth = 0, string $path = ''): mixed
     {
         // Prevent infinite recursion
         if ($depth > 5) {
@@ -234,14 +244,14 @@ class ContextSanitizer implements ContextSanitizerInterface
             }
 
             if ($value instanceof Request) {
-                return $this->sanitizeRequest($value);
+                return $this->sanitizeRequest($value, $path);
             }
 
-            return $this->sanitizeObject($value, $depth);
+            return $this->sanitizeObject($value, $depth, $path);
         }
 
         if (is_array($value)) {
-            return $this->sanitizeArray($value, $depth);
+            return $this->sanitizeArray($value, $depth, $path);
         }
 
         // json_encode() cannot represent a resource, and an unencodable value
@@ -259,14 +269,17 @@ class ContextSanitizer implements ContextSanitizerInterface
      * Redaction happens here rather than only on the Request path, so it
      * reaches every array the application logs itself and every object
      * expanded into one — a DTO's $password property included.
+     *
+     * $path carries the ancestor keys down so that a compound fragment can
+     * still see a name split across two levels — card[number] (#80).
      */
-    protected function sanitizeArray(array $value, int $depth = 0): array
+    protected function sanitizeArray(array $value, int $depth = 0, string $path = ''): array
     {
         $result = [];
         foreach ($value as $key => $item) {
-            $result[$key] = $this->shouldRedactKey($key)
+            $result[$key] = $this->shouldRedactKey($key, $path)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($item, $depth + 1);
+                : $this->sanitizeValue($item, $depth + 1, $this->childPath($path, $key, $item));
         }
 
         return $result;
@@ -274,8 +287,15 @@ class ContextSanitizer implements ContextSanitizerInterface
 
     /**
      * Sanitize a generic object.
+     *
+     * The object's own key path passes straight through to its array form:
+     * ['card' => $dto] puts the DTO's $number on the same footing as
+     * ['card' => ['number' => …]]. The '_type'/'class'/'data' wrapper keys
+     * below are LogScope's, not the application's, so they are not added to
+     * the path — otherwise every expanded object would break a compound
+     * fragment in half.
      */
-    protected function sanitizeObject(object $value, int $depth = 0): mixed
+    protected function sanitizeObject(object $value, int $depth = 0, string $path = ''): mixed
     {
         // Handle enums first — they don't implement any serialization interfaces
         if ($value instanceof \BackedEnum) {
@@ -304,17 +324,17 @@ class ContextSanitizer implements ContextSanitizerInterface
             }
 
             if ($value instanceof JsonSerializable) {
-                return $this->sanitizeArray((array) $value->jsonSerialize(), $depth + 1);
+                return $this->sanitizeArray((array) $value->jsonSerialize(), $depth + 1, $path);
             }
 
             if ($value instanceof Arrayable) {
-                return $this->sanitizeArray($value->toArray(), $depth + 1);
+                return $this->sanitizeArray($value->toArray(), $depth + 1, $path);
             }
 
             if ($value instanceof Jsonable) {
                 $decoded = json_decode($value->toJson(), true);
 
-                return is_array($decoded) ? $this->sanitizeArray($decoded, $depth + 1) : $decoded;
+                return is_array($decoded) ? $this->sanitizeArray($decoded, $depth + 1, $path) : $decoded;
             }
 
             if ($value instanceof \Stringable) {
@@ -325,7 +345,7 @@ class ContextSanitizer implements ContextSanitizerInterface
             return [
                 '_type' => 'object',
                 'class' => get_class($value),
-                'data' => $this->sanitizeArray(get_object_vars($value), $depth + 1),
+                'data' => $this->sanitizeArray(get_object_vars($value), $depth + 1, $path),
             ];
         } catch (\Throwable) {
             // Fall through to return class name
@@ -337,20 +357,30 @@ class ContextSanitizer implements ContextSanitizerInterface
 
     /**
      * Sanitize a Request object to extract useful information.
+     *
+     * $path is the context key the Request was logged under, and it reaches
+     * the request's own fields the same way it reaches an expanded object's
+     * properties: ['api' => $request] with ?key=… has to redact, because
+     * ['api' => ['key' => …]] and ['api' => $dto] both do. The '_type',
+     * 'query' and 'input' keys below are LogScope's own, so they are not
+     * added to the path.
+     *
+     * The url gets it too. Without that, a secret redacted out of `query`
+     * would still be readable in the `url` of the same entry.
      */
-    protected function sanitizeRequest(Request $request): array
+    protected function sanitizeRequest(Request $request, string $path = ''): array
     {
         return [
             '_type' => 'request',
             'method' => $request->method(),
-            'url' => $this->sanitizeUrl($request->fullUrl()),
+            'url' => $this->redactUrl($request->fullUrl(), $path),
             'path' => $request->path(),
-            'query' => $this->redactSensitive($request->query()),
+            'query' => $this->redactSensitive($request->query(), $path),
             // all(), not except(...): redaction covers these
             // keys now, and dropping them outright made a sensitive field
             // vanish from the entry while a nested one showed [REDACTED].
             // A reader cannot tell an absent field from one never sent.
-            'input' => $this->redactSensitive($request->all()),
+            'input' => $this->redactSensitive($request->all(), $path),
             'headers' => $this->sanitizeHeaders($request->headers->all()),
         ];
     }
@@ -358,7 +388,7 @@ class ContextSanitizer implements ContextSanitizerInterface
     /**
      * Redact sensitive keys from data.
      */
-    protected function redactSensitive(array $data): array
+    protected function redactSensitive(array $data, string $path = ''): array
     {
         if (! $this->redactSensitive) {
             return $data;
@@ -366,10 +396,10 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         $result = [];
         foreach ($data as $key => $value) {
-            if ($this->isSensitiveKey((string) $key)) {
+            if ($this->isSensitiveKey((string) $key, $path)) {
                 $result[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
-                $result[$key] = $this->redactSensitive($value);
+                $result[$key] = $this->redactSensitive($value, $this->childPath($path, $key, $value));
             } else {
                 $result[$key] = $value;
             }
@@ -384,11 +414,11 @@ class ContextSanitizer implements ContextSanitizerInterface
      * Integer keys are never sensitive — they are list positions, not names —
      * and skipping them keeps the matching off the hot path for large lists.
      */
-    protected function shouldRedactKey(mixed $key): bool
+    protected function shouldRedactKey(mixed $key, string $path = ''): bool
     {
         return $this->redactSensitive
             && is_string($key)
-            && $this->isSensitiveKey($key);
+            && $this->isSensitiveKey($key, $path);
     }
 
     /**
@@ -414,8 +444,15 @@ class ContextSanitizer implements ContextSanitizerInterface
      * Redaction fails towards [REDACTED]: an over-redacted field is visible
      * and one config line away from fixed, a missed one is a secret in the
      * database that nobody goes looking for.
+     *
+     * $path holds the ancestor keys, already joined, and is matched ONLY by
+     * the multi-word half — so card[number], which Laravel produces from a
+     * bracketed form field, reads as 'cardnumber' and redacts (#80). The
+     * single-word half deliberately never sees it: 'ssn' tested against a
+     * joined path would redact class[name], which is the same gluing the
+     * word/phrase split exists to prevent.
      */
-    protected function isSensitiveKey(string $key): bool
+    protected function isSensitiveKey(string $key, string $path = ''): bool
     {
         // A field name this long is not a field name. Tokenizing costs time
         // linear in a length the client chooses, and truncating first would
@@ -467,7 +504,7 @@ class ContextSanitizer implements ContextSanitizerInterface
             return false;
         }
 
-        $joined = implode('', $words);
+        $joined = $path.implode('', $words);
 
         foreach ($this->sensitivePhrases as $phrase) {
             if (str_contains($joined, $phrase)) {
@@ -476,6 +513,53 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         return false;
+    }
+
+    /**
+     * The ancestor path a nested value's own keys are matched against.
+     *
+     * A compound entry such as card_number has to see both halves of
+     * card[number], and they arrive one array level apart, so the parent's
+     * words travel down with the recursion (#80).
+     *
+     * Only a value that recurses needs one, and only when a multi-word
+     * fragment is configured at all — everything else gets '' and skips the
+     * tokenizing entirely.
+     */
+    protected function childPath(string $path, mixed $key, mixed $value): string
+    {
+        // With redaction off nothing reads the path, and building one would
+        // tokenize a client-chosen key with no MAX_KEY_LENGTH check in front
+        // of it — that guard lives in isSensitiveKey(), which this config
+        // never reaches.
+        if (! $this->redactSensitive || $this->longestSensitivePhrase === 0) {
+            return '';
+        }
+
+        if (! is_array($value) && ! is_object($value)) {
+            return '';
+        }
+
+        // A numeric key is a list position, not part of a field's name, so it
+        // is stepped over rather than joined: ['card' => [0 => ['number' =>
+        // …]]] still has to read as card + number.
+        //
+        // is_numeric(), not is_string(): PHP casts an array key to int only
+        // when it is a CANONICAL decimal, so card[0][number] arrives as an
+        // int while card[01][number], card[+1][number] and card[1.0][number]
+        // all arrive as strings. Those are ordinary bracket syntax no client
+        // has to craft, and treating them as words broke the adjacency the
+        // compound needs — storing the card number in clear.
+        if (is_string($key) && ! is_numeric($key)) {
+            $path .= implode('', $this->withoutExcluded($this->words($key)));
+        }
+
+        // A path that already contained a whole fragment would have been
+        // redacted before the recursion got here, so any match still to
+        // come must cover part of the leaf key too. That caps what is worth
+        // carrying at one character short of the longest fragment, and with
+        // it the cost of a deeply nested request body.
+        return substr($path, 1 - $this->longestSensitivePhrase);
     }
 
     /**
@@ -739,6 +823,18 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     public function sanitizeUrl(string $url): string
     {
+        return $this->redactUrl($url);
+    }
+
+    /**
+     * Redact a URL's query parameters, optionally under an ancestor path.
+     *
+     * Split from sanitizeUrl() rather than given a second parameter because
+     * sanitizeUrl() is on ContextSanitizerInterface, and adding an argument
+     * there would break every third-party implementation of it.
+     */
+    protected function redactUrl(string $url, string $path = ''): string
+    {
         if (! $this->redactSensitive) {
             return $url;
         }
@@ -755,7 +851,7 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         parse_str($parsed['query'], $queryParams);
-        $sanitizedQuery = $this->redactSensitive($queryParams);
+        $sanitizedQuery = $this->redactSensitive($queryParams, $path);
 
         // Rebuild the URL with sanitized query string
         $newQuery = http_build_query($sanitizedQuery);

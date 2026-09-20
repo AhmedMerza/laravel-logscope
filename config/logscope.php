@@ -425,8 +425,17 @@ return [
     |                    'token' redacts token, access_token, accessToken,
     |                    APIToken and access_tokens, while 'card_number'
     |                    also redacts cardNumber and card.number.
-    |                    A one-word entry only matches inside a single word,
-    |                    so 'ssn' does not redact class_name.
+    |                    A multi-word entry spans array levels too, so
+    |                    'card_number' covers ['card' => ['number' => …]]
+    |                    and the ?card[number]= form Laravel parses into it.
+    |                    The halves must be adjacent: a numeric position is
+    |                    stepped over (card[0][number] redacts), but a named
+    |                    level between them ends the match, just as it would
+    |                    inside one key — ['card' => ['holder' => ['number'
+    |                    => …]]] is no more covered than card_holder_number.
+    |                    A one-word entry only matches inside a single word
+    |                    and never spans levels, so 'ssn' redacts neither
+    |                    class_name nor ['class' => ['name' => …]].
     |                    Keys over 256 characters are redacted unexamined.
     |                    Set to [] to use defaults, or provide your own list.
     |                    Your list REPLACES the defaults, it does not add
@@ -447,6 +456,10 @@ return [
     |                    every word containing it, so 'tokens' would also
     |                    stop access_tokens being redacted, while
     |                    'usage_tokens' only covers that field.
+    |                    A multi-word exclusion cancels the key it names, not
+    |                    the same name split across array levels: excluding
+    |                    'credit_card' keeps credit_card, while
+    |                    ['credit' => ['card' => …]] still redacts.
     |
     | 'sensitive_headers' - Request header name fragments that should be redacted.
     |                       Headers containing these strings (case-insensitive)
