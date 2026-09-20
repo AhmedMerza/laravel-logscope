@@ -23,9 +23,9 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v2.0.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.0.0)** — **Run `php artisan migrate` after upgrading.**
+**Latest: [v2.1.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.1.0)** — **a redaction release. Upgrade if you log request data.** No migration.
 
-On Postgres, a failed log write inside a transaction used to roll back the application's own writes, and `DB::commit()` still returned normally — so the loss was silent (#40). Behind a load balancer, `ip_address` recorded the proxy instead of the client, which also meant Watchtower blocked the proxy (#54). Both are fixed. Entries can now carry the request's headers in their own allowlisted column (#30).
+`sensitive_keys` only ever redacted a logged `Request` object, so the arrays you log yourself stored passwords, card numbers and API tokens in clear — and `['request' => $request->all()]` is the common spelling (#76). The Monolog handler carried its own copy of the context walk with no redaction in it at all, storing Symfony's raw HTTP dump — `Authorization` header, `Cookie`, form body — for everyone using `capture => channel` or `pushHandler()` (#77). A compound key split across array levels was missed too, which is what Laravel makes of a bracketed form field like `card[number]` (#80). Keys are now matched per word, with `sensitive_keys_except` to name the false positives. `logscope:import` also works for the first time (#77).
 
 Breaking: the API returns `user_id` as a string (#26) — the one change likely to reach your code. Four narrower ones are in the changelog: Laravel 11 is now the minimum (#52), and `ContextSanitizerInterface` gained two methods, which only matters if you bound your own implementation.
 
