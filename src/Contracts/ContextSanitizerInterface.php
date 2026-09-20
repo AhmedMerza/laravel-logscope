@@ -12,7 +12,12 @@ interface ContextSanitizerInterface
     /**
      * Sanitize context array for storage.
      *
-     * Converts objects and exceptions to JSON-safe representations.
+     * Converts objects and exceptions to JSON-safe representations, and
+     * replaces the value of any key matching `context.sensitive_keys` with
+     * [REDACTED] — at any depth, including keys inside objects expanded to
+     * arrays. Redaction is part of the contract, not an implementation
+     * detail: an implementation that skips it stores passwords and tokens in
+     * clear wherever the application logs them.
      */
     public function sanitize(array $context): array;
 

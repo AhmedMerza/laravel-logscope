@@ -6,6 +6,7 @@ namespace LogScope\Console\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Models\LogEntry;
 use LogScope\Services\LogParser;
 use Throwable;
@@ -31,7 +32,8 @@ class ImportCommand extends Command
     protected $description = 'Import logs from Laravel log files into the database';
 
     public function __construct(
-        protected LogParser $parser
+        protected LogParser $parser,
+        protected ContextSanitizerInterface $sanitizer
     ) {
         parent::__construct();
     }
@@ -190,12 +192,19 @@ class ImportCommand extends Command
             $limits['message_preview_length'] ?? 500
         );
 
+        // Sanitized like any other entry (#77). An imported line's context is
+        // whatever the application logged before LogScope existed — exactly
+        // the unredacted `$request->all()` payload #76 is about — and import
+        // is what moves it from a file into a queryable, long-lived table.
+        //
         // Shares LogEntry's encoder so this call site can't drift from the
         // other two (#67). Defensive rather than load-bearing, and untested
         // for that reason: LogParser decodes a line's context with
         // JSON_THROW_ON_ERROR, which throws on a malformed byte and leaves
         // those bytes in the message, so `context` never carries one here.
-        $contextJson = LogEntry::encodeContext($entry['context'] ?? []);
+        $contextJson = LogEntry::encodeContext(
+            $this->sanitizer->sanitize($entry['context'] ?? [])
+        );
         $contextPreview = LogEntry::createPreview(
             $contextJson,
             $limits['context_preview_length'] ?? 500
@@ -218,7 +227,9 @@ class ImportCommand extends Command
             'context' => $contextJson,
             'context_preview' => $contextPreview,
             'channel' => $entry['channel'] ?? 'import',
-            'environment' => $entry['environment'] ?? app()->environment(),
+            // No 'environment' key: migration 2026_01_24_000001 dropped that
+            // column, and inserting it threw on every import. Found by the
+            // first test ever written for this command (#77).
             'source' => $entry['source'],
             'source_line' => $entry['source_line'],
             'occurred_at' => $entry['occurred_at'],

@@ -417,10 +417,36 @@ return [
     | 'redact_sensitive' - When true, sensitive keys/headers are redacted.
     |                      Set to false to disable all redaction (not recommended).
     |
-    | 'sensitive_keys' - Keys that should be redacted in request data.
-    |                    Values containing these strings (case-insensitive)
-    |                    will be replaced with [REDACTED].
+    | 'sensitive_keys' - Keys whose values are replaced with [REDACTED],
+    |                    anywhere in an entry's context: arrays you log
+    |                    yourself, objects expanded into arrays, and expanded
+    |                    Request objects alike, at any depth.
+    |                    Matched per word, ignoring case and separators:
+    |                    'token' redacts token, access_token, accessToken,
+    |                    APIToken and access_tokens, while 'card_number'
+    |                    also redacts cardNumber and card.number.
+    |                    A one-word entry only matches inside a single word,
+    |                    so 'ssn' does not redact class_name.
+    |                    Keys over 256 characters are redacted unexamined.
     |                    Set to [] to use defaults, or provide your own list.
+    |                    Your list REPLACES the defaults, it does not add
+    |                    to them. A list that is empty (or all blank) falls
+    |                    back to the defaults rather than redacting nothing.
+    |
+    | 'sensitive_keys_except' - Keys that look sensitive but are not, so they
+    |                    keep their values. An entry removes the words it
+    |                    covers, so 'prompt_tokens' keeps prompt_tokens but
+    |                    still lets prompt_tokens_password redact.
+    |                    Entries ADD to the defaults (the usage counters of
+    |                    the common LLM APIs, plus token_count and
+    |                    tokenizer), so naming your own keeps LogScope's.
+    |                    Entries under 3 characters are ignored.
+    |                    This is the dial to reach for when a field of yours
+    |                    reads [REDACTED] and should not.
+    |                    Prefer the FULL field name: a one-word entry removes
+    |                    every word containing it, so 'tokens' would also
+    |                    stop access_tokens being redacted, while
+    |                    'usage_tokens' only covers that field.
     |
     | 'sensitive_headers' - Request header name fragments that should be redacted.
     |                       Headers containing these strings (case-insensitive)
@@ -444,6 +470,11 @@ return [
         // Defaults: password, password_confirmation, secret, token, api_key,
         //           apikey, authorization, credit_card, card_number, cvv, ssn
         'sensitive_keys' => [],
+
+        // Added to the defaults: prompt_tokens, completion_tokens,
+        // total_tokens, input_tokens, output_tokens, max_tokens,
+        // tokens_used, token_count, tokenizer
+        'sensitive_keys_except' => [],
 
         // Added to the defaults: auth, cookie, token, key, secret, password, session
         'sensitive_headers' => [],

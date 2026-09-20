@@ -312,6 +312,264 @@ describe('request redaction', function () {
     });
 });
 
+describe('context redaction', function () {
+    it('redacts a sensitive key at the top level of logged context', function () {
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
+
+        expect($result['password'])->toBe('[REDACTED]')
+            ->and($result['user_id'])->toBe(7);
+    });
+
+    it('redacts sensitive keys nested inside a logged array', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'request' => ['card_number' => '4111', 'api_token' => 'secret-abc', 'amount' => 500],
+        ]);
+
+        expect($result['request']['card_number'])->toBe('[REDACTED]')
+            ->and($result['request']['api_token'])->toBe('[REDACTED]')
+            ->and($result['request']['amount'])->toBe(500);
+    });
+
+    it('redacts however the application spells the key', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'accessToken' => 'a',
+            'user-password' => 'b',
+            'API_KEY' => 'c',
+            'credit.card.number' => 'd',
+        ]);
+
+        expect($result)->toBe([
+            'accessToken' => '[REDACTED]',
+            'user-password' => '[REDACTED]',
+            'API_KEY' => '[REDACTED]',
+            'credit.card.number' => '[REDACTED]',
+        ]);
+    });
+
+    it('redacts plural and acronym spellings (#77 regression)', function () {
+        // Whole-word matching passed every other test in this block and still
+        // stored these in clear. They are the reason matching is a fragment.
+        $keys = [
+            'access_tokens', 'refresh_tokens', 'api_keys', 'card_numbers', 'passwords',
+            'APIToken', 'SSNNumber', 'IDToken', 'HTTPSecret', 'CVVCode',
+        ];
+
+        $result = (new ContextSanitizer)->sanitize(array_fill_keys($keys, 'SECRET'));
+
+        expect($result)->toBe(array_fill_keys($keys, '[REDACTED]'));
+    });
+
+    it('keeps keys named in the exclusion list', function () {
+        $context = [
+            'prompt_tokens' => 150,
+            'completion_tokens' => 50,
+            'total_tokens' => 200,
+            'token_count' => 12,
+            'tokenizer' => 'cl100k',
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('does not let an exclusion cancel an unrelated secret in the same key (#77)', function () {
+        // Checking "contains an exclusion" before "contains a secret" meant
+        // prompt_tokens_password matched both and was stored in the clear.
+        $keys = [
+            'prompt_tokens_password',
+            'stripe_secret_prompt_tokens_meta',
+            'usage.prompt_tokens.debug_api_key',
+        ];
+
+        $result = (new ContextSanitizer)->sanitize(array_fill_keys($keys, 'SECRET'));
+
+        expect($result)->toBe(array_fill_keys($keys, '[REDACTED]'));
+    });
+
+    it('keeps ordinary keys that only look sensitive with their separators removed (#77)', function () {
+        // class_name collapses to 'classname', which contains 'ssn';
+        // cv_video collapses to 'cvvideo', which contains 'cvv'. Matching a
+        // one-word fragment inside a single word is what prevents this.
+        $context = [
+            'class_name' => 'App\\Jobs\\SyncOrders',
+            'business_name' => 'Acme',
+            'address_name' => 'HQ',
+            'process_notes' => 'ok',
+            'cv_video' => 'intro.mp4',
+            'classSnapshot' => 'before',
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('falls back to the defaults when every configured key is blank (#77)', function () {
+        // explode(',', env('LOGSCOPE_SENSITIVE_KEYS', '')) yields [''] when
+        // the variable is unset. Filtering that to an empty list left a
+        // matcher with no fragments, which redacts nothing at all.
+        config(['logscope.context.sensitive_keys' => ['', '   ', '---']]);
+
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
+
+        expect($result['password'])->toBe('[REDACTED]')
+            ->and($result['user_id'])->toBe(7);
+    });
+
+    it('ignores an exclusion too short to be anything but a fail-open', function () {
+        // An exclusion removes whole words, so 'e' would remove almost every
+        // word of every key.
+        config(['logscope.context.sensitive_keys_except' => ['e']]);
+
+        $result = (new ContextSanitizer)->sanitize(['secret' => 'x', 'password' => 'y']);
+
+        expect($result['secret'])->toBe('[REDACTED]')
+            ->and($result['password'])->toBe('[REDACTED]');
+    });
+
+    it('redacts an absurdly long key rather than searching it', function () {
+        // Key length is client-chosen. Truncating before matching would let
+        // a long prefix hide the fragment, so over-long keys redact on sight.
+        $key = str_repeat('a', 300);
+
+        expect((new ContextSanitizer)->sanitize([$key => 'v'])[$key])->toBe('[REDACTED]');
+    });
+
+    it('adds configured exclusions to the defaults rather than replacing them', function () {
+        config(['logscope.context.sensitive_keys_except' => ['token_budget']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'token_budget' => 4096,
+            'prompt_tokens' => 150,
+            'access_token' => 'secret',
+        ]);
+
+        expect($result['token_budget'])->toBe(4096)
+            ->and($result['prompt_tokens'])->toBe(150)
+            ->and($result['access_token'])->toBe('[REDACTED]');
+    });
+
+    it('ignores blank entries instead of letting them match everything', function () {
+        // A stray comma in an env-driven list yields ''. In sensitive_keys that
+        // would redact the whole context; in the exclusion list it would cancel
+        // redaction entirely — a silent fail-open.
+        config([
+            'logscope.context.sensitive_keys' => ['', '   ', 'password'],
+            'logscope.context.sensitive_keys_except' => ['', '  '],
+        ]);
+
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);
+
+        expect($result['password'])->toBe('[REDACTED]')
+            ->and($result['user_id'])->toBe(7);
+    });
+
+    it('replaces a resource with a marker on the shared path', function () {
+        // json_encode() cannot represent a resource, and an unencodable value
+        // costs the whole context column rather than the one field. The
+        // handler's deleted copy had this branch; the shared sanitizer did
+        // not until it became the only one (#77).
+        $handle = fopen('php://memory', 'r');
+
+        $result = (new ContextSanitizer)->sanitize(['handle' => $handle, 'ok' => 1]);
+        fclose($handle);
+
+        expect($result['handle'])->toBe('[Resource]')
+            ->and($result['ok'])->toBe(1);
+    });
+
+    it('keeps the usage counters of the common LLM APIs', function () {
+        // A developer who sees these redacted reaches for the exclusion list
+        // and adds 'tokens', which takes access_tokens with it. Shipping the
+        // counters is what stops that.
+        $context = [
+            'prompt_tokens' => 1, 'completion_tokens' => 2, 'total_tokens' => 3,
+            'input_tokens' => 4, 'output_tokens' => 5, 'max_tokens' => 6,
+            'tokens_used' => 7, 'token_count' => 8,
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('matches a fragment split by a camelCase boundary inside it', function () {
+        // passWord splits to pass + word, which no single word contains.
+        // Joining a run and comparing for equality recovers it without
+        // reopening the gluing (classname contains 'ssn' but never equals it).
+        $result = (new ContextSanitizer)->sanitize(['passWord' => 'hunter2', 'myPassWord' => 'x']);
+
+        expect($result['passWord'])->toBe('[REDACTED]')
+            ->and($result['myPassWord'])->toBe('[REDACTED]');
+    });
+
+    it('covers every spelling whichever way a configured entry is written', function () {
+        config(['logscope.context.sensitive_keys' => ['cardnumber']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'cardnumber' => 'a', 'card_number' => 'b', 'cardNumber' => 'c', 'card.number' => 'd',
+        ]);
+
+        expect($result)->toBe([
+            'cardnumber' => '[REDACTED]', 'card_number' => '[REDACTED]',
+            'cardNumber' => '[REDACTED]', 'card.number' => '[REDACTED]',
+        ]);
+    });
+
+    it('survives config shapes that are not a list of strings (#77)', function () {
+        // Each of these produced a matcher that redacted nothing at all:
+        // a comma-joined string never exploded, an assoc flag map whose
+        // VALUES were read, and a non-string entry.
+        $shapes = [
+            'comma-joined' => ['password, token, secret'],
+            'raw string' => 'password,token',
+            'assoc flags' => ['password' => true, 'token' => true],
+            'non-string' => [0],
+        ];
+
+        foreach ($shapes as $label => $configured) {
+            config(['logscope.context.sensitive_keys' => $configured]);
+
+            $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2']);
+
+            expect($result['password'])->toBe('[REDACTED]', "shape: {$label}");
+        }
+    });
+
+    it('redacts a sensitive property of an expanded object', function () {
+        $user = new stdClass;
+        $user->email = 'a@b.test';
+        $user->password = 'hunter2';
+
+        $result = (new ContextSanitizer)->sanitize(['user' => $user]);
+
+        expect($result['user']['data']['password'])->toBe('[REDACTED]')
+            ->and($result['user']['data']['email'])->toBe('a@b.test');
+    });
+
+    it('redacts nothing when redact_sensitive is off', function () {
+        config(['logscope.context.redact_sensitive' => false]);
+
+        $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2']);
+
+        expect($result['password'])->toBe('hunter2');
+    });
+
+    it('honours a configured key list on plain context, replacing the defaults', function () {
+        config(['logscope.context.sensitive_keys' => ['PIN']]);
+
+        $result = (new ContextSanitizer)->sanitize(['pin_code' => '1234', 'password' => 'hunter2']);
+
+        expect($result['pin_code'])->toBe('[REDACTED]')
+            ->and($result['password'])->toBe('hunter2');
+    });
+
+    it('leaves list positions alone', function () {
+        // Integer keys are list positions, never names. Configure a numeral as
+        // sensitive so this fails if shouldRedactKey()'s is_string guard goes.
+        config(['logscope.context.sensitive_keys' => ['1']]);
+
+        $context = ['items' => ['a', 'b', 'c']];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+});
+
 describe('extractSource', function () {
     it('returns null when no exception in context', function () {
         $context = ['message' => 'hello'];
