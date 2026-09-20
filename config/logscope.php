@@ -437,13 +437,16 @@ return [
     |                    keep their values. An entry removes the words it
     |                    covers, so 'prompt_tokens' keeps prompt_tokens but
     |                    still lets prompt_tokens_password redact.
-    |                    Entries ADD to the defaults (prompt_tokens,
-    |                    completion_tokens, total_tokens, token_count,
+    |                    Entries ADD to the defaults (the usage counters of
+    |                    the common LLM APIs, plus token_count and
     |                    tokenizer), so naming your own keeps LogScope's.
     |                    Entries under 3 characters are ignored.
     |                    This is the dial to reach for when a field of yours
-    |                    reads [REDACTED] and should not — widening it is
-    |                    always safer than narrowing 'sensitive_keys'.
+    |                    reads [REDACTED] and should not.
+    |                    Prefer the FULL field name: a one-word entry removes
+    |                    every word containing it, so 'tokens' would also
+    |                    stop access_tokens being redacted, while
+    |                    'usage_tokens' only covers that field.
     |
     | 'sensitive_headers' - Request header name fragments that should be redacted.
     |                       Headers containing these strings (case-insensitive)
@@ -469,7 +472,8 @@ return [
         'sensitive_keys' => [],
 
         // Added to the defaults: prompt_tokens, completion_tokens,
-        // total_tokens, token_count, tokenizer
+        // total_tokens, input_tokens, output_tokens, max_tokens,
+        // tokens_used, token_count, tokenizer
         'sensitive_keys_except' => [],
 
         // Added to the defaults: auth, cookie, token, key, secret, password, session

@@ -45,6 +45,11 @@ class ContextSanitizer implements ContextSanitizerInterface
     protected array $sensitivePhrases;
 
     /**
+     * Length of the longest single-word fragment, to bound run joining.
+     */
+    protected int $longestSensitiveWord;
+
+    /**
      * Word runs that cancel the part of a key they cover.
      *
      * @var list<list<string>>
@@ -107,6 +112,10 @@ class ContextSanitizer implements ContextSanitizerInterface
         'prompt_tokens',
         'completion_tokens',
         'total_tokens',
+        'input_tokens',
+        'output_tokens',
+        'max_tokens',
+        'tokens_used',
         'token_count',
         'tokenizer',
     ];
@@ -155,6 +164,10 @@ class ContextSanitizer implements ContextSanitizerInterface
             static fn (array $run): string => implode('', $run),
             array_filter($fragments, static fn (array $run): bool => count($run) > 1)
         ));
+
+        $this->longestSensitiveWord = $this->sensitiveWords === []
+            ? 0
+            : max(array_map(strlen(...), $this->sensitiveWords));
 
         // Exclusions add to the defaults rather than replacing them. The
         // shipped entries are known false positives of the key list, and an
@@ -426,6 +439,30 @@ class ContextSanitizer implements ContextSanitizerInterface
             }
         }
 
+        // A camelCase boundary can fall inside a fragment rather than
+        // between words — 'passWord' splits to pass + word, which no single
+        // word contains 'password'. Joining a run of words and testing for
+        // EQUALITY recovers those without reopening the gluing this design
+        // exists to prevent: class_name joins to 'classname', which
+        // contains 'ssn' but does not equal it.
+        $count = count($words);
+
+        for ($i = 0; $i < $count; $i++) {
+            $joined = $words[$i];
+
+            for ($j = $i + 1; $j < $count; $j++) {
+                $joined .= $words[$j];
+
+                if (strlen($joined) > $this->longestSensitiveWord) {
+                    break;
+                }
+
+                if (in_array($joined, $this->sensitiveWords, true)) {
+                    return true;
+                }
+            }
+        }
+
         if ($this->sensitivePhrases === []) {
             return false;
         }
@@ -513,10 +550,29 @@ class ContextSanitizer implements ContextSanitizerInterface
         $runs = [];
 
         foreach ($fragments as $fragment) {
-            $words = $this->words((string) $fragment);
+            // A list of strings is expected, but config supplies other
+            // shapes, and each used to produce a matcher that redacted
+            // nothing — silently, which for redaction means secrets stored
+            // in the clear (#77). An assoc flag map ('password' => true)
+            // gave the words "1"; a nested array stringified to "array";
+            // an object threw out of the constructor and took logging with
+            // it. Anything that is not a string is dropped, and a list that
+            // ends up empty falls back to the defaults in the constructor.
+            if (! is_string($fragment)) {
+                continue;
+            }
 
-            if ($words !== []) {
-                $runs[] = $words;
+            // A single entry holding the whole comma-separated list is the
+            // other shape seen in the wild — env('…') left un-exploded, or
+            // the defaults pasted from this package's own config comment.
+            // Splitting is harmless for a real entry, since a key name
+            // cannot contain a comma and survive matching anyway.
+            foreach (explode(',', $fragment) as $part) {
+                $words = $this->words($part);
+
+                if ($words !== []) {
+                    $runs[] = $words;
+                }
             }
         }
 

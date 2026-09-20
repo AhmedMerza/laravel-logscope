@@ -475,6 +475,62 @@ describe('context redaction', function () {
             ->and($result['ok'])->toBe(1);
     });
 
+    it('keeps the usage counters of the common LLM APIs', function () {
+        // A developer who sees these redacted reaches for the exclusion list
+        // and adds 'tokens', which takes access_tokens with it. Shipping the
+        // counters is what stops that.
+        $context = [
+            'prompt_tokens' => 1, 'completion_tokens' => 2, 'total_tokens' => 3,
+            'input_tokens' => 4, 'output_tokens' => 5, 'max_tokens' => 6,
+            'tokens_used' => 7, 'token_count' => 8,
+        ];
+
+        expect((new ContextSanitizer)->sanitize($context))->toBe($context);
+    });
+
+    it('matches a fragment split by a camelCase boundary inside it', function () {
+        // passWord splits to pass + word, which no single word contains.
+        // Joining a run and comparing for equality recovers it without
+        // reopening the gluing (classname contains 'ssn' but never equals it).
+        $result = (new ContextSanitizer)->sanitize(['passWord' => 'hunter2', 'myPassWord' => 'x']);
+
+        expect($result['passWord'])->toBe('[REDACTED]')
+            ->and($result['myPassWord'])->toBe('[REDACTED]');
+    });
+
+    it('covers every spelling whichever way a configured entry is written', function () {
+        config(['logscope.context.sensitive_keys' => ['cardnumber']]);
+
+        $result = (new ContextSanitizer)->sanitize([
+            'cardnumber' => 'a', 'card_number' => 'b', 'cardNumber' => 'c', 'card.number' => 'd',
+        ]);
+
+        expect($result)->toBe([
+            'cardnumber' => '[REDACTED]', 'card_number' => '[REDACTED]',
+            'cardNumber' => '[REDACTED]', 'card.number' => '[REDACTED]',
+        ]);
+    });
+
+    it('survives config shapes that are not a list of strings (#77)', function () {
+        // Each of these produced a matcher that redacted nothing at all:
+        // a comma-joined string never exploded, an assoc flag map whose
+        // VALUES were read, and a non-string entry.
+        $shapes = [
+            'comma-joined' => ['password, token, secret'],
+            'raw string' => 'password,token',
+            'assoc flags' => ['password' => true, 'token' => true],
+            'non-string' => [0],
+        ];
+
+        foreach ($shapes as $label => $configured) {
+            config(['logscope.context.sensitive_keys' => $configured]);
+
+            $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2']);
+
+            expect($result['password'])->toBe('[REDACTED]', "shape: {$label}");
+        }
+    });
+
     it('redacts a sensitive property of an expanded object', function () {
         $user = new stdClass;
         $user->email = 'a@b.test';
