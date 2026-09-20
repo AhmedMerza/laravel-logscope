@@ -56,6 +56,20 @@ it('redacts sensitive keys logged as a plain array through the handler', functio
         ->and($context['amount'])->toBe(500);
 });
 
+it('redacts a compound key split across array levels through the handler (#80)', function () {
+    // The Unit suite covers this against ContextSanitizer directly. Without
+    // a Feature case, a regression in the ancestor-path threading would ship
+    // green through every test that exercises a real entry point.
+    $this->logger->error('nested payment failed', [
+        'card' => ['number' => '4111111111111111', 'exp_month' => 12],
+    ]);
+
+    $context = LogEntry::where('message', 'nested payment failed')->latest('id')->first()->context;
+
+    expect($context['card']['number'])->toBe('[REDACTED]')
+        ->and($context['card']['exp_month'])->toBe(12);
+});
+
 it('expands and redacts a Request logged through the handler', function () {
     // Before delegation this stored Symfony's raw __toString() dump: the
     // Authorization header, the Cookie and the form body, all in clear.

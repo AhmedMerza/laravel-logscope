@@ -643,9 +643,20 @@ describe('compound keys split across array levels', function () {
         expect(urldecode($url))->toContain('card[01][number]=[REDACTED]');
     });
 
-    it('keeps a genuinely named key that merely starts with digits', function () {
-        // is_numeric() must not swallow a real field name.
-        $context = ['card' => ['2nd_holder' => 'Jo']];
+    it('needs the two halves adjacent, so a named level between them breaks it', function () {
+        // The design limit, pinned deliberately: only a POSITION is stepped
+        // over. Any name-like key between the halves ends the adjacency the
+        // compound needs, and that is what makes card[0x1A][number] a
+        // non-match rather than a bypass — it behaves exactly like
+        // card[holder][number], which never claimed to redact. Listing
+        // `number` covers these if an app needs them.
+        $context = [
+            'card' => [
+                'holder' => ['number' => '4111'],
+                '0x1A' => ['number' => '4222'],
+                '2nd' => ['number' => '4333'],
+            ],
+        ];
 
         expect((new ContextSanitizer)->sanitize($context))->toBe($context);
     });
@@ -790,22 +801,29 @@ describe('compound keys and the request boundary (#81 review)', function () {
 });
 
 describe('path threading guards (#81 review)', function () {
-    it('survives truncation when the configured fragment is long', function () {
-        // The path is capped at longestPhrase - 1 characters. Every other
-        // test keeps it far below the cap, so an off-by-one here would go
-        // unnoticed. 'alphabetagammadeltanumber' is 25 chars; the ancestors
-        // reach 19 before the leaf completes the match.
-        config(['logscope.context.sensitive_keys' => ['alpha_beta_gamma_delta_number']]);
+    it('keeps exactly the last longestPhrase - 1 characters of the path', function () {
+        // The off-by-one test. The cap has to keep L-1 ancestor characters:
+        // a surviving path can never hold a whole fragment (it would have
+        // been redacted before the recursion got here), so a match still to
+        // come must take at least one character from the leaf.
+        //
+        // 'cardnumber' is 10, so the cap is 9. The ancestors below contribute
+        // exactly 9 characters after truncation — 'cardnumbe' — and the leaf
+        // 'r' completes it. At a cap of 8 the path would truncate to
+        // 'ardnumbe' and this would silently stop redacting.
+        config(['logscope.context.sensitive_keys' => ['card_numbe_r']]);
 
         $result = (new ContextSanitizer)->sanitize([
-            'alpha' => ['beta' => ['gamma' => ['delta' => ['number' => 'X', 'ok' => 1]]]],
+            'zz' => ['card' => ['numbe' => ['r' => 'X', 'ok' => 1]]],
         ]);
 
-        expect($result['alpha']['beta']['gamma']['delta']['number'])->toBe('[REDACTED]')
-            ->and($result['alpha']['beta']['gamma']['delta']['ok'])->toBe(1);
+        expect($result['zz']['card']['numbe']['r'])->toBe('[REDACTED]')
+            ->and($result['zz']['card']['numbe']['ok'])->toBe(1);
     });
 
     it('still matches when a long ancestor is truncated away', function () {
+        // 44 ancestor characters against the default cap of 19, so the
+        // substr() really does discard here.
         $key = str_repeat('z', 40);
 
         $result = (new ContextSanitizer)->sanitize([$key => ['card' => ['number' => 'X']]]);
@@ -821,15 +839,30 @@ describe('path threading guards (#81 review)', function () {
         expect($result['a']['b']['c']['d']['card']['number'])->toBe('[REDACTED]');
     });
 
-    it('leaks nothing past the depth cap', function () {
-        $result = (new ContextSanitizer)->sanitize([
+    it('redacts at the deepest level walked, and discards past it', function () {
+        // Asserting only that SECRET is absent could not tell redaction apart
+        // from the depth cap throwing the subtree away — both are
+        // SECRET-free. Name which one happens on each side of the boundary.
+        $sanitizer = new ContextSanitizer;
+
+        $walked = $sanitizer->sanitize([
             'a' => ['b' => ['c' => ['d' => ['e' => ['f' => ['card_number' => 'SECRET']]]]]],
         ]);
 
-        expect(json_encode($result))->not->toContain('SECRET');
+        $capped = $sanitizer->sanitize([
+            'a' => ['b' => ['c' => ['d' => ['e' => ['f' => ['g' => ['card_number' => 'SECRET']]]]]]],
+        ]);
+
+        expect($walked['a']['b']['c']['d']['e']['f']['card_number'])->toBe('[REDACTED]')
+            ->and($capped['a']['b']['c']['d']['e']['f']['g'])->toBe('[Max depth exceeded]')
+            ->and(json_encode($walked))->not->toContain('SECRET')
+            ->and(json_encode($capped))->not->toContain('SECRET');
     });
 
-    it('builds no path at all when redaction is off', function () {
+    it('returns the context untouched when redaction is off', function () {
+        // The output contract only. shouldRedactKey() and redactSensitive()
+        // both short-circuit on the same flag, so nothing here would notice
+        // childPath()'s own guard going missing — that is the next test.
         config(['logscope.context.redact_sensitive' => false]);
 
         $context = ['card' => ['number' => '4111']];
@@ -854,7 +887,20 @@ describe('path threading guards (#81 review)', function () {
             ->and($childPath->invoke($sanitizer, '', str_repeat('a', 300), ['x' => 1]))->toBe('');
     });
 
-    it('skips the path when no multi-word fragment is configured', function () {
+    it('builds no path when no multi-word fragment is configured', function () {
+        // Reflection for the same reason: isSensitiveKey() returns early on
+        // an empty phrase list before it ever reads the path, so this
+        // short-circuit has no observable output of its own either.
+        config(['logscope.context.sensitive_keys' => ['pin']]);
+
+        $sanitizer = new ContextSanitizer;
+        $childPath = new ReflectionMethod($sanitizer, 'childPath');
+        $childPath->setAccessible(true);
+
+        expect($childPath->invoke($sanitizer, '', 'card', ['number' => '4111']))->toBe('');
+    });
+
+    it('still matches a single-word fragment when no phrase is configured', function () {
         config(['logscope.context.sensitive_keys' => ['pin']]);
 
         $result = (new ContextSanitizer)->sanitize([

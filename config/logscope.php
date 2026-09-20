@@ -428,6 +428,11 @@ return [
     |                    A multi-word entry spans array levels too, so
     |                    'card_number' covers ['card' => ['number' => …]]
     |                    and the ?card[number]= form Laravel parses into it.
+    |                    The halves must be adjacent: a numeric position is
+    |                    stepped over (card[0][number] redacts), but a named
+    |                    level between them ends the match, just as it would
+    |                    inside one key — ['card' => ['holder' => ['number'
+    |                    => …]]] is no more covered than card_holder_number.
     |                    A one-word entry only matches inside a single word
     |                    and never spans levels, so 'ssn' redacts neither
     |                    class_name nor ['class' => ['name' => …]].
