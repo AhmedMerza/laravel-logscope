@@ -782,7 +782,7 @@ That is deliberately broad, because a missed secret is invisible and a redacted 
 
 `sensitive_keys_except` ships with `prompt_tokens`, `completion_tokens`, `total_tokens`, `token_count` and `tokenizer` — the LLM-era fields that `token` would otherwise catch. Your entries add to those.
 
-All three lists **add to their defaults** — adding `pin` to `sensitive_keys` keeps `password`, `token` and the other nine. (Before v3.0.0 `sensitive_keys` replaced its defaults instead, so adding one key silently dropped eleven; see the CHANGELOG if you are upgrading.) To see what is redacted in a given environment rather than inferring it from config:
+All three lists **add to their defaults** — adding `pin` to `sensitive_keys` keeps `password`, `token` and the other nine. (Before v2.2.0 `sensitive_keys` replaced its defaults instead, so adding one key silently dropped eleven; see the CHANGELOG if you are upgrading.) To see what is redacted in a given environment rather than inferring it from config:
 
 ```bash
 php artisan logscope:doctor
