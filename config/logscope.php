@@ -437,13 +437,17 @@ return [
     |                    and never spans levels, so 'ssn' redacts neither
     |                    class_name nor ['class' => ['name' => …]].
     |                    Keys and entries alike are folded to their ASCII
-    |                    nearest first, so an accent or a lookalike cannot
-    |                    slip a field past the list: 'sécret' redacts, and
-    |                    'contraseña' and 'contrasena' are one entry. The
-    |                    fold is spelling, not meaning — 'numéro' reads as
-    |                    numero, which card_number does not cover — and a
-    |                    name with no Latin form at all ('密码') folds to
-    |                    nothing and cannot be matched by a fragment.
+    |                    nearest first, so a name differing only by an
+    |                    accent or a Latin-lookalike letter still redacts:
+    |                    'sécret' matches secret, and 'contraseña' and
+    |                    'contrasena' are one entry. The fold reaches a
+    |                    character that HAS a Latin form; one that has none
+    |                    stays a word separator, as it was before the fold,
+    |                    so a name written entirely in CJK ('密码') or in a
+    |                    compatibility form (fullwidth, circled, maths) is
+    |                    not matched by a fragment, as a key or an entry.
+    |                    The fold is spelling, not meaning — 'numéro' reads
+    |                    as numero, which card_number does not cover.
     |                    Keys over 256 characters are redacted unexamined.
     |                    Entries ADD to the defaults, they never replace
     |                    them, so adding one key keeps the other eleven.

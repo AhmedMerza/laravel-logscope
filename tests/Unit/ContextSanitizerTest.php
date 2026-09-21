@@ -1009,8 +1009,13 @@ describe('non-ASCII key names (#83)', function () {
             ->and($result['user']['sécret'])->toBe('[REDACTED]');
     });
 
-    it('still matches a non-ASCII fragment configured and used consistently', function () {
-        // Both sides fold, so this kept working rather than starting to.
+    it('keeps matching an entry spelled identically to its key, fold or no fold', function () {
+        // Pins nothing about #83 and is not meant to: it passes with the
+        // fold reverted, because both sides tokenize the same way whatever
+        // words() does to them. It is here as the no-regression guard for
+        // that property — the one thing a future change to the tokenizer
+        // must not break — and named so it does not read as evidence of
+        // the fix. The test below is the one that needs the fold.
         config(['logscope.context.sensitive_keys' => ['contraseña']]);
 
         $result = (new ContextSanitizer)->sanitize(['contraseña' => 'X']);
@@ -1067,6 +1072,92 @@ describe('non-ASCII key names (#83)', function () {
         $result = (new ContextSanitizer)->sanitize(['pa'.chr(0xB1).'ssword' => 'X']);
 
         expect(array_values($result))->toBe(['[REDACTED]']);
+    });
+});
+
+describe('fold boundaries (#86 review)', function () {
+    it('does not let a zero-width character fuse an exclusion onto a secret', function () {
+        // The fold's first form ran Str::ascii() over the whole key, and a
+        // zero-width character folds to '' rather than to a space. That
+        // fused tokenizer + password into one word; 'tokenizer' is a
+        // shipped one-word exclusion, withoutExcluded() drops any word
+        // CONTAINING it, and the password went with it — stored in clear,
+        // where before the fold the same key split and redacted.
+        $keys = [
+            "tokenizer\u{200C}password",  // zero-width non-joiner
+            "tokenizer\u{200D}password",  // zero-width joiner
+            "tokenizer\u{00AD}password",  // soft hyphen
+            "tokenizer\u{2060}password",  // word joiner
+            "tokenizer\u{FEFF}password",  // BOM
+        ];
+
+        foreach ($keys as $key) {
+            $result = (new ContextSanitizer)->sanitize([$key => 'hunter2']);
+
+            expect(array_values($result)[0])->toBe('[REDACTED]');
+        }
+    });
+
+    it('keeps a character with no Latin form acting as a separator', function () {
+        // class_name is deliberately NOT redacted — 'ssn' matches inside a
+        // single word, and neither 'class' nor 'name' contains it. A CJK
+        // character between the halves must behave the same way a '_' does,
+        // which is only true if it separates rather than disappearing.
+        $result = (new ContextSanitizer)->sanitize(["class\u{5BC6}name" => 'visible']);
+
+        expect($result["class\u{5BC6}name"])->toBe('visible');
+    });
+
+    it('folds a non-ASCII character inside a camelCase run', function () {
+        $result = (new ContextSanitizer)->sanitize(['mySécretKey' => 'X']);
+
+        expect($result['mySécretKey'])->toBe('[REDACTED]');
+    });
+
+    it('folds a non-ASCII ancestor for the cross-level compound match', function () {
+        // #80's card_number/api_key path joins an ancestor key to a leaf.
+        // The ancestor goes through words() too, so it has to fold before
+        // the halves are joined — 'äpi' + 'key' must read as apikey.
+        $result = (new ContextSanitizer)->sanitize(['äpi' => ['key' => 'sk-live-1']]);
+
+        expect($result['äpi']['key'])->toBe('[REDACTED]');
+    });
+
+    it('measures the length guard in bytes, so a multi-byte key trips it sooner', function () {
+        // MAX_KEY_LENGTH is a strlen() check and runs before the fold. Each
+        // 'é' is two bytes, so 130 characters is 260 bytes and redacts on
+        // sight while an ASCII key of the same 130 characters does not.
+        // That is the intended direction — an over-long key fails toward
+        // [REDACTED] — but nothing pinned it, so a future switch to
+        // mb_strlen(), or moving the guard behind the fold, would ship
+        // silently and start storing these in clear.
+        $multibyte = str_repeat('é', 130);
+        $ascii = str_repeat('a', 130);
+
+        $result = (new ContextSanitizer)->sanitize([$multibyte => 'X', $ascii => 'Y']);
+
+        expect(strlen($multibyte))->toBe(260)
+            ->and($result[$multibyte])->toBe('[REDACTED]')
+            ->and($result[$ascii])->toBe('Y');
+    });
+
+    it('lets an ASCII exclusion cancel a folded key', function () {
+        config(['logscope.context.sensitive_keys_except' => ['xyzsecret']]);
+
+        $result = (new ContextSanitizer)->sanitize(['xyzsécret' => 'visible']);
+
+        expect($result['xyzsécret'])->toBe('visible');
+    });
+
+    it('lets a folded exclusion cancel an ASCII key', function () {
+        config([
+            'logscope.context.sensitive_keys' => ['xyzsecret'],
+            'logscope.context.sensitive_keys_except' => ['xyzsécret'],
+        ]);
+
+        $result = (new ContextSanitizer)->sanitize(['xyzsecret' => 'visible']);
+
+        expect($result['xyzsecret'])->toBe('visible');
     });
 });
 

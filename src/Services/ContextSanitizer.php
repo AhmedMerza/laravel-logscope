@@ -654,18 +654,18 @@ class ContextSanitizer implements ContextSanitizerInterface
      * Configured fragments come through here too, so both sides of the
      * match fold identically and an entry written in its own script still
      * finds its own keys — contraseña and its key both read 'contrasena'.
-     * A fragment in a script with no ASCII fold at all ('密码') tokenizes
-     * to nothing and is dropped by wordRuns(), exactly as it was before.
+     * A character with no Latin form ('密码') still tokenizes to nothing
+     * and is dropped by wordRuns(), exactly as it was before.
      *
      * The guard is what keeps the ASCII path byte-identical: a plain key
-     * never reaches Str::ascii(), and only a key that needs it pays for it.
+     * never reaches the fold, and only a key that needs it pays for it.
      *
      * @return list<string>
      */
     protected function words(string $key): array
     {
         if (! Str::isAscii($key)) {
-            $key = Str::ascii($key);
+            $key = $this->foldToAscii($key);
         }
 
         $spaced = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key) ?? $key;
@@ -674,6 +674,60 @@ class ContextSanitizer implements ContextSanitizerInterface
             preg_split('/[^a-z0-9]+/', strtolower($spaced)) ?: [],
             static fn (string $word): bool => $word !== ''
         ));
+    }
+
+    /**
+     * Fold a non-ASCII key to ASCII, one character at a time.
+     *
+     * The invariant this preserves: a non-ASCII character may turn INTO a
+     * letter, or it may SEPARATE two words. It must never silently JOIN
+     * two words that were apart.
+     *
+     * Folding the whole string in one Str::ascii() call broke that, and
+     * turned a redacted key into a secret in the clear (#86 review). The
+     * zero-width and format characters — ZWNJ, ZWJ, soft hyphen, word
+     * joiner, BOM, the directional marks — fold to the EMPTY string, not
+     * to a space, so 'tokenizer<ZWNJ>password' fused into the single word
+     * 'tokenizerpassword'. withoutExcluded() drops any word CONTAINING a
+     * one-word exclusion, 'tokenizer' is one of the shipped defaults, and
+     * so the fused word took the password out with it: the word list came
+     * back empty and isSensitiveKey() returned false. Before the fold that
+     * same character was an ordinary separator and the key split into
+     * tokenizer + password, which redacted correctly.
+     *
+     * So each character is folded on its own and one that folds to nothing
+     * becomes a space. A letter still folds in place — é gives e, the
+     * Cyrillic а gives a, ß gives ss — while anything with no Latin form
+     * goes back to being the boundary it always was.
+     *
+     * The /u modifier fails on a malformed byte and preg_replace_callback
+     * returns null; the raw key is used then, and the split treats the bad
+     * byte as a separator exactly as it did before #83 (#70).
+     */
+    protected function foldToAscii(string $key): string
+    {
+        // Folding per character costs ~70x what one Str::ascii() call does,
+        // which is nothing on a field name and 750ms on a megabyte. A key
+        // that long is already redacted unexamined by isSensitiveKey(), and
+        // childPath() tokenizes without that guard in front of it — so the
+        // cap lives here, where every caller gets it. Left unfolded such a
+        // key splits on its non-ASCII bytes exactly as it did before #83,
+        // which is the behaviour this method is careful to preserve anyway.
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
+            return $key;
+        }
+
+        return preg_replace_callback(
+            '/[^\x00-\x7F]/u',
+            static function (array $match): string {
+                $folded = Str::ascii($match[0]);
+
+                // Not ?: — a character that folds to '0' is falsy and would
+                // become a separator, splitting a word it belongs to.
+                return $folded === '' ? ' ' : $folded;
+            },
+            $key
+        ) ?? $key;
     }
 
     /**
