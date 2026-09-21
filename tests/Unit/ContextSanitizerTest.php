@@ -978,6 +978,98 @@ describe('path threading guards (#81 review)', function () {
     });
 });
 
+describe('non-ASCII key names (#83)', function () {
+    it('redacts an accented key against an ASCII fragment', function () {
+        // 'secret' is a default. The split keeps only [a-z0-9], so "sécret"
+        // used to tokenize to s + cret — the é REPLACED a letter rather than
+        // separating two intact halves, so #77's adjacent-word join had
+        // nothing to restore and the value was stored in the clear.
+        $result = (new ContextSanitizer)->sanitize(['sécret' => 'X']);
+
+        expect($result['sécret'])->toBe('[REDACTED]');
+    });
+
+    it('redacts a homoglyph key against an ASCII fragment', function () {
+        // Cyrillic а (U+0430), not Latin a. It tokenized to p + ssword,
+        // whose join is 'pssword' — 7 characters, so it neither equalled
+        // nor contained 'password'.
+        $key = "p\u{0430}ssword";
+
+        $result = (new ContextSanitizer)->sanitize([$key => 'X']);
+
+        expect($result[$key])->toBe('[REDACTED]');
+    });
+
+    it('redacts a non-ASCII key nested inside an array', function () {
+        $result = (new ContextSanitizer)->sanitize([
+            'user' => ["p\u{0430}ssword" => 'X', 'sécret' => 'Y'],
+        ]);
+
+        expect($result['user']["p\u{0430}ssword"])->toBe('[REDACTED]')
+            ->and($result['user']['sécret'])->toBe('[REDACTED]');
+    });
+
+    it('still matches a non-ASCII fragment configured and used consistently', function () {
+        // Both sides fold, so this kept working rather than starting to.
+        config(['logscope.context.sensitive_keys' => ['contraseña']]);
+
+        $result = (new ContextSanitizer)->sanitize(['contraseña' => 'X']);
+
+        expect($result['contraseña'])->toBe('[REDACTED]');
+    });
+
+    it('matches a fragment and a key that spell the same word differently', function () {
+        // The fold is what joins them: both sides read 'contrasena', so
+        // neither has to know how the other spells it.
+        config(['logscope.context.sensitive_keys' => ['contrasena']]);
+
+        $result = (new ContextSanitizer)->sanitize(['contraseña' => 'X']);
+
+        expect($result['contraseña'])->toBe('[REDACTED]');
+    });
+
+    it('honours a fragment written entirely in another script', function () {
+        // 'пароль' tokenized to nothing, wordRuns() dropped the empty run,
+        // and the entry was silently ignored — the key it named was stored
+        // in the clear. It now folds to 'parol' and matches.
+        config(['logscope.context.sensitive_keys' => ['пароль']]);
+
+        $result = (new ContextSanitizer)->sanitize(['пароль' => 'X']);
+
+        expect($result['пароль'])->toBe('[REDACTED]');
+    });
+
+    it('leaves a script with no ASCII fold dropped, as before', function () {
+        // '密码' folds to '', so wordRuns() still drops it and naming it in
+        // sensitive_keys still does nothing. The ASCII defaults are
+        // untouched alongside it.
+        config(['logscope.context.sensitive_keys' => ['密码']]);
+
+        $result = (new ContextSanitizer)->sanitize(['密码' => 'X', 'password' => 'Y']);
+
+        expect($result['密码'])->toBe('X')
+            ->and($result['password'])->toBe('[REDACTED]');
+    });
+
+    it('folds spelling, not meaning', function () {
+        // 'numéro' folds to 'numero', which is not 'number', so the compound
+        // card_number does not reach it. Translating a field name is not
+        // something the fold does, and the README should not imply it does.
+        $result = (new ContextSanitizer)->sanitize(['card' => ['numéro' => '4111']]);
+
+        expect($result['card']['numéro'])->toBe('4111');
+    });
+
+    it('leaves the malformed-byte case matching as it did (#70)', function () {
+        // 0xB1 is not a character, so there is nothing to fold — it is
+        // dropped and 'pa' + 'ssword' still join to 'password'. The key
+        // itself comes back re-encoded, so only the value is pinned here.
+        $result = (new ContextSanitizer)->sanitize(['pa'.chr(0xB1).'ssword' => 'X']);
+
+        expect(array_values($result))->toBe(['[REDACTED]']);
+    });
+});
+
 describe('extractSource', function () {
     it('returns null when no exception in context', function () {
         $context = ['message' => 'hello'];

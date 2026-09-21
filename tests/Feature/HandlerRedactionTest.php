@@ -70,6 +70,24 @@ it('redacts a compound key split across array levels through the handler (#80)',
         ->and($context['card']['exp_month'])->toBe(12);
 });
 
+it('redacts a non-ASCII key through the handler (#83)', function () {
+    // The Unit suite covers the fold against ContextSanitizer directly. This
+    // is here for the other half: the key has to survive the JSON round-trip
+    // into the context column and still come back readable (#63, #67), and a
+    // fold that only worked in memory would ship green without it.
+    $this->logger->error('accented payment failed', [
+        'sécret' => 'hunter2',
+        "p\u{0430}ssword" => 'hunter3',
+        'montant' => 500,
+    ]);
+
+    $context = LogEntry::where('message', 'accented payment failed')->latest('id')->first()->context;
+
+    expect($context['sécret'])->toBe('[REDACTED]')
+        ->and($context["p\u{0430}ssword"])->toBe('[REDACTED]')
+        ->and($context['montant'])->toBe(500);
+});
+
 it('expands and redacts a Request logged through the handler', function () {
     // Before delegation this stored Symfony's raw __toString() dump: the
     // Authorization header, the Cookie and the form body, all in clear.

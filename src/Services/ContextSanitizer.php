@@ -643,10 +643,31 @@ class ContextSanitizer implements ContextSanitizerInterface
      * is deliberately left whole — APIToken gives ['apitoken'], and the
      * fragment match inside a word finds 'token' in it anyway.
      *
+     * A non-ASCII character is folded to its ASCII nearest before the split
+     * rather than left for it to discard (#83). The pattern keeps only
+     * [a-z0-9], so 'sécret' tokenized to s + cret — a letter REPLACED, not
+     * a separator sitting between two intact halves, so #77's adjacent-word
+     * join had nothing to restore, an ASCII 'secret' never matched, and the
+     * value was stored in the clear. Folding first gives 'secret'. It also
+     * folds a homoglyph: the Cyrillic а in 'pаssword' becomes 'a'.
+     *
+     * Configured fragments come through here too, so both sides of the
+     * match fold identically and an entry written in its own script still
+     * finds its own keys — contraseña and its key both read 'contrasena'.
+     * A fragment in a script with no ASCII fold at all ('密码') tokenizes
+     * to nothing and is dropped by wordRuns(), exactly as it was before.
+     *
+     * The guard is what keeps the ASCII path byte-identical: a plain key
+     * never reaches Str::ascii(), and only a key that needs it pays for it.
+     *
      * @return list<string>
      */
     protected function words(string $key): array
     {
+        if (! Str::isAscii($key)) {
+            $key = Str::ascii($key);
+        }
+
         $spaced = preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key) ?? $key;
 
         return array_values(array_filter(

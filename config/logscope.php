@@ -436,6 +436,14 @@ return [
     |                    A one-word entry only matches inside a single word
     |                    and never spans levels, so 'ssn' redacts neither
     |                    class_name nor ['class' => ['name' => …]].
+    |                    Keys and entries alike are folded to their ASCII
+    |                    nearest first, so an accent or a lookalike cannot
+    |                    slip a field past the list: 'sécret' redacts, and
+    |                    'contraseña' and 'contrasena' are one entry. The
+    |                    fold is spelling, not meaning — 'numéro' reads as
+    |                    numero, which card_number does not cover — and a
+    |                    name with no Latin form at all ('密码') folds to
+    |                    nothing and cannot be matched by a fragment.
     |                    Keys over 256 characters are redacted unexamined.
     |                    Entries ADD to the defaults, they never replace
     |                    them, so adding one key keeps the other eleven.

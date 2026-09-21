@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`logscope:doctor` reports the redaction actually in force** (#79). The command said nothing about redaction at all, so nothing answered "which keys are being redacted right now?" — the question that would have exposed the behaviour above the first time anyone asked it. A new `Redaction` row prints the effective key count and the list itself, notes how many exclusions are active, and warns when `context.redact_sensitive` is off or when an application has bound its own sanitizer in place of LogScope's. The list is read from the sanitizer rather than recomputed from config, so it cannot report a key the matcher never received.
 
+### Fixed
+
+- **A non-ASCII character in a key name no longer defeats redaction** (#83). Key names and configured entries are now folded to their ASCII nearest before matching, so `sécret` and `pаssword` — that second one carries a Cyrillic `а` — redact against the ASCII defaults instead of being stored in clear. Tokenizing kept only `[a-z0-9]`, and a non-ASCII character was discarded as though it were a separator. That is harmless when one sits *between* two intact halves, because v2.1.0's adjacent-word join reassembles them (#77) — but a character that *replaces* a letter leaves the join nothing to restore: `pаssword` became `p` + `ssword`, joining to `pssword`, which neither equals nor contains `password`. Flat and nested keys were affected identically; this was never specific to the cross-level match from #80.
+
+  The realistic case was accidental rather than adversarial — an app configuring `secret` or `password` in ASCII while its own field names carry accents. Substituting a homoglyph into your own field name only hides your own secret from your own log table, which is not an attack on anyone.
+
+  Two things follow from folding both sides of the match. An entry written in its own script now covers keys spelled either way, so `contraseña` and `contrasena` are one entry rather than two; and an entry with no ASCII characters at all, such as `пароль`, used to tokenize to nothing and be dropped in silence — it now folds to `parol` and matches. The fold is spelling, not meaning: `numéro` reads as `numero`, which `card_number` still does not cover, and a name with no Latin form at all (`密码`) folds to nothing and cannot be matched by a fragment — as was already the case. No new extension or dependency: the fold is `Str::ascii()`, already present through `illuminate/support`. A key that is plain ASCII takes the byte-identical path it always did, so nothing that was redacted before starts reading differently.
+
 ## [2.1.0] — 2026-09-20
 
 A redaction release. Every entry below is a case where a secret reached the

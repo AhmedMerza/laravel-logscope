@@ -768,6 +768,8 @@ The two halves have to be **adjacent**. A numeric position is stepped over, so `
 
 Matching a one-word entry inside a single word is what keeps ordinary keys readable: `class_name` and `cv_video` are left alone, where collapsing the whole key would have made them match `ssn` and `cvv`. One-word entries never span levels for the same reason, so `['class' => ['name' => …]]` is kept as well.
 
+A key is folded to its **ASCII nearest** before it is matched, so an accent or a lookalike character does not slip a field past the list: `sécret` and `pаssword` (that is a Cyrillic `а`) both redact against the ASCII defaults. Entries are folded the same way, so one written in its own script matches keys spelled either way — `contraseña` and `contrasena` are the same entry, and a fully non-Latin entry such as `пароль` works as well. The fold is spelling, not meaning: `numéro` reads as `numero`, which `card_number` does not cover. A name with no Latin form at all (`密码`) folds to nothing and cannot be matched by a fragment — that was true before the fold and still is.
+
 That is deliberately broad, because a missed secret is invisible and a redacted field is not. When a field of your own reads `[REDACTED]` and shouldn't, name it in `sensitive_keys_except` rather than narrowing `sensitive_keys`:
 
 ```php
