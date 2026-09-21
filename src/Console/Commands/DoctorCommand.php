@@ -11,9 +11,11 @@ use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\ContextSanitizer;
 use LogScope\Services\WriteFailureLogger;
 use Throwable;
 
@@ -39,6 +41,7 @@ class DoctorCommand extends Command
         $this->checkMiddleware();
         $this->checkRetention();
         $this->checkHeaderCapture();
+        $this->checkRedaction();
         $this->checkAuthResolution();
         $this->checkOctaneIntegration();
         $this->checkBuiltAssets();
@@ -265,6 +268,52 @@ class DoctorCommand extends Command
         $max = (int) config('logscope.context.headers.max_value_length', 500);
 
         $this->markPass('Header capture', count($allowlist).' allowlisted, values cut at '.$max.': '.implode(', ', $allowlist));
+    }
+
+    /**
+     * Report the sensitive keys actually in force.
+     *
+     * Until #79 no command answered "which keys are being redacted right
+     * now?", which is the question that would have exposed `sensitive_keys`
+     * replacing the defaults the moment anyone asked it. The list is read
+     * off the sanitizer rather than recomputed here, so this cannot claim a
+     * key is redacted that the matcher never got.
+     */
+    protected function checkRedaction(): void
+    {
+        if (! (bool) config('logscope.context.redact_sensitive', true)) {
+            $this->markWarn('Redaction', 'disabled — passwords, tokens and card numbers are stored exactly as logged; set context.redact_sensitive=true');
+
+            return;
+        }
+
+        try {
+            $sanitizer = $this->getLaravel()->make(ContextSanitizerInterface::class);
+        } catch (Throwable $e) {
+            $this->markFail('Redaction', 'could not resolve the sanitizer: '.$e->getMessage());
+
+            return;
+        }
+
+        // Someone can bind their own implementation over the alias. We can
+        // still say redaction is on, but not what it covers — guessing on
+        // their behalf is the failure this check exists to prevent.
+        if (! $sanitizer instanceof ContextSanitizer) {
+            $this->markWarn('Redaction', 'enabled, but '.$sanitizer::class.' is bound in place of LogScope\'s sanitizer — the effective key list is whatever that class matches');
+
+            return;
+        }
+
+        $keys = $sanitizer->effectiveSensitiveKeys();
+        $except = $sanitizer->effectiveSensitiveKeysExcept();
+
+        $detail = count($keys).' keys redacted: '.implode(', ', $keys);
+
+        if ($except !== []) {
+            $detail .= ' (+'.count($except).' kept by sensitive_keys_except)';
+        }
+
+        $this->markPass('Redaction', $detail);
     }
 
     /**

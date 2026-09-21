@@ -5,6 +5,33 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`sensitive_keys` now adds to the defaults instead of replacing them** (#79). **Behaviour change** — it only ever adds redaction, never removes it, so it fails closed. `'sensitive_keys' => ['pin']` used to make `pin` the *only* redacted key, silently dropping `password`, `password_confirmation`, `secret`, `token`, `api_key`, `apikey`, `authorization`, `credit_card`, `card_number`, `cvv` and `ssn`. Nothing warned and nothing logged it, so the config read as though a key had been added while eleven had been taken away — and the person editing that setting was, by definition, trying to redact *more*. It failed open, in the one setting where failing open means secrets stored in clear. Entries now merge with the defaults, which is what `sensitive_keys_except` and `sensitive_headers` already did; the three lists in that config block finally agree with each other.
+
+  Replacement existed as an escape hatch for a false positive — `token` catching an LLM app's `prompt_tokens` — and that job now belongs to `sensitive_keys_except` (v2.1.0, #77), which cancels one field by name instead of costing eleven defaults to do it.
+
+  **Upgrading:** if you set `sensitive_keys` to *add* keys, nothing changes — you can drop any defaults you re-listed, since repeats are now ignored. If you set it to *drop* a default, that default redacts again from this release, so a field you expected in clear will read `[REDACTED]`. Name that field in `sensitive_keys_except` instead:
+
+  ```php
+  // Before — dropped all eleven defaults to keep one field readable
+  'sensitive_keys' => ['password', 'secret', 'api_key'],  // 'token' left out on purpose
+
+  // After — keep the field, keep the defaults
+  'sensitive_keys' => [],
+  'sensitive_keys_except' => ['usage_token'],
+  ```
+
+  Nothing that was redacted before this release stops being redacted, and existing rows are not rewritten. `php artisan logscope:doctor` prints the list in force.
+
+- **A configured list that is empty or all-blank no longer needs a fallback.** `'sensitive_keys' => ['']`, or the `['']` that `explode(',', env('…', ''))` yields for an unset variable, used to leave the matcher with nothing to match on; a guard caught that case and restored the defaults. The defaults are unconditionally present now, so the guard is gone rather than fixed — the failure it covered can no longer be reached.
+
+### Added
+
+- **`logscope:doctor` reports the redaction actually in force** (#79). The command said nothing about redaction at all, so nothing answered "which keys are being redacted right now?" — the question that would have exposed the behaviour above the first time anyone asked it. A new `Redaction` row prints the effective key count and the list itself, notes how many exclusions are active, and warns when `context.redact_sensitive` is off or when an application has bound its own sanitizer in place of LogScope's. The list is read from the sanitizer rather than recomputed from config, so it cannot report a key the matcher never received.
+
 ## [2.1.0] — 2026-09-20
 
 A redaction release. Every entry below is a case where a secret reached the

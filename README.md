@@ -774,13 +774,20 @@ That is deliberately broad, because a missed secret is invisible and a redacted 
 'context' => [
     'expand_objects' => true,      // Set false to show [Object: ClassName]
     'redact_sensitive' => true,    // Set false to disable redaction (not recommended)
-    'sensitive_keys' => [],        // Empty = use defaults; your own list replaces them
+    'sensitive_keys' => [],        // Key fragments added to the defaults (password, token, cvv, ...)
     'sensitive_keys_except' => [], // Keys to keep despite matching; adds to the defaults
     'sensitive_headers' => [],     // Name fragments added to the defaults (auth, cookie, token, key, ...)
 ],
 ```
 
 `sensitive_keys_except` ships with `prompt_tokens`, `completion_tokens`, `total_tokens`, `token_count` and `tokenizer` — the LLM-era fields that `token` would otherwise catch. Your entries add to those.
+
+All three lists **add to their defaults** — adding `pin` to `sensitive_keys` keeps `password`, `token` and the other nine. (Before v2.2.0 `sensitive_keys` replaced its defaults instead, so adding one key silently dropped eleven; see the CHANGELOG if you are upgrading.) To see what is redacted in a given environment rather than inferring it from config:
+
+```bash
+php artisan logscope:doctor
+# Redaction   11 keys redacted: password, password_confirmation, secret, token, ... (+9 kept by sensitive_keys_except)
+```
 
 Redaction matches **key names, not values**: a secret pasted into a log message, an exception message, or a URL path is stored as written.
 
