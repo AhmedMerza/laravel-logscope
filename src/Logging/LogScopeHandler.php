@@ -9,6 +9,7 @@ use LogScope\Concerns\ResolvesExceptionSource;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Services\LogBuffer;
 use LogScope\Services\TransactionSavepoint;
 use LogScope\Services\WriteGuard;
 use Monolog\Handler\AbstractProcessingHandler;
@@ -81,7 +82,7 @@ class LogScopeHandler extends AbstractProcessingHandler
                 $customContext = LogScope::getCapturedContext(request());
             }
 
-            TransactionSavepoint::around(fn () => LogEntry::createEntry([
+            $data = [
                 'level' => strtolower($record->level->name),
                 'message' => $record->message,
                 'context' => $this->sanitizeContext(array_merge($record->context, $customContext)),
@@ -96,7 +97,17 @@ class LogScopeHandler extends AbstractProcessingHandler
                 'url' => $requestContext['url'] ?? null,
                 'headers' => $requestContext['headers'] ?? null,
                 'occurred_at' => $record->datetime,
-            ]));
+            ];
+
+            // This handler writes on the app's connection too, so it gets the
+            // same deferral as the listener: nothing is inserted inside the
+            // app's transaction (#45). Channel capture ignores write_mode, so
+            // the check lives here rather than in LogWriter.
+            if (LogBuffer::deferIfInTransaction($data)) {
+                return;
+            }
+
+            TransactionSavepoint::around(fn () => LogEntry::createEntry($data));
         } catch (Throwable $e) {
             // Don't break the calling application, but always surface the
             // failure to PHP's error log. Hiding it behind APP_DEBUG meant

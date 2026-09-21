@@ -156,9 +156,9 @@ Batch mode (`LOGSCOPE_WRITE_MODE=batch`, default) accumulates logs during the re
 - OOM kill: same
 - `E_PARSE` / `E_COMPILE_ERROR`: PHP can't run user code at shutdown for these
 
-What's at risk is what's still in the buffer. The buffer is also written once it holds 500 logs or its oldest log is 10 seconds old (see [Write Mode](#write-mode-performance)), and queue workers flush after every job, so a long-running artisan command or worker loses at most that much, not everything it logged since it started. Neither limit flushes inside an open database transaction, so a crash during a long transaction can still lose more.
+What's at risk is what's still in the buffer. The buffer is also written once it holds 500 logs or its oldest log is 10 seconds old (see [Write Mode](#write-mode-performance)), and queue workers flush after every job, so a long-running artisan command or worker loses at most that much, not everything it logged since it started. Inside an open database transaction the limits don't apply — the buffer waits for the transaction to end instead — so a crash during a long transaction can lose more, up to the 5,000-entry cap at which LogScope writes anyway.
 
-**If low-loss is critical**, set `LOGSCOPE_WRITE_MODE=sync` to write every log immediately. Cost: each `Log::*()` call adds a synchronous DB round-trip.
+**If low-loss is critical**, set `LOGSCOPE_WRITE_MODE=sync` to write every log immediately. Cost: each `Log::*()` call adds a synchronous DB round-trip. Logs written inside one of your own transactions still wait for it to end (see [Writes During Your Transactions](#writes-during-your-transactions)) unless you also set `LOGSCOPE_DEFER_IN_TRANSACTIONS=false`.
 
 ### 5. `null_channel` filter — read before enabling
 
@@ -214,6 +214,21 @@ LOGSCOPE_QUEUE=default
 LOGSCOPE_QUEUE_CONNECTION=
 ```
 
+### Writes During Your Transactions
+
+LogScope writes on your application's database connection, so a log written inside one of your transactions would sit in the log table, uncommitted, until you commit. That has three costs: the Clear button and `logscope:prune` wait on your request (and a Clear covering two levels or channels can deadlock with it, which your transaction loses); the log rows roll back with the transaction, losing exactly the logs that explain the rollback; and every write pays for a savepoint.
+
+So LogScope doesn't write there. A log written while a transaction is open is held in memory and written as soon as that transaction ends — committed or rolled back, keeping the time it was logged. Reading logs never affects your app.
+
+```env
+# Turn it off to write inside your transactions as before.
+LOGSCOPE_DEFER_IN_TRANSACTIONS=true
+```
+
+This applies to every write mode (`batch` already worked this way). In `queue` mode, entries held this way are written directly when the transaction ends rather than dispatched — the job would have written the same rows on the same connection a moment later.
+
+One bound: a single transaction that logs more than ten times `LOGSCOPE_BATCH_MAX_ENTRIES` (5,000 by default) would grow that buffer until the process ran out of memory, so at that point LogScope writes inside your transaction after all. Each write is isolated in a savepoint, so a failure can't take your transaction with it.
+
 ### Testing
 
 LogScope forces `write_mode` to `sync` whenever the app is running in the `testing` environment, regardless of what `LOGSCOPE_WRITE_MODE` or `config/logscope.php` says. This mirrors how Laravel ships sensible test defaults for mail (`array`), queue (`sync`), and cache (`array`).
@@ -231,6 +246,12 @@ protected function setUp(): void
 ```
 
 Even with that override, the shutdown discard warning is suppressed in the testing env (the loss is expected and uninteresting) — production keeps the loud notify so real data loss stays visible.
+
+Deferring writes during transactions is switched off in the testing environment for the same reason. `RefreshDatabase` wraps every test in a transaction it never commits, so a deferred log would never be written and any assertion against it would fail; nothing distinguishes that wrapping transaction from one of your own at runtime. Test writes stay immediate, protected by savepoints as before. To exercise the real behaviour, turn it back on in a test that manages its own transactions (not `RefreshDatabase`):
+
+```php
+config(['logscope.defer_in_transactions' => true]);
+```
 
 ### Retention
 

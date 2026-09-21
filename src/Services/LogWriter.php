@@ -30,6 +30,14 @@ class LogWriter implements LogWriterInterface
         $mode = config('logscope.write_mode', 'batch');
 
         WriteGuard::during(function () use ($mode, $data) {
+            // Both writing modes reach the database during the request, so
+            // inside the app's transaction they hold its locks and roll back
+            // with it. Hand them to the buffer instead, which writes once the
+            // transaction ends (#45). Batch already buffers.
+            if ($mode !== 'batch' && LogBuffer::deferIfInTransaction($data)) {
+                return;
+            }
+
             match ($mode) {
                 'sync' => $this->writeSync($data),
                 'queue' => $this->writeQueue($data),

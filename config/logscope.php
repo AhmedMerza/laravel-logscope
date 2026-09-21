@@ -320,6 +320,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Defer Writes During Transactions
+    |--------------------------------------------------------------------------
+    |
+    | LogScope writes on your application's database connection. A log
+    | written inside one of your transactions therefore holds locks in the
+    | log table until you commit — the Clear button and `logscope:prune`
+    | then wait on your request, and a Clear covering two levels or channels
+    | can deadlock with it, which your transaction loses. Those rows also
+    | roll back with the transaction, losing the logs that explain why it
+    | rolled back.
+    |
+    | With this on, a log written while a transaction is open is held in
+    | memory and written as soon as that transaction ends, whether it
+    | committed or rolled back. Reading logs then never affects the app.
+    | It applies to every write mode; 'batch' already behaves this way.
+    | Entries held this way are written directly even in 'queue' mode —
+    | the queued job would have written the same rows on the same
+    | connection, one statement later.
+    |
+    | Forced off in the 'testing' environment: RefreshDatabase wraps each
+    | test in a transaction that never commits, so deferred logs would
+    | never be written and assertions against them would fail. Turn it
+    | back on inside a test to exercise this behaviour.
+    |
+    */
+
+    'defer_in_transactions' => env('LOGSCOPE_DEFER_IN_TRANSACTIONS', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Batch Limits
     |--------------------------------------------------------------------------
     |
@@ -329,8 +359,13 @@ return [
     | from holding their logs in memory until they exit. Queue workers
     | also flush after every job. Set either limit to 0 to disable it.
     |
-    | Neither limit flushes inside an open database transaction, so a
-    | rollback can't discard buffered logs.
+    | Neither limit applies inside an open database transaction, where the
+    | buffer waits for the transaction to end instead. The exception is a
+    | hard cap at ten times 'max_entries': a transaction that logs that
+    | much would otherwise grow the buffer until the process runs out of
+    | memory, so at the cap the buffer is written inside the transaction
+    | after all. Each write is isolated in a savepoint, so a failure there
+    | can't take your transaction with it.
     |
     */
 
