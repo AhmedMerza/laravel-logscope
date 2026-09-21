@@ -22,6 +22,13 @@ class LogEntry extends Model
     use Prunable;
 
     /**
+     * Rows deleted per statement by {@see self::deleteInChunks()}.
+     *
+     * Matches the default `logscope:prune --chunk` uses.
+     */
+    public const DELETE_CHUNK_SIZE = 1000;
+
+    /**
      * Create a new factory instance for the model.
      */
     protected static function newFactory(): LogEntryFactory
@@ -151,6 +158,36 @@ class LogEntry extends Model
         $days = config('logscope.retention.days', 30);
 
         return static::query()->where('occurred_at', '<', now()->subDays($days));
+    }
+
+    /**
+     * Delete everything the query matches, in bounded chunks (#46).
+     *
+     * The ids are read first with a plain SELECT, then deleted by primary
+     * key. Deleting by the filter directly makes MySQL lock every row and
+     * gap it scans, so it waits on any row another session has inserted but
+     * not committed — measured as a lock wait timeout even in chunks. An
+     * MVCC read never sees that row, so it stays out of the id list, and a
+     * delete by primary key touches only the rows it names.
+     *
+     * Not absolute: on a table small enough that InnoDB prefers a full scan
+     * to primary-key lookups, the delete scans and waits again. It narrows
+     * the window rather than closing it — #45 is what keeps LogScope's own
+     * writes out of the app's transaction in the first place.
+     */
+    public static function deleteInChunks(Builder $query, int $chunkSize = self::DELETE_CHUNK_SIZE): int
+    {
+        $deleted = 0;
+
+        do {
+            $ids = (clone $query)->limit($chunkSize)->pluck('id');
+            $batch = $ids->isEmpty()
+                ? 0
+                : static::query()->whereIn('id', $ids)->delete();
+            $deleted += $batch;
+        } while ($batch > 0);
+
+        return $deleted;
     }
 
     /**
