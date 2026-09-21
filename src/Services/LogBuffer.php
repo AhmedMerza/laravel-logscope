@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LogScope\Services;
 
-use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Carbon;
 use LogScope\Contracts\LogBufferInterface;
 use LogScope\Models\LogEntry;
@@ -20,9 +19,29 @@ use Throwable;
 class LogBuffer implements LogBufferInterface
 {
     /**
+     * How many times over 'batch.max_entries' the buffer may grow inside an
+     * open transaction before it is written anyway (#28, #45).
+     */
+    private const TRANSACTION_CAP_FACTOR = 10;
+
+    /**
+     * The package default for 'batch.max_entries', used as the floor for the
+     * in-transaction cap when the setting is 0.
+     */
+    private const DEFAULT_MAX_ENTRIES = 500;
+
+    /**
      * Buffer for batch write mode.
      */
     protected static array $buffer = [];
+
+    /**
+     * Whether the buffer holds any entry deferred out of an app transaction
+     * (#45), as opposed to ordinary batch-mode entries. Only these need the
+     * buffer written when the transaction ends; a batch buffer is left to
+     * its usual end-of-process flush.
+     */
+    protected static bool $hasDeferred = false;
 
     /**
      * Unix timestamp of the oldest entry in the buffer.
@@ -52,22 +71,77 @@ class LogBuffer implements LogBufferInterface
      */
     protected static bool $shutdownRegistered = false;
 
-    public function __construct(
-        protected Application $app
-    ) {}
-
     /**
      * Add a log entry to the buffer.
      */
     public function add(array $data): void
     {
+        self::store($data);
+    }
+
+    /**
+     * Hold a log entry until the app's transaction ends, instead of writing
+     * it inside that transaction (#45).
+     *
+     * LogScope writes on the app's connection, so an insert made inside the
+     * app's transaction holds locks in log_entries until the app commits:
+     * Clear and logscope:prune then wait on the app, and a Clear spanning two
+     * levels or channels can deadlock with it — MySQL kills the app's
+     * transaction, not ours. The same insert also rolls back with the app,
+     * losing exactly the logs that explain the rollback. Reviewing logs must
+     * never affect the app, so we write nothing until the transaction ends.
+     *
+     * Returns whether the entry was taken. Callers that get false write as
+     * usual; the buffer's normal flushes (transaction end, request terminate,
+     * shutdown, queue-worker looping) write what it takes.
+     */
+    public static function deferIfInTransaction(array $data): bool
+    {
+        if (! config('logscope.defer_in_transactions', true)) {
+            return false;
+        }
+
+        if ((new LogEntry)->getConnection()->transactionLevel() === 0) {
+            return false;
+        }
+
+        // The row is written later but happened now. Both capture paths
+        // stamp this already; a caller going straight to LogWriter::write()
+        // may not, and prepareData would then date the row when the
+        // transaction ended rather than when it was logged.
+        $data['occurred_at'] ??= Carbon::now();
+
+        self::$hasDeferred = true;
+
+        self::store($data, inTransaction: true);
+
+        return true;
+    }
+
+    /**
+     * Whether the buffer is holding entries deferred out of a transaction.
+     */
+    public static function hasDeferredEntries(): bool
+    {
+        return self::$hasDeferred;
+    }
+
+    /**
+     * Append to the buffer and write it if it has hit a limit.
+     *
+     * $inTransaction is passed by callers that have already resolved it, so
+     * the connection is not asked twice for the same log write.
+     */
+    private static function store(array $data, ?bool $inTransaction = null): void
+    {
         // Cache config limits while the container is still alive
         self::$cachedLimits = config('logscope.limits', []);
 
-        // Same idea for the testing-env flag: capture it now so flushStatic
-        // can answer "should the discard warning be quiet?" after the
-        // container has been torn down.
-        self::$cachedTestingEnv ??= $this->app->environment('testing');
+        // Same for the testing-env flag, so flushStatic can answer "should
+        // the discard warning be quiet?" after the container has been torn
+        // down. It lives here rather than in add() because deferred entries
+        // reach the buffer without going through add() at all.
+        self::$cachedTestingEnv ??= app()->environment('testing');
 
         $now = Carbon::now()->getTimestamp();
 
@@ -77,7 +151,7 @@ class LogBuffer implements LogBufferInterface
 
         self::$buffer[] = $data;
 
-        if (self::shouldFlushEarly($now)) {
+        if (self::shouldFlushEarly($now, $inTransaction)) {
             self::flushStatic();
         }
     }
@@ -90,22 +164,38 @@ class LogBuffer implements LogBufferInterface
      * memory until then — invisible to readers and lost on SIGKILL/OOM (#28).
      * A web request rarely reaches either limit, so it still flushes once.
      *
-     * Never flushes inside an open transaction: the insert would share the
-     * app's connection and roll back with it, taking the logs that explain
-     * the rollback. The limits stay exceeded, so the next add() after the
-     * transaction ends flushes instead.
+     * Inside an open transaction the limits don't apply: a write there rolls
+     * back with the app and holds locks until it commits (#45), and the
+     * transaction's own end flushes soon enough. Only the hard cap of
+     * TRANSACTION_CAP_FACTOR x max_entries writes through, because a
+     * transaction that logs that much would otherwise grow the buffer until
+     * the process runs out of memory (#28) — and a log that was dropped or
+     * OOM'd is worth less than one written inside the transaction, now that
+     * every write is isolated in a savepoint (#40). Age is not a reason to
+     * write through: only memory is.
      */
-    private static function shouldFlushEarly(int $now): bool
+    private static function shouldFlushEarly(int $now, ?bool $inTransaction = null): bool
     {
         $batch = config('logscope.batch', []);
-        $maxEntries = (int) ($batch['max_entries'] ?? 500);
+        $maxEntries = (int) ($batch['max_entries'] ?? self::DEFAULT_MAX_ENTRIES);
         $maxAge = (int) ($batch['max_age'] ?? 10);
+
+        $inTransaction ??= (new LogEntry)->getConnection()->transactionLevel() > 0;
+
+        if ($inTransaction) {
+            // max_entries = 0 turns off the ordinary flush, not this one:
+            // the buffer still has to stop growing before the process runs
+            // out of memory, so the cap falls back to the default.
+            $cap = ($maxEntries > 0 ? $maxEntries : self::DEFAULT_MAX_ENTRIES)
+                * self::TRANSACTION_CAP_FACTOR;
+
+            return count(self::$buffer) >= $cap;
+        }
 
         $full = $maxEntries > 0 && count(self::$buffer) >= $maxEntries;
         $stale = $maxAge > 0 && $now - self::$bufferStartedAt >= $maxAge;
 
-        return ($full || $stale)
-            && (new LogEntry)->getConnection()->transactionLevel() === 0;
+        return $full || $stale;
     }
 
     /**
@@ -155,15 +245,13 @@ class LogBuffer implements LogBufferInterface
         // silent data-loss event.
         try {
             if (! app()->bound('db')) {
-                $count = count(self::$buffer);
-                self::$buffer = [];
+                $count = count(self::takeBuffer());
                 self::notifyDiscard($count, 'container has no db binding (PHP shutdown or test teardown)');
 
                 return;
             }
         } catch (Throwable $e) {
-            $count = count(self::$buffer);
-            self::$buffer = [];
+            $count = count(self::takeBuffer());
             self::notifyDiscard($count, 'container unavailable: ['.get_class($e).'] '.$e->getMessage());
 
             return;
@@ -171,13 +259,26 @@ class LogBuffer implements LogBufferInterface
 
         // Take the current buffer and clear it immediately
         // This prevents re-processing the same logs if flush is called again
-        $logsToFlush = self::$buffer;
-        self::$buffer = [];
+        $logsToFlush = self::takeBuffer();
 
         // Guard against re-entry: an observer or query listener that fires
         // a log during the bulk insert would otherwise be re-captured by
         // LogCapture and added back to the buffer or written sync.
         WriteGuard::during(fn () => self::performFlush($logsToFlush));
+    }
+
+    /**
+     * Empty the buffer and return what it held, so a flush can't process the
+     * same entries twice if it is called again while one is in progress.
+     */
+    private static function takeBuffer(): array
+    {
+        $taken = self::$buffer;
+
+        self::$buffer = [];
+        self::$hasDeferred = false;
+
+        return $taken;
     }
 
     /**
@@ -260,6 +361,7 @@ class LogBuffer implements LogBufferInterface
     public static function reset(): void
     {
         self::$buffer = [];
+        self::$hasDeferred = false;
         self::$cachedLimits = [];
         self::$cachedTestingEnv = null;
         self::$shutdownRegistered = false;

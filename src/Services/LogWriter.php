@@ -30,6 +30,13 @@ class LogWriter implements LogWriterInterface
         $mode = config('logscope.write_mode', 'batch');
 
         WriteGuard::during(function () use ($mode, $data) {
+            // A write that lands on the app's own connection holds its locks
+            // and rolls back with it, so hand it to the buffer instead and
+            // write once the transaction ends (#45).
+            if ($this->writesOnAppConnection($mode) && LogBuffer::deferIfInTransaction($data)) {
+                return;
+            }
+
             match ($mode) {
                 'sync' => $this->writeSync($data),
                 'queue' => $this->writeQueue($data),
@@ -37,6 +44,35 @@ class LogWriter implements LogWriterInterface
                 default => $this->writeSync($data),
             };
         });
+    }
+
+    /**
+     * Whether this mode's write would go to the app's own connection, and so
+     * end up inside whatever transaction the app has open.
+     *
+     * 'batch' already buffers. 'queue' only touches that connection on the
+     * 'sync' driver, which runs the job inline, and on 'database', whose job
+     * row is inserted there — a broker like redis or sqs is untouched by the
+     * app's transaction, and deferring those would trade the dispatch's
+     * durability for nothing.
+     */
+    protected function writesOnAppConnection(string $mode): bool
+    {
+        if ($mode === 'batch') {
+            return false;
+        }
+
+        if ($mode !== 'queue') {
+            return true;
+        }
+
+        $connection = config('logscope.queue.connection') ?: config('queue.default');
+
+        return in_array(
+            config("queue.connections.{$connection}.driver"),
+            ['sync', 'database'],
+            true
+        );
     }
 
     /**

@@ -6,6 +6,8 @@ namespace LogScope;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Database\Events\TransactionCommitted;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\ServiceProvider;
 use LogScope\Console\Commands\DoctorCommand;
@@ -19,6 +21,7 @@ use LogScope\Contracts\LogBufferInterface;
 use LogScope\Contracts\LogWriterInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\Logging\AddChannelToContext;
+use LogScope\Models\LogEntry;
 use LogScope\Services\ContextSanitizer;
 use LogScope\Services\FallbackWriter;
 use LogScope\Services\LogBuffer;
@@ -86,8 +89,8 @@ class LogScopeServiceProvider extends ServiceProvider
      */
     protected function registerServices(): void
     {
-        $this->app->singleton(LogBuffer::class, function ($app) {
-            return new LogBuffer($app);
+        $this->app->singleton(LogBuffer::class, function () {
+            return new LogBuffer;
         });
         $this->app->alias(LogBuffer::class, LogBufferInterface::class);
 
@@ -161,8 +164,10 @@ class LogScopeServiceProvider extends ServiceProvider
 
     /**
      * Mirror Laravel's "sensible defaults in tests" pattern (mail=array,
-     * queue=sync, cache=array) by forcing write_mode to 'sync' when the
-     * app environment is 'testing'. Without this, the package-default
+     * queue=sync, cache=array) when the app environment is 'testing': logs
+     * are written immediately, so a test can assert on them.
+     *
+     * write_mode is forced to 'sync'. Without this, the package-default
      * 'batch' accumulates entries across tests that never trigger
      * Application::terminate(); the leftover buffer is then discarded at
      * PHP shutdown — emitting a noisy "Discarded N buffered log entries"
@@ -186,7 +191,23 @@ class LogScopeServiceProvider extends ServiceProvider
             return;
         }
 
-        config(['logscope.write_mode' => 'sync']);
+        config([
+            'logscope.write_mode' => 'sync',
+            // RefreshDatabase wraps every test in a transaction it never
+            // commits, and unsets the event dispatcher around it — so
+            // transactionLevel() never reaches 0 and no committed/rolled-back
+            // event ever fires. Deferring there would buffer every log in the
+            // suite and flush none of them, breaking any test that asserts a
+            // log row exists. Nothing distinguishes that wrapping transaction
+            // from a real one at runtime, so testing writes stay immediate,
+            // protected by savepoints as before (#45).
+            //
+            // Tests that want the real behaviour opt back in with
+            // config(['logscope.defer_in_transactions' => true]) — see
+            // tests/Transactions, which avoids RefreshDatabase for this
+            // reason.
+            'logscope.defer_in_transactions' => false,
+        ]);
     }
 
     /**
@@ -385,6 +406,33 @@ class LogScopeServiceProvider extends ServiceProvider
         };
 
         $this->app->terminating($flushSafely);
+
+        // Entries deferred out of the app's transaction (#45) are written as
+        // soon as it ends — committed or rolled back, since a rollback's logs
+        // are usually the ones that explain it. Laravel fires these events for
+        // nested levels and savepoint rollbacks too, so wait for the outermost
+        // one to close.
+        //
+        // A commit with nothing deferred writes nothing, so batch mode keeps
+        // its own cadence. Deferred and batch entries do share one buffer,
+        // though: once anything has been deferred, the flush writes whatever
+        // else was buffered alongside it.
+        $this->app['events']->listen(
+            [TransactionCommitted::class, TransactionRolledBack::class],
+            static function () use ($flushSafely): void {
+                if (! LogBuffer::hasDeferredEntries()) {
+                    return;
+                }
+
+                // Our own connection is what matters: the event may come from
+                // another one that has nothing to do with log_entries.
+                if ((new LogEntry)->getConnection()->transactionLevel() !== 0) {
+                    return;
+                }
+
+                $flushSafely();
+            }
+        );
 
         if (! LogBuffer::shutdownFunctionRegistered()) {
             register_shutdown_function($flushSafely);

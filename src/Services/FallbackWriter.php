@@ -98,8 +98,17 @@ class FallbackWriter
         }
 
         try {
+            $payload = $this->buildPayload($data, $e, $where, $count);
+
+            // The row explaining a failed write is worth more than most: it
+            // must not be the one thing an app rollback discards, so it gets
+            // the same deferral as the write it is standing in for (#45).
+            if (LogBuffer::deferIfInTransaction($payload)) {
+                return;
+            }
+
             WriteGuard::during(fn () => TransactionSavepoint::around(
-                fn () => LogEntry::createEntry($this->buildPayload($data, $e, $where, $count))
+                fn () => LogEntry::createEntry($payload)
             ));
         } catch (Throwable) {
             // Last-resort: the failure has already been surfaced to error_log
