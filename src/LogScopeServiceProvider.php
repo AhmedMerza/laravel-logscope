@@ -411,8 +411,12 @@ class LogScopeServiceProvider extends ServiceProvider
         // soon as it ends — committed or rolled back, since a rollback's logs
         // are usually the ones that explain it. Laravel fires these events for
         // nested levels and savepoint rollbacks too, so wait for the outermost
-        // one to close. The batch buffer is left alone: an unrelated commit is
-        // no reason to write it early.
+        // one to close.
+        //
+        // A commit with nothing deferred writes nothing, so batch mode keeps
+        // its own cadence. Deferred and batch entries do share one buffer,
+        // though: once anything has been deferred, the flush writes whatever
+        // else was buffered alongside it.
         $this->app['events']->listen(
             [TransactionCommitted::class, TransactionRolledBack::class],
             static function () use ($flushSafely): void {

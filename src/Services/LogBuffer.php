@@ -26,6 +26,12 @@ class LogBuffer implements LogBufferInterface
     private const TRANSACTION_CAP_FACTOR = 10;
 
     /**
+     * The package default for 'batch.max_entries', used as the floor for the
+     * in-transaction cap when the setting is 0.
+     */
+    private const DEFAULT_MAX_ENTRIES = 500;
+
+    /**
      * Buffer for batch write mode.
      */
     protected static array $buffer = [];
@@ -75,11 +81,6 @@ class LogBuffer implements LogBufferInterface
      */
     public function add(array $data): void
     {
-        // Cache the testing-env flag while the container is still alive, so
-        // flushStatic can answer "should the discard warning be quiet?" after
-        // the container has been torn down.
-        self::$cachedTestingEnv ??= $this->app->environment('testing');
-
         self::store($data);
     }
 
@@ -139,6 +140,12 @@ class LogBuffer implements LogBufferInterface
         // Cache config limits while the container is still alive
         self::$cachedLimits = config('logscope.limits', []);
 
+        // Same for the testing-env flag, so flushStatic can answer "should
+        // the discard warning be quiet?" after the container has been torn
+        // down. It lives here rather than in add() because deferred entries
+        // reach the buffer without going through add() at all.
+        self::$cachedTestingEnv ??= app()->environment('testing');
+
         $now = Carbon::now()->getTimestamp();
 
         if (self::$buffer === []) {
@@ -173,12 +180,17 @@ class LogBuffer implements LogBufferInterface
     private static function shouldFlushEarly(int $now): bool
     {
         $batch = config('logscope.batch', []);
-        $maxEntries = (int) ($batch['max_entries'] ?? 500);
+        $maxEntries = (int) ($batch['max_entries'] ?? self::DEFAULT_MAX_ENTRIES);
         $maxAge = (int) ($batch['max_age'] ?? 10);
 
         if ((new LogEntry)->getConnection()->transactionLevel() > 0) {
-            return $maxEntries > 0
-                && count(self::$buffer) >= $maxEntries * self::TRANSACTION_CAP_FACTOR;
+            // max_entries = 0 turns off the ordinary flush, not this one:
+            // the buffer still has to stop growing before the process runs
+            // out of memory, so the cap falls back to the default.
+            $cap = ($maxEntries > 0 ? $maxEntries : self::DEFAULT_MAX_ENTRIES)
+                * self::TRANSACTION_CAP_FACTOR;
+
+            return count(self::$buffer) >= $cap;
         }
 
         $full = $maxEntries > 0 && count(self::$buffer) >= $maxEntries;

@@ -334,10 +334,15 @@ return [
     | With this on, a log written while a transaction is open is held in
     | memory and written as soon as that transaction ends, whether it
     | committed or rolled back. Reading logs then never affects the app.
-    | It applies to every write mode; 'batch' already behaves this way.
-    | Entries held this way are written directly even in 'queue' mode —
-    | the queued job would have written the same rows on the same
-    | connection, one statement later.
+    |
+    | This covers the writes that land on your connection: 'sync', channel
+    | capture, and 'queue' on the 'sync' or 'database' driver. 'batch'
+    | already behaves this way, and a broker queue (redis, sqs) is left
+    | alone — your transaction never touched it, and holding the entry in
+    | memory would only cost the dispatch its durability. Entries held
+    | during a transaction are written directly when it ends rather than
+    | dispatched; the queued job would have written the same rows on the
+    | same connection, one statement later.
     |
     | Forced off in the 'testing' environment: RefreshDatabase wraps each
     | test in a transaction that never commits, so deferred logs would

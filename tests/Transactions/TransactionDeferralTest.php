@@ -13,8 +13,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use LogScope\Contracts\LogWriterInterface;
+use LogScope\Jobs\WriteLogEntry;
 use LogScope\Logging\LogScopeHandler;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
@@ -159,6 +161,73 @@ it('flushes only once for a transaction that logged many times', function () {
 
     expect($inserts)->toBe(1)
         ->and(loggedCount())->toBe(3);
+});
+
+it('waits for the outermost transaction, not an inner one', function () {
+    DB::beginTransaction();
+    Log::info('logged at the outer level');
+
+    DB::transaction(function () {
+        DB::table('deferral_rows')->insert(['note' => 'inner']);
+        Log::info('logged at the inner level');
+    });
+
+    // The inner commit fired TransactionCommitted, but the app is still in a
+    // transaction: writing now would be the very thing this avoids.
+    expect(loggedCount())->toBe(0);
+
+    DB::commit();
+
+    expect(loggedMessages())->toBe(['logged at the outer level', 'logged at the inner level']);
+});
+
+it('waits for the outermost transaction when an inner one rolls back', function () {
+    DB::beginTransaction();
+    Log::info('logged at the outer level');
+
+    try {
+        DB::transaction(function () {
+            Log::warning('logged before the inner failure');
+
+            throw new RuntimeException('inner work failed');
+        });
+    } catch (RuntimeException) {
+        // The inner savepoint rolled back and fired TransactionRolledBack.
+    }
+
+    expect(loggedCount())->toBe(0);
+
+    DB::commit();
+
+    expect(loggedMessages())->toBe(['logged at the outer level', 'logged before the inner failure']);
+});
+
+it('does not break the app commit when the deferred flush fails', function () {
+    // The flush now runs from inside the commit event, so a failure there
+    // must not surface as an exception from the app's own DB::commit().
+    DB::beginTransaction();
+    DB::table('deferral_rows')->insert(['note' => 'row']);
+    Log::info('this entry cannot be written');
+
+    Schema::drop('log_entries');
+
+    expect(fn () => DB::commit())->not->toThrow(Throwable::class)
+        ->and(DB::table('deferral_rows')->count())->toBe(1);
+});
+
+it('does not defer a queued write that never touches the app connection', function () {
+    // A broker driver's dispatch is unaffected by the app's transaction, so
+    // deferring it would only cost the dispatch its durability.
+    config(['logscope.write_mode' => 'queue', 'queue.default' => 'null']);
+
+    Queue::fake();
+
+    DB::beginTransaction();
+    Log::info('dispatched, not deferred');
+    DB::commit();
+
+    Queue::assertPushed(WriteLogEntry::class);
+    expect(LogBuffer::getBuffer())->toBe([]);
 });
 
 it('leaves a batch buffer alone when an unrelated transaction commits', function () {

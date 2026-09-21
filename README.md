@@ -225,7 +225,7 @@ So LogScope doesn't write there. A log written while a transaction is open is he
 LOGSCOPE_DEFER_IN_TRANSACTIONS=true
 ```
 
-This applies to every write mode (`batch` already worked this way). In `queue` mode, entries held this way are written directly when the transaction ends rather than dispatched — the job would have written the same rows on the same connection a moment later.
+This covers the writes that land on your connection: `sync`, channel capture, and `queue` on the `sync` or `database` driver. `batch` already worked this way, and a broker queue (redis, sqs) is left alone — your transaction never touched it, so holding the entry in memory would only cost the dispatch its durability. Entries held during a transaction are written directly when it ends rather than dispatched; the job would have written the same rows on the same connection a moment later.
 
 One bound: a single transaction that logs more than ten times `LOGSCOPE_BATCH_MAX_ENTRIES` (5,000 by default) would grow that buffer until the process ran out of memory, so at that point LogScope writes inside your transaction after all. Each write is isolated in a savepoint, so a failure can't take your transaction with it.
 
