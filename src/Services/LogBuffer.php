@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace LogScope\Services;
 
-use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Carbon;
 use LogScope\Contracts\LogBufferInterface;
 use LogScope\Models\LogEntry;
@@ -72,10 +71,6 @@ class LogBuffer implements LogBufferInterface
      */
     protected static bool $shutdownRegistered = false;
 
-    public function __construct(
-        protected Application $app
-    ) {}
-
     /**
      * Add a log entry to the buffer.
      */
@@ -110,16 +105,15 @@ class LogBuffer implements LogBufferInterface
             return false;
         }
 
-        // The row is written later but happened now: prepareData and
-        // createEntry both default occurred_at to the time of the insert.
-        // Both capture paths stamp this already; a caller that goes straight
-        // to LogWriter::write() may not, and prepareData would then date the
-        // row when the transaction ended rather than when it was logged.
+        // The row is written later but happened now. Both capture paths
+        // stamp this already; a caller going straight to LogWriter::write()
+        // may not, and prepareData would then date the row when the
+        // transaction ended rather than when it was logged.
         $data['occurred_at'] ??= Carbon::now();
 
         self::$hasDeferred = true;
 
-        self::store($data);
+        self::store($data, inTransaction: true);
 
         return true;
     }
@@ -134,8 +128,11 @@ class LogBuffer implements LogBufferInterface
 
     /**
      * Append to the buffer and write it if it has hit a limit.
+     *
+     * $inTransaction is passed by callers that have already resolved it, so
+     * the connection is not asked twice for the same log write.
      */
-    private static function store(array $data): void
+    private static function store(array $data, ?bool $inTransaction = null): void
     {
         // Cache config limits while the container is still alive
         self::$cachedLimits = config('logscope.limits', []);
@@ -154,7 +151,7 @@ class LogBuffer implements LogBufferInterface
 
         self::$buffer[] = $data;
 
-        if (self::shouldFlushEarly($now)) {
+        if (self::shouldFlushEarly($now, $inTransaction)) {
             self::flushStatic();
         }
     }
@@ -177,13 +174,15 @@ class LogBuffer implements LogBufferInterface
      * every write is isolated in a savepoint (#40). Age is not a reason to
      * write through: only memory is.
      */
-    private static function shouldFlushEarly(int $now): bool
+    private static function shouldFlushEarly(int $now, ?bool $inTransaction = null): bool
     {
         $batch = config('logscope.batch', []);
         $maxEntries = (int) ($batch['max_entries'] ?? self::DEFAULT_MAX_ENTRIES);
         $maxAge = (int) ($batch['max_age'] ?? 10);
 
-        if ((new LogEntry)->getConnection()->transactionLevel() > 0) {
+        $inTransaction ??= (new LogEntry)->getConnection()->transactionLevel() > 0;
+
+        if ($inTransaction) {
             // max_entries = 0 turns off the ordinary flush, not this one:
             // the buffer still has to stop growing before the process runs
             // out of memory, so the cap falls back to the default.

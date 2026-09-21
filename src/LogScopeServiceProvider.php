@@ -89,8 +89,8 @@ class LogScopeServiceProvider extends ServiceProvider
      */
     protected function registerServices(): void
     {
-        $this->app->singleton(LogBuffer::class, function ($app) {
-            return new LogBuffer($app);
+        $this->app->singleton(LogBuffer::class, function () {
+            return new LogBuffer;
         });
         $this->app->alias(LogBuffer::class, LogBufferInterface::class);
 

@@ -60,6 +60,10 @@ afterEach(function () {
     Carbon::setTestNow();
     LogEntry::flushEventListeners();
     LogScopeHandler::didHandleCurrentLog();
+
+    // A test that fails mid-buffer would otherwise leave entries in static
+    // state for whichever file runs next in this process.
+    LogBuffer::reset();
 });
 
 function loggedMessages(): array
@@ -101,6 +105,9 @@ it('records when the log happened, not when it was written', function () {
     DB::beginTransaction();
     Log::info('logged early in a long transaction');
 
+    // Without this the test would pass on an immediate write too.
+    expect(loggedCount())->toBe(0);
+
     Carbon::setTestNow('2026-09-21 10:05:00');
     DB::commit();
 
@@ -113,6 +120,8 @@ it('stamps an entry that reaches the writer without a time of its own', function
 
     DB::beginTransaction();
     app(LogWriterInterface::class)->write(['level' => 'info', 'message' => 'no occurred_at']);
+
+    expect(loggedCount())->toBe(0);
 
     Carbon::setTestNow('2026-09-21 10:05:00');
     DB::commit();
@@ -269,7 +278,7 @@ it('writes inside the transaction once the buffer hits its cap', function () {
     expect(loggedCount())->toBe(20);
 });
 
-it('still writes deferred entries for a transaction that never ends', function () {
+it('drains the buffer from the safety-net flush when a transaction never ends', function () {
     DB::beginTransaction();
     Log::info('the process ends before the transaction does');
 
@@ -278,9 +287,16 @@ it('still writes deferred entries for a transaction that never ends', function (
     // Stand-in for the terminate/shutdown/queue-worker flushes.
     LogBuffer::flushStatic();
 
-    expect(loggedMessages())->toBe(['the process ends before the transaction does']);
+    expect(loggedMessages())->toBe(['the process ends before the transaction does'])
+        ->and(LogBuffer::getBuffer())->toBe([]);
 
+    // The limit worth being honest about: the safety net bounds what is held
+    // in memory, but its insert joins the transaction that is still open. A
+    // process that dies before committing loses the row either way — the same
+    // as it did before deferral existed.
     DB::rollBack();
+
+    expect(loggedCount())->toBe(0);
 });
 
 it('lets another connection delete log rows while the app transaction is open', function () {

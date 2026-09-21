@@ -21,7 +21,7 @@ describe('buffer management', function () {
     });
 
     it('adds entries to buffer', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         $buffer->add(['message' => 'first']);
         $buffer->add(['message' => 'second']);
@@ -32,7 +32,7 @@ describe('buffer management', function () {
     });
 
     it('preserves entry data in buffer', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         $data = [
             'level' => 'error',
@@ -49,7 +49,7 @@ describe('buffer management', function () {
 
 describe('reset', function () {
     it('clears the buffer', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         $buffer->add(['message' => 'test']);
         expect(LogBuffer::getBuffer())->toHaveCount(1);
@@ -69,7 +69,7 @@ describe('flushStatic', function () {
     });
 
     it('clears buffer after flush', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
         $buffer->add(['message' => 'test']);
 
         expect(LogBuffer::getBuffer())->toHaveCount(1);
@@ -86,7 +86,7 @@ describe('flushStatic', function () {
     });
 
     it('can be called multiple times safely', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
         $buffer->add(['message' => 'test']);
 
         try {
@@ -102,7 +102,7 @@ describe('flushStatic', function () {
     });
 
     it('does not crash when container is unavailable during shutdown', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
         $buffer->add(['message' => 'test']);
 
         // Destroy the container to simulate PHP shutdown state
@@ -120,7 +120,7 @@ describe('flushStatic', function () {
     });
 
     it('bails out gracefully when db binding is missing', function () {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
         $buffer->add(['message' => 'test']);
 
         // Unbind db to simulate a partially torn-down container
@@ -176,7 +176,7 @@ describe('flushStatic', function () {
         // Keep all 501 entries for one flush, so the second chunk fails within it.
         config(['logscope.batch.max_entries' => 0, 'logscope.batch.max_age' => 0]);
 
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         for ($i = 0; $i < 500; $i++) {
             $buffer->add([
@@ -210,7 +210,7 @@ describe('early flush (#28)', function () {
 
     it('flushes once the buffer reaches max_entries', function () use ($entry, $stored) {
         config(['logscope.batch.max_entries' => 3]);
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         $buffer->add($entry('one'));
         $buffer->add($entry('two'));
@@ -226,7 +226,7 @@ describe('early flush (#28)', function () {
 
     it('flushes once the oldest entry reaches max_age', function () use ($entry, $stored) {
         config(['logscope.batch.max_age' => 10]);
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         $buffer->add($entry('first'));
         $this->travel(9)->seconds();
@@ -242,7 +242,7 @@ describe('early flush (#28)', function () {
     });
 
     it('keeps buffering for the life of the process when both limits are 0', function () use ($entry, $stored) {
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         for ($i = 0; $i < 600; $i++) {
             $buffer->add($entry("entry {$i}"));
@@ -256,7 +256,7 @@ describe('early flush (#28)', function () {
 
     it('does not flush inside a transaction, so a rollback keeps the logs', function () use ($entry, $stored) {
         config(['logscope.batch.max_entries' => 2]);
-        $buffer = new LogBuffer(app());
+        $buffer = new LogBuffer;
 
         DB::beginTransaction();
         $buffer->add($entry('one'));
