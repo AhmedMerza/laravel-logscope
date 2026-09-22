@@ -29,6 +29,16 @@ class LogEntry extends Model
     public const DELETE_CHUNK_SIZE = 1000;
 
     /**
+     * Ceiling on a caller-supplied chunk size.
+     *
+     * Every id in a chunk is bound as its own statement parameter, and each
+     * engine caps how many a statement may carry — around 32,000 on SQLite,
+     * 65,535 on MySQL and Postgres. Staying well under the lowest keeps an
+     * oversized `--chunk` merely slow instead of fatal.
+     */
+    public const MAX_DELETE_CHUNK_SIZE = 10000;
+
+    /**
      * Create a new factory instance for the model.
      */
     protected static function newFactory(): LogEntryFactory
@@ -177,15 +187,29 @@ class LogEntry extends Model
      */
     public static function deleteInChunks(Builder $query, int $chunkSize = self::DELETE_CHUNK_SIZE): int
     {
+        // `--chunk` reaches here straight off the command line. A negative
+        // one the query builder drops altogether, leaving the SELECT
+        // unbounded — the whole-table statement this method exists to
+        // avoid. Zero is worse than it looks: the loop below continues
+        // while the SELECT filled a chunk, and an empty result trivially
+        // "fills" a chunk of zero, so it spins forever. This clamp is load
+        // bearing for termination, not just for sane batch sizes.
+        $chunkSize = max(1, min($chunkSize, self::MAX_DELETE_CHUNK_SIZE));
+
         $deleted = 0;
 
         do {
             $ids = (clone $query)->limit($chunkSize)->pluck('id');
-            $batch = $ids->isEmpty()
-                ? 0
-                : static::query()->whereIn('id', $ids)->delete();
-            $deleted += $batch;
-        } while ($batch > 0);
+
+            if ($ids->isNotEmpty()) {
+                $deleted += static::query()->whereIn('id', $ids)->delete();
+            }
+
+            // Carry on by what the SELECT found, not by what the DELETE
+            // removed. Another session deleting these same ids in between
+            // the two statements would otherwise read as "nothing left"
+            // and strand every row past this chunk.
+        } while ($ids->count() === $chunkSize);
 
         return $deleted;
     }

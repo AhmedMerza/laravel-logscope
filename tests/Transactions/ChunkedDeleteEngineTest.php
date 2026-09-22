@@ -20,21 +20,23 @@ beforeEach(function () {
 
 function seedLevels(int $errors, int $survivors): void
 {
-    LogEntry::insert(array_map(fn ($i) => LogEntry::prepareData([
-        'level' => 'error',
-        'message' => "bulk {$i}",
-        'channel' => 'single',
-    ]), range(1, $errors)));
-
-    if ($survivors < 1) {
-        return;
+    // range(1, 0) counts down and yields [1, 0] rather than an empty array,
+    // so both of these need the guard, not just the second.
+    if ($errors > 0) {
+        LogEntry::insert(array_map(fn ($i) => LogEntry::prepareData([
+            'level' => 'error',
+            'message' => "bulk {$i}",
+            'channel' => 'single',
+        ]), range(1, $errors)));
     }
 
-    LogEntry::insert(array_map(fn ($i) => LogEntry::prepareData([
-        'level' => 'info',
-        'message' => "survivor {$i}",
-        'channel' => 'single',
-    ]), range(1, $survivors)));
+    if ($survivors > 0) {
+        LogEntry::insert(array_map(fn ($i) => LogEntry::prepareData([
+            'level' => 'info',
+            'message' => "survivor {$i}",
+            'channel' => 'single',
+        ]), range(1, $survivors)));
+    }
 }
 
 it('deletes only the filtered rows across several chunks on a real engine', function () {
@@ -46,6 +48,40 @@ it('deletes only the filtered rows across several chunks on a real engine', func
     expect($deleted)->toBe($errors)
         ->and(LogEntry::query()->count())->toBe(5)
         ->and(LogEntry::query()->where('level', 'error')->exists())->toBeFalse();
+});
+
+it('returns zero and issues no delete when nothing matches', function () {
+    // The seeded rows all survive the filter, so the first SELECT comes back
+    // empty. Guards the empty-set path, which every other test seeds past.
+    seedLevels(0, 3);
+
+    $deletes = 0;
+    DB::listen(function ($query) use (&$deletes) {
+        if (str_starts_with(strtolower(trim($query->sql)), 'delete')) {
+            $deletes++;
+        }
+    });
+
+    $deleted = LogEntry::deleteInChunks(LogEntry::query()->where('level', 'error'));
+
+    expect($deleted)->toBe(0)
+        ->and($deletes)->toBe(0)
+        ->and(LogEntry::query()->count())->toBe(3);
+});
+
+it('clamps a chunk size that would defeat chunking', function () {
+    // --chunk reaches deleteInChunks unvalidated. Zero would make every
+    // SELECT empty and report a successful no-op; a negative one the query
+    // builder drops, leaving the SELECT unbounded.
+    seedLevels(5, 2);
+
+    expect(LogEntry::deleteInChunks(LogEntry::query()->where('level', 'error'), 0))->toBe(5)
+        ->and(LogEntry::query()->count())->toBe(2);
+
+    seedLevels(5, 0);
+
+    expect(LogEntry::deleteInChunks(LogEntry::query()->where('level', 'error'), -1))->toBe(5)
+        ->and(LogEntry::query()->count())->toBe(2);
 });
 
 it('prunes past the retention cutoff and keeps the rows on the boundary', function () {

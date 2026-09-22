@@ -7,6 +7,7 @@ declare(strict_types=1);
 // match — no more, no fewer — including across a chunk boundary.
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 
@@ -133,6 +134,42 @@ it('deletes every matching row when the set spans more than one chunk', function
     $response->assertOk();
     expect(remainingMessages())->toBe(['survivor']);
 });
+
+// =============================================================================
+// THE ENDPOINT ACTUALLY USES THE CHUNKED PATH
+// =============================================================================
+
+it('clears by selecting ids and deleting on the primary key, never by filter', function () {
+    // Everything above this passes just as well against a plain
+    // `$query->delete()` — they pin what Clear deletes, not how. This pins
+    // how, because that is the whole point of #46: a DELETE that names the
+    // filter column takes gap locks over the range it scans, and a DELETE
+    // that names primary keys does not.
+    seedEntry(['level' => 'error', 'message' => 'drop']);
+    seedEntry(['level' => 'info', 'message' => 'keep']);
+
+    $statements = [];
+    DB::listen(function ($query) use (&$statements) {
+        $statements[] = $query->sql;
+    });
+
+    $this->postJson('/logscope/api/logs/clear', ['levels' => ['error']])->assertOk();
+
+    $deletes = array_values(array_filter(
+        $statements,
+        fn ($sql) => str_starts_with(strtolower(trim($sql)), 'delete')
+    ));
+
+    expect($deletes)->not->toBeEmpty();
+
+    foreach ($deletes as $sql) {
+        expect($sql)->toContain('"id" in')
+            ->and($sql)->not->toContain('"level"');
+    }
+})->skip(
+    fn () => DB::getDriverName() !== 'sqlite',
+    'Asserts on SQLite identifier quoting',
+);
 
 it('reports the total deleted across all chunks, not just the last one', function () {
     $total = LogEntry::DELETE_CHUNK_SIZE + 3;
