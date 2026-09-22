@@ -419,7 +419,7 @@ class LogController extends Controller
             $query->status((array) $request->input('statuses'));
         }
 
-        $deleted = $query->delete();
+        $deleted = LogEntry::deleteInChunks($query);
 
         $this->clearFilterCaches();
 

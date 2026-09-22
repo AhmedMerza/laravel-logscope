@@ -53,7 +53,7 @@ class ImportCommand extends Command
         // Clear existing logs if --fresh
         if ($fresh) {
             if ($this->confirm('This will delete all existing log entries. Continue?', false)) {
-                $deleted = LogEntry::query()->delete();
+                $deleted = LogEntry::deleteInChunks(LogEntry::query());
                 $this->components->info("Deleted {$deleted} existing log entries.");
             } else {
                 return self::SUCCESS;

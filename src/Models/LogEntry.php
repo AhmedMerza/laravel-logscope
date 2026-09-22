@@ -22,6 +22,23 @@ class LogEntry extends Model
     use Prunable;
 
     /**
+     * Rows deleted per statement by {@see self::deleteInChunks()}.
+     *
+     * Matches the default `logscope:prune --chunk` uses.
+     */
+    public const DELETE_CHUNK_SIZE = 1000;
+
+    /**
+     * Ceiling on a caller-supplied chunk size.
+     *
+     * Every id in a chunk is bound as its own statement parameter, and each
+     * engine caps how many a statement may carry — around 32,000 on SQLite,
+     * 65,535 on MySQL and Postgres. Staying well under the lowest keeps an
+     * oversized `--chunk` merely slow instead of fatal.
+     */
+    public const MAX_DELETE_CHUNK_SIZE = 10000;
+
+    /**
      * Create a new factory instance for the model.
      */
     protected static function newFactory(): LogEntryFactory
@@ -151,6 +168,50 @@ class LogEntry extends Model
         $days = config('logscope.retention.days', 30);
 
         return static::query()->where('occurred_at', '<', now()->subDays($days));
+    }
+
+    /**
+     * Delete everything the query matches, in bounded chunks (#46).
+     *
+     * The ids are read first with a plain SELECT, then deleted by primary
+     * key. Deleting by the filter directly makes MySQL lock every row and
+     * gap it scans, so it waits on any row another session has inserted but
+     * not committed — measured as a lock wait timeout even in chunks. An
+     * MVCC read never sees that row, so it stays out of the id list, and a
+     * delete by primary key touches only the rows it names.
+     *
+     * Not absolute: on a table small enough that InnoDB prefers a full scan
+     * to primary-key lookups, the delete scans and waits again. It narrows
+     * the window rather than closing it — #45 is what keeps LogScope's own
+     * writes out of the app's transaction in the first place.
+     */
+    public static function deleteInChunks(Builder $query, int $chunkSize = self::DELETE_CHUNK_SIZE): int
+    {
+        // `--chunk` reaches here straight off the command line. A negative
+        // one the query builder drops altogether, leaving the SELECT
+        // unbounded — the whole-table statement this method exists to
+        // avoid. Zero is worse than it looks: the loop below continues
+        // while the SELECT filled a chunk, and an empty result trivially
+        // "fills" a chunk of zero, so it spins forever. This clamp is load
+        // bearing for termination, not just for sane batch sizes.
+        $chunkSize = max(1, min($chunkSize, self::MAX_DELETE_CHUNK_SIZE));
+
+        $deleted = 0;
+
+        do {
+            $ids = (clone $query)->limit($chunkSize)->pluck('id');
+
+            if ($ids->isNotEmpty()) {
+                $deleted += static::query()->whereIn('id', $ids)->delete();
+            }
+
+            // Carry on by what the SELECT found, not by what the DELETE
+            // removed. Another session deleting these same ids in between
+            // the two statements would otherwise read as "nothing left"
+            // and strand every row past this chunk.
+        } while ($ids->count() === $chunkSize);
+
+        return $deleted;
     }
 
     /**

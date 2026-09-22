@@ -74,17 +74,14 @@ class PruneCommand extends Command
             return self::SUCCESS;
         }
 
-        // Delete in chunks to avoid memory issues with large datasets
+        // Delete in chunks, by id, so the statements stay short and don't
+        // wait on rows another session has open (#46).
         $deleted = 0;
         $this->components->task('Pruning old log entries', function () use ($cutoff, $chunkSize, &$deleted) {
-            do {
-                $batch = LogEntry::query()
-                    ->where('occurred_at', '<', $cutoff)
-                    ->limit($chunkSize)
-                    ->delete();
-
-                $deleted += $batch;
-            } while ($batch > 0);
+            $deleted = LogEntry::deleteInChunks(
+                LogEntry::query()->where('occurred_at', '<', $cutoff),
+                $chunkSize,
+            );
 
             return true;
         });
