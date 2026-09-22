@@ -902,7 +902,7 @@ LOGSCOPE_CAPTURE_HEADERS=true
 
 ### Watchtower
 
-Block malicious IPs directly from the LogScope UI and sync the blacklist across all your environments automatically. (Previously named `ahmedmerza/logscope-guard`.)
+Block malicious IPs and sync the blacklist across all your environments automatically. Blocking is done from Watchtower's own dashboard — LogScope shows you the traffic, Watchtower acts on it. (Previously named `ahmedmerza/logscope-guard`.)
 
 ```bash
 composer require ahmedmerza/watchtower
