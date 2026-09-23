@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
+use LogScope\Concerns\ResolvesStatuses;
 use LogScope\Enums\LogStatus;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
@@ -16,6 +17,8 @@ use LogScope\Services\WriteFailureLogger;
 
 class LogController extends Controller
 {
+    use ResolvesStatuses;
+
     /**
      * Display the log viewer.
      */
@@ -38,6 +41,11 @@ class LogController extends Controller
                 'autoCollapseKeys' => config('logscope.json_viewer.auto_collapse_keys', ['trace', 'stack_trace', 'stacktrace', 'backtrace']),
             ],
             'shortcuts' => $this->getShortcuts(),
+            'grouping' => [
+                // Whether the list opens in the grouped view. Groups are
+                // recorded either way — this only picks the default tab (#29).
+                'enabled' => (bool) config('logscope.grouping.enabled', true),
+            ],
             'failureBanner' => config('logscope.failure_banner.enabled', true)
                 ? WriteFailureLogger::recentFailures()
                 : null,
@@ -553,26 +561,6 @@ class LogController extends Controller
         }
 
         return $options;
-    }
-
-    /**
-     * Get all valid status values (built-in + custom).
-     */
-    protected function getValidStatuses(): array
-    {
-        $statuses = array_column(LogStatus::cases(), 'value');
-
-        // Add custom statuses from config
-        $configStatuses = config('logscope.statuses', []);
-        $builtInValues = array_column(LogStatus::cases(), 'value');
-
-        foreach (array_keys($configStatuses) as $value) {
-            if (! in_array($value, $builtInValues)) {
-                $statuses[] = $value;
-            }
-        }
-
-        return $statuses;
     }
 
     /**

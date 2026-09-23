@@ -316,10 +316,33 @@ class LogBuffer implements LogBufferInterface
             try {
                 $rows = array_map(fn ($data) => LogEntry::prepareData($data, $limits), $originalChunk);
                 TransactionSavepoint::around(fn () => LogEntry::insert(self::normalizeChunk($rows)));
+                self::recordGroups($rows);
             } catch (Throwable $e) {
                 WriteFailureLogger::report($e, 'buffer-flush');
                 self::writeFallbackForChunk($originalChunk, $e);
             }
+        }
+    }
+
+    /**
+     * Roll the chunk up into log_groups (#29), after its entries are safely
+     * written and in a savepoint of its own.
+     *
+     * Deliberately not inside the insert's savepoint, and deliberately not
+     * allowed to propagate: the entries are the record, the groups are derived
+     * from them. A failure here — a missing log_groups table on an install
+     * that hasn't migrated, say — must not roll back or discard 500 logs that
+     * inserted cleanly. Counts drifting is recoverable, and
+     * `logscope:doctor` reports it; losing the logs is not.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private static function recordGroups(array $rows): void
+    {
+        try {
+            TransactionSavepoint::around(fn () => GroupRecorder::record($rows));
+        } catch (Throwable $e) {
+            WriteFailureLogger::report($e, 'group-recorder');
         }
     }
 

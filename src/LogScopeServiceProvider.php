@@ -10,6 +10,7 @@ use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\ServiceProvider;
+use LogScope\Console\Commands\BackfillFingerprintsCommand;
 use LogScope\Console\Commands\DoctorCommand;
 use LogScope\Console\Commands\ImportCommand;
 use LogScope\Console\Commands\InstallCommand;
@@ -472,6 +473,7 @@ class LogScopeServiceProvider extends ServiceProvider
                 SeedCommand::class,
                 DoctorCommand::class,
                 TestCommand::class,
+                BackfillFingerprintsCommand::class,
             ]);
         }
     }

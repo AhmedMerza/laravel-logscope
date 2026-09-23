@@ -169,6 +169,7 @@ describe('flushStatic', function () {
             $table->text('message_preview')->nullable();
             $table->timestamp('occurred_at');
             $table->string('status');
+            $table->string('fingerprint', 40)->nullable();
             $table->boolean('is_truncated')->default(false);
             $table->timestamp('created_at')->nullable();
         });

@@ -20,6 +20,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | LogScope Groups Table
+    |--------------------------------------------------------------------------
+    |
+    | Table holding one row per distinct issue — the rollup of every entry
+    | sharing a fingerprint. Same schema-qualification rules as 'table'.
+    |
+    */
+
+    'groups_table' => env('LOGSCOPE_GROUPS_TABLE', 'log_groups'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention Policy
     |--------------------------------------------------------------------------
     |
@@ -230,6 +242,37 @@ return [
         'notes' => env('LOGSCOPE_FEATURE_NOTES', true),
         'search_syntax' => env('LOGSCOPE_FEATURE_SEARCH_SYNTAX', true),
         'regex' => env('LOGSCOPE_FEATURE_REGEX', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Grouping
+    |--------------------------------------------------------------------------
+    |
+    | Entries sharing a fingerprint are the same issue, and triage — status
+    | and notes — applies to the group rather than to each occurrence.
+    |
+    | 'enabled' is a VIEW setting, not a capture setting. Fingerprints and
+    | log_groups rows are written either way; turning this off only makes the
+    | flat entry list the default and hides the Grouped/All toggle. That is
+    | deliberate: status lives on the group, so a mode where groups did not
+    | exist would need a second, separate status implementation for the flat
+    | list, and the two would drift. The cost of always recording is three
+    | statements per batch flush, whatever the batch size.
+    |
+    | 'regression' - When a Resolved group sees a new occurrence it reopens and
+    |                records regressed_at, so an error that comes back is
+    |                visible again instead of staying hidden behind the status
+    |                you gave it last week. Ignored groups are never reopened;
+    |                that is the difference between the two closed statuses.
+    |                Applies to the built-in 'resolved' status only — a custom
+    |                closed status from the 'statuses' block stays as it is.
+    |
+    */
+
+    'grouping' => [
+        'enabled' => env('LOGSCOPE_GROUPING_ENABLED', true),
+        'regression' => env('LOGSCOPE_GROUPING_REGRESSION', true),
     ],
 
     /*
