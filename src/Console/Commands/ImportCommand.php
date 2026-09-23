@@ -6,6 +6,7 @@ namespace LogScope\Console\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Models\LogEntry;
 use LogScope\Services\LogParser;
@@ -220,7 +221,7 @@ class ImportCommand extends Command
         }
 
         return [
-            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'id' => (string) Str::ulid(),
             'level' => $entry['level'],
             'message' => $entry['message'],
             'message_preview' => $messagePreview,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Middleware\TrustProxies;
 use LogScope\Http\Middleware\CaptureRequestContext;
+use LogScope\LogScopeServiceProvider;
 use LogScope\Tests\Fixtures\StubGlobalMiddleware;
 
 /**
@@ -12,7 +13,7 @@ use LogScope\Tests\Fixtures\StubGlobalMiddleware;
  */
 function registerMiddlewareAgain(): void
 {
-    $provider = new \LogScope\LogScopeServiceProvider(app());
+    $provider = new LogScopeServiceProvider(app());
 
     $method = (new ReflectionClass($provider))->getMethod('registerMiddleware');
     $method->setAccessible(true);
@@ -76,7 +77,7 @@ it('does not crash when the HTTP kernel is unavailable', function () {
     // boot.
     $this->app->offsetUnset(Kernel::class);
 
-    expect(fn () => registerMiddlewareAgain())->not->toThrow(\Throwable::class);
+    expect(fn () => registerMiddlewareAgain())->not->toThrow(Throwable::class);
 });
 
 it('falls back to prepending on a kernel that only supports prependMiddleware', function () {
@@ -105,5 +106,5 @@ it('does not crash when the resolved kernel exposes no middleware API at all', f
         // intentionally empty — no prependMiddleware/getGlobalMiddleware
     });
 
-    expect(fn () => registerMiddlewareAgain())->not->toThrow(\Throwable::class);
+    expect(fn () => registerMiddlewareAgain())->not->toThrow(Throwable::class);
 });

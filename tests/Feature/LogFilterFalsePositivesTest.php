@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Log;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
@@ -77,7 +78,7 @@ describe('ignore.deprecations substring false positive', function () {
         // list (default: ['deprecations']).
         setChannelAsFresh('deprecations');
 
-        event(new \Illuminate\Log\Events\MessageLogged(
+        event(new MessageLogged(
             'warning',
             'strpos(): Passing null to parameter #1 is deprecated',
             []
@@ -94,7 +95,7 @@ describe('ignore.deprecations substring false positive', function () {
 
         setChannelAsFresh('php-deprecations');
 
-        event(new \Illuminate\Log\Events\MessageLogged('warning', 'a deprecation', []));
+        event(new MessageLogged('warning', 'a deprecation', []));
 
         // The default 'deprecations' name is no longer in the list, but our
         // custom name is — log should be ignored.
@@ -112,7 +113,7 @@ describe('ignore.deprecations substring false positive', function () {
         // 'application' isn't in the deprecation_channels list and the
         // message lacks the "on line N" suffix that PHP-runtime
         // deprecations always have — log must be captured.
-        event(new \Illuminate\Log\Events\MessageLogged(
+        event(new MessageLogged(
             'warning',
             'feature flag x is deprecated',
             []
@@ -131,7 +132,7 @@ describe('ignore.deprecations substring false positive', function () {
         config(['logscope.ignore.deprecations' => true]);
 
         // Channel is null/empty (processor wasn't attached at boot time).
-        event(new \Illuminate\Log\Events\MessageLogged(
+        event(new MessageLogged(
             'warning',
             'strpos(): Passing null to parameter #1 ($haystack) of type string is deprecated in /vendor/pkg/file.php on line 42',
             []
@@ -154,7 +155,7 @@ describe('ignore.deprecations substring false positive', function () {
         ];
 
         foreach ($messages as $message) {
-            event(new \Illuminate\Log\Events\MessageLogged('warning', $message, []));
+            event(new MessageLogged('warning', $message, []));
         }
 
         expect(LogEntry::count())->toBe(count($messages));

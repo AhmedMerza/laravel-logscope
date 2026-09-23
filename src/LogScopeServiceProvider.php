@@ -9,7 +9,11 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Octane\Events\RequestReceived;
+use Laravel\Octane\Events\RequestTerminated;
 use LogScope\Console\Commands\BackfillFingerprintsCommand;
 use LogScope\Console\Commands\DoctorCommand;
 use LogScope\Console\Commands\ImportCommand;
@@ -22,12 +26,14 @@ use LogScope\Contracts\LogBufferInterface;
 use LogScope\Contracts\LogWriterInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\Logging\AddChannelToContext;
+use LogScope\Logging\ChannelContextProcessor;
 use LogScope\Models\LogEntry;
 use LogScope\Services\ContextSanitizer;
 use LogScope\Services\FallbackWriter;
 use LogScope\Services\LogBuffer;
 use LogScope\Services\LogCapture;
 use LogScope\Services\LogWriter;
+use LogScope\Services\WriteGuard;
 
 class LogScopeServiceProvider extends ServiceProvider
 {
@@ -341,14 +347,14 @@ class LogScopeServiceProvider extends ServiceProvider
      */
     protected function registerOctaneStateReset(): void
     {
-        if (! class_exists(\Laravel\Octane\Events\RequestReceived::class)) {
+        if (! class_exists(RequestReceived::class)) {
             return;
         }
 
         $this->app['events']->listen(
-            \Laravel\Octane\Events\RequestReceived::class,
+            RequestReceived::class,
             function (): void {
-                \LogScope\Logging\ChannelContextProcessor::clearLastChannel();
+                ChannelContextProcessor::clearLastChannel();
                 FallbackWriter::reset();
             }
         );
@@ -440,20 +446,20 @@ class LogScopeServiceProvider extends ServiceProvider
             LogBuffer::markShutdownFunctionRegistered();
         }
 
-        if (class_exists(\Laravel\Octane\Events\RequestTerminated::class)) {
+        if (class_exists(RequestTerminated::class)) {
             $this->app['events']->listen(
-                \Laravel\Octane\Events\RequestTerminated::class,
+                RequestTerminated::class,
                 $flushSafely
             );
         }
 
         // Looping is dispatched with events->until(), so a listener returning
         // false would pause the worker — $flushSafely returns null.
-        if (class_exists(\Illuminate\Queue\Events\Looping::class)) {
+        if (class_exists(Looping::class)) {
             $this->app['events']->listen(
                 [
-                    \Illuminate\Queue\Events\Looping::class,
-                    \Illuminate\Queue\Events\WorkerStopping::class,
+                    Looping::class,
+                    WorkerStopping::class,
                 ],
                 $flushSafely
             );
@@ -553,6 +559,6 @@ class LogScopeServiceProvider extends ServiceProvider
     public static function resetBufferState(): void
     {
         LogBuffer::reset();
-        \LogScope\Services\WriteGuard::reset();
+        WriteGuard::reset();
     }
 }

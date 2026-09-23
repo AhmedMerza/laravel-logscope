@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use LogScope\Models\LogEntry;
 
 uses(RefreshDatabase::class);
@@ -40,11 +41,11 @@ it('generates preview for long messages', function () {
 });
 
 it('filters by trace_id (full UUID uses exact match)', function () {
-    $traceId = \Illuminate\Support\Str::uuid()->toString();
+    $traceId = Str::uuid()->toString();
 
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 1', 'trace_id' => $traceId]);
     LogEntry::createEntry(['level' => 'info', 'message' => 'Test 2', 'trace_id' => $traceId]);
-    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'trace_id' => \Illuminate\Support\Str::uuid()->toString()]);
+    LogEntry::createEntry(['level' => 'info', 'message' => 'Test 3', 'trace_id' => Str::uuid()->toString()]);
 
     expect(LogEntry::traceId($traceId)->count())->toBe(2);
 

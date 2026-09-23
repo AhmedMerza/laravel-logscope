@@ -83,9 +83,9 @@ it('isolates a throwing capture-context callback so the underlying log still lan
     // ErrorException. Without isolation, that throw cascades into the
     // outer write try/catch and the original log is silently lost.
     LogScope::captureContext(function ($request) {
-        $obj = new \stdClass; // no `id` property — accessing throws via __get? actually returns null on stdClass
+        $obj = new stdClass; // no `id` property — accessing throws via __get? actually returns null on stdClass
         // Force a real Undefined-property-style error via throw
-        throw new \ErrorException('Undefined property: Laravel\\Sanctum\\TransientToken::$id');
+        throw new ErrorException('Undefined property: Laravel\\Sanctum\\TransientToken::$id');
     });
 
     $request = Request::create('/test');

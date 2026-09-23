@@ -8,10 +8,12 @@ use Illuminate\Console\Command;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Middleware\TrustProxies;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Octane\Events\RequestReceived;
+use Laravel\Octane\Events\RequestTerminated;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
@@ -154,7 +156,7 @@ class DoctorCommand extends Command
         $mode = (string) config('logscope.capture', 'all');
 
         if ($mode === 'all') {
-            $this->markPass('Capture mode', "all (global MessageLogged listener)");
+            $this->markPass('Capture mode', 'all (global MessageLogged listener)');
 
             return;
         }
@@ -163,7 +165,7 @@ class DoctorCommand extends Command
             $channels = (array) config('logging.channels', []);
 
             if (! isset($channels['logscope'])) {
-                $this->markFail('Capture mode', "channel mode is set but no `logscope` channel is defined in config/logging.php");
+                $this->markFail('Capture mode', 'channel mode is set but no `logscope` channel is defined in config/logging.php');
 
                 return;
             }
@@ -209,7 +211,7 @@ class DoctorCommand extends Command
         $driver = $known[$connectionName]['driver'] ?? 'unknown';
 
         if ($driver === 'sync') {
-            $this->markWarn('Write mode', "queue mode using `sync` driver — writes happen inline, no worker needed");
+            $this->markWarn('Write mode', 'queue mode using `sync` driver — writes happen inline, no worker needed');
 
             return;
         }
@@ -444,14 +446,14 @@ class DoctorCommand extends Command
 
     protected function checkOctaneIntegration(): void
     {
-        if (! class_exists(\Laravel\Octane\Events\RequestTerminated::class)) {
+        if (! class_exists(RequestTerminated::class)) {
             $this->markPass('Octane', 'not installed — nothing to do');
 
             return;
         }
 
-        $hasTerminated = Event::hasListeners(\Laravel\Octane\Events\RequestTerminated::class);
-        $hasReceived = Event::hasListeners(\Laravel\Octane\Events\RequestReceived::class);
+        $hasTerminated = Event::hasListeners(RequestTerminated::class);
+        $hasReceived = Event::hasListeners(RequestReceived::class);
 
         if (! $hasTerminated || ! $hasReceived) {
             $missing = [];

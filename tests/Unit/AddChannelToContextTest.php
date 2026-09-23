@@ -5,6 +5,8 @@ use LogScope\Logging\AddChannelToContext;
 use LogScope\Logging\ChannelContextProcessor;
 use Monolog\Handler\NullHandler;
 use Monolog\Logger as MonologLogger;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LoggerTrait;
 
 it('adds ChannelContextProcessor with channel name to monolog logger', function () {
     $monolog = new MonologLogger('test-channel');
@@ -36,11 +38,11 @@ it('passes the channel name to the processor', function () {
 
 it('does not fail if logger is not monolog', function () {
     // Create a mock logger that is not Monolog
-    $mockPsrLogger = new class implements \Psr\Log\LoggerInterface
+    $mockPsrLogger = new class implements LoggerInterface
     {
-        use \Psr\Log\LoggerTrait;
+        use LoggerTrait;
 
-        public function log($level, \Stringable|string $message, array $context = []): void
+        public function log($level, Stringable|string $message, array $context = []): void
         {
             // No-op
         }

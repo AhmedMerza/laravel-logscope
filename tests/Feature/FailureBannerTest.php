@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Container\Container;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScope;
@@ -48,13 +52,13 @@ afterEach(function () {
 it('writes a cache breadcrumb on each reported failure', function () {
     Schema::drop('log_entries');
 
-    \Illuminate\Support\Facades\Log::error('boom');
+    Log::error('boom');
 
     $banner = WriteFailureLogger::recentFailures();
 
     expect($banner)->not->toBeNull()
         ->and($banner['count'])->toBe(1)
-        ->and($banner['last_class'])->toBe(\Illuminate\Database\QueryException::class)
+        ->and($banner['last_class'])->toBe(QueryException::class)
         ->and($banner['last_where'])->toBe('listener')
         ->and($banner['last_at'])->not->toBe('');
 });
@@ -63,7 +67,7 @@ it('increments the count across multiple failures', function () {
     Schema::drop('log_entries');
 
     for ($i = 0; $i < 3; $i++) {
-        \Illuminate\Support\Facades\Log::error('repeat');
+        Log::error('repeat');
     }
 
     $banner = WriteFailureLogger::recentFailures();
@@ -76,7 +80,7 @@ it('returns null when there are no recent failures', function () {
 
 it('dismissFailures clears the cached breadcrumb', function () {
     Schema::drop('log_entries');
-    \Illuminate\Support\Facades\Log::error('boom');
+    Log::error('boom');
 
     expect(WriteFailureLogger::recentFailures())->not->toBeNull();
 
@@ -89,20 +93,20 @@ it('returns null gracefully when the cache binding is missing', function () {
     // Simulate cache being unavailable. We can't unbind 'cache' easily
     // without breaking other parts of the app, so we use a stubbed
     // container. recentFailures() must not throw.
-    $original = \Illuminate\Container\Container::getInstance();
-    $stub = new \Illuminate\Container\Container;
-    \Illuminate\Container\Container::setInstance($stub);
+    $original = Container::getInstance();
+    $stub = new Container;
+    Container::setInstance($stub);
 
     try {
         expect(WriteFailureLogger::recentFailures())->toBeNull();
     } finally {
-        \Illuminate\Container\Container::setInstance($original);
+        Container::setInstance($original);
     }
 });
 
 it('the dismiss endpoint clears the breadcrumb and returns ok', function () {
     Schema::drop('log_entries');
-    \Illuminate\Support\Facades\Log::error('boom');
+    Log::error('boom');
 
     expect(WriteFailureLogger::recentFailures())->not->toBeNull();
 
@@ -115,7 +119,7 @@ it('the dismiss endpoint clears the breadcrumb and returns ok', function () {
 it('persists the breadcrumb forever by default (no TTL config)', function () {
     config(['logscope.failure_banner.ttl_seconds' => null]);
 
-    WriteFailureLogger::report(new \RuntimeException('forever'), 'test');
+    WriteFailureLogger::report(new RuntimeException('forever'), 'test');
 
     // The cache key should be stored without a TTL — Laravel's array
     // cache doesn't expose TTL inspection, but we can verify the value
@@ -136,7 +140,7 @@ it('honors a configured ttl_seconds when set', function () {
     // travel; behavior there is verified manually rather than in CI.
     config(['logscope.failure_banner.ttl_seconds' => 10]);
 
-    WriteFailureLogger::report(new \RuntimeException('temporary'), 'test');
+    WriteFailureLogger::report(new RuntimeException('temporary'), 'test');
 
     expect(WriteFailureLogger::recentFailures())->not->toBeNull();
 
@@ -148,7 +152,7 @@ it('honors a configured ttl_seconds when set', function () {
 it('truncates very long error messages before caching', function () {
     $longMessage = str_repeat('A', 800).'_END';
 
-    WriteFailureLogger::report(new \RuntimeException($longMessage), 'test');
+    WriteFailureLogger::report(new RuntimeException($longMessage), 'test');
 
     $banner = WriteFailureLogger::recentFailures();
 
@@ -158,13 +162,13 @@ it('truncates very long error messages before caching', function () {
 });
 
 it('records first_at on the first failure and preserves it across subsequent reports', function () {
-    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-30 12:00:00'));
-    WriteFailureLogger::report(new \RuntimeException('first'), 'test');
+    $this->travelTo(Carbon::parse('2026-04-30 12:00:00'));
+    WriteFailureLogger::report(new RuntimeException('first'), 'test');
 
     $firstAt = WriteFailureLogger::recentFailures()['first_at'];
 
-    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-30 12:30:00'));
-    WriteFailureLogger::report(new \RuntimeException('second'), 'test');
+    $this->travelTo(Carbon::parse('2026-04-30 12:30:00'));
+    WriteFailureLogger::report(new RuntimeException('second'), 'test');
 
     $banner = WriteFailureLogger::recentFailures();
 
@@ -177,7 +181,7 @@ it('respects the failure_banner.enabled config in the index view', function () {
     // Write a breadcrumb directly without breaking the schema — the index
     // controller queries log_entries to populate filter dropdowns and would
     // fail before reaching our viewData if the table is gone.
-    WriteFailureLogger::report(new \RuntimeException('forced'), 'test-injection');
+    WriteFailureLogger::report(new RuntimeException('forced'), 'test-injection');
 
     // Banner enabled: index gets the breadcrumb
     config(['logscope.failure_banner.enabled' => true]);

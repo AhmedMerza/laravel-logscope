@@ -7,6 +7,7 @@ use Illuminate\Queue\Events\Looping;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Octane\Events\RequestTerminated;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
@@ -44,7 +45,7 @@ it('flushes the buffer before a later-registered terminate callback that throws'
 
     try {
         $this->app->terminate();
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // Expected — the user's callback threw. Our flush should already
         // have completed by then.
     }
@@ -78,11 +79,11 @@ it('the safe flush wrapper swallows its own exceptions instead of breaking the t
 });
 
 it('registers the Octane RequestTerminated listener when Octane is installed', function () {
-    if (! class_exists(\Laravel\Octane\Events\RequestTerminated::class)) {
+    if (! class_exists(RequestTerminated::class)) {
         $this->markTestSkipped('Laravel Octane is not installed in the test environment.');
     }
 
-    expect($this->app['events']->hasListeners(\Laravel\Octane\Events\RequestTerminated::class))->toBeTrue();
+    expect($this->app['events']->hasListeners(RequestTerminated::class))->toBeTrue();
 });
 
 it('flushes the buffer each time a queue worker loops, without pausing the worker (#28)', function () {

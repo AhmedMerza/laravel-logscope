@@ -6,6 +6,7 @@ namespace LogScope\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use LogScope\Models\LogEntry;
 
 class SeedCommand extends Command
 {
@@ -49,7 +50,7 @@ class SeedCommand extends Command
     {
         $this->info("Generating {$count} log entries using factory...");
 
-        $factory = \LogScope\Models\LogEntry::factory();
+        $factory = LogEntry::factory();
 
         if ($level) {
             $factory = $factory->level($level);

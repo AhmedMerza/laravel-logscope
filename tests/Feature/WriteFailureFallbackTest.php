@@ -7,7 +7,9 @@ declare(strict_types=1);
 // minimal *fallback* row to log_entries so the failure is visible in the UI
 // — not just in php-fpm's error_log.
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -64,7 +66,7 @@ function poisonNormalInserts(): void
     LogEntry::creating(function (LogEntry $entry) {
         $context = is_array($entry->context) ? $entry->context : [];
         if (! isset($context['_logscope_write_failure'])) {
-            throw new \Error('Class "OwenIt\\Auditing\\Models\\Audit" not found');
+            throw new Error('Class "OwenIt\\Auditing\\Models\\Audit" not found');
         }
     });
 }
@@ -188,7 +190,7 @@ it('writes a fallback row when batch buffer flush fails', function () {
     {
         public array $calls = [];
 
-        public function record(array $data, \Throwable $e, string $where): void
+        public function record(array $data, Throwable $e, string $where): void
         {
             $this->calls[] = ['data' => $data, 'exception_class' => get_class($e), 'where' => $where];
         }
@@ -231,8 +233,8 @@ it('reads request context from Laravel Context when recordFromEvent is called', 
     ]);
 
     $fallback = app(FallbackWriter::class);
-    $event = new \Illuminate\Log\Events\MessageLogged('error', 'pre-build failure', []);
-    $fallback->recordFromEvent($event, 'mychan', new \Error('Class X not found'), 'listener');
+    $event = new MessageLogged('error', 'pre-build failure', []);
+    $fallback->recordFromEvent($event, 'mychan', new Error('Class X not found'), 'listener');
 
     $entry = LogEntry::query()->first();
     expect($entry)->not->toBeNull()
@@ -251,8 +253,8 @@ it('writes a separate fallback row for each unique throw site', function () {
     // be invisible.
     $fallback = app(FallbackWriter::class);
 
-    $fallback->record(['level' => 'error', 'message' => 'one'], new \RuntimeException('a'), 'listener');
-    $fallback->record(['level' => 'error', 'message' => 'two'], new \LogicException('b'), 'listener');
+    $fallback->record(['level' => 'error', 'message' => 'one'], new RuntimeException('a'), 'listener');
+    $fallback->record(['level' => 'error', 'message' => 'two'], new LogicException('b'), 'listener');
 
     expect(LogEntry::query()->count())->toBe(2);
 });
@@ -285,7 +287,7 @@ it('re-throws transient QueryException so Laravel retries the queue job', functi
     // catch-all did — defeats the queue's transient-error contract.
     $job = new WriteLogEntry(['level' => 'error', 'message' => 'transient']);
 
-    $pdo = new class extends \PDOException
+    $pdo = new class extends PDOException
     {
         public function __construct()
         {
@@ -293,13 +295,13 @@ it('re-throws transient QueryException so Laravel retries the queue job', functi
             $this->code = '08006';
         }
     };
-    $transient = new \Illuminate\Database\QueryException('sqlite', 'SELECT 1', [], $pdo);
+    $transient = new QueryException('sqlite', 'SELECT 1', [], $pdo);
 
     LogEntry::creating(function () use ($transient) {
         throw $transient;
     });
 
-    expect(fn () => $job->handle())->toThrow(\Illuminate\Database\QueryException::class);
+    expect(fn () => $job->handle())->toThrow(QueryException::class);
 
     // Critical: no fallback row was written. If the retry succeeds, we'd
     // otherwise have a duplicate (one fallback marker + one real entry).
@@ -314,7 +316,7 @@ it('swallows persistent failures in the queue worker and writes a fallback row',
 
     poisonNormalInserts();
 
-    expect(fn () => $job->handle())->not->toThrow(\Throwable::class);
+    expect(fn () => $job->handle())->not->toThrow(Throwable::class);
     expect(LogEntry::query()->count())->toBe(1);
 });
 
@@ -326,7 +328,7 @@ it('survives a missing or broken FallbackWriter binding during batch flush', fun
     config(['logscope.write_mode' => 'batch']);
 
     app()->bind(FallbackWriter::class, function () {
-        throw new \Exception('intentionally broken container resolution');
+        throw new Exception('intentionally broken container resolution');
     });
 
     Log::error('batched');
@@ -334,7 +336,7 @@ it('survives a missing or broken FallbackWriter binding during batch flush', fun
     Schema::drop('log_entries');
 
     expect(fn () => LogScopeServiceProvider::flushLogBufferStatic())
-        ->not->toThrow(\Throwable::class);
+        ->not->toThrow(Throwable::class);
 });
 
 it('reset() clears the occurrence map so dedupe restarts (Octane request-boundary contract)', function () {
