@@ -12,8 +12,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use LogScope\Casts\LogStatusCast;
 use LogScope\Database\Factories\LogEntryFactory;
 use LogScope\Enums\LogStatus;
+use LogScope\Services\Fingerprint;
+use LogScope\Services\GroupRecorder;
+use LogScope\Services\WriteFailureLogger;
+use Throwable;
 
 class LogEntry extends Model
 {
@@ -56,7 +61,7 @@ class LogEntry extends Model
             'occurred_at' => 'datetime',
             'created_at' => 'datetime',
             'status_changed_at' => 'datetime',
-            'status' => LogStatus::class,
+            'status' => LogStatusCast::class,
             'is_truncated' => 'boolean',
         ];
     }
@@ -151,7 +156,7 @@ class LogEntry extends Model
     {
         try {
             return config('logscope.table', 'log_entries');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'log_entries';
         }
     }
@@ -465,7 +470,7 @@ class LogEntry extends Model
      */
     public function needsAttention(): bool
     {
-        return ! $this->status->isClosed();
+        return ! LogStatus::isClosedValue($this->status);
     }
 
     /**
@@ -481,12 +486,8 @@ class LogEntry extends Model
      */
     public function setStatus(LogStatus|string $status, ?string $changedBy = null, ?string $note = null): bool
     {
-        if (is_string($status)) {
-            $status = LogStatus::from($status);
-        }
-
         $data = [
-            'status' => $status->value,
+            'status' => LogStatus::valueOf($status),
             'status_changed_at' => now(),
         ];
 
@@ -531,6 +532,15 @@ class LogEntry extends Model
         if (empty($limits)) {
             $limits = config('logscope.limits', []);
         }
+
+        // Fingerprint first, from the attributes as they arrived (#29).
+        // Context is JSON-encoded further down, and Fingerprint needs the
+        // array to find an exception in it — computing this any later would
+        // silently fall through to the message path and hash a batch-written
+        // entry differently from the same log written in sync mode, splitting
+        // one error across two groups. A caller that already has one (the
+        // backfill command) keeps it.
+        $attributes['fingerprint'] ??= Fingerprint::for($attributes);
 
         $timestamp = date('Y-m-d H:i:s');
 
@@ -620,6 +630,10 @@ class LogEntry extends Model
     {
         $limits = config('logscope.limits', []);
 
+        // Fingerprint from the attributes as they arrived, for the same
+        // reason prepareData() does — the two paths must agree (#29).
+        $attributes['fingerprint'] ??= Fingerprint::for($attributes);
+
         // Generate message preview
         if (isset($attributes['message'])) {
             $maxPreview = $limits['message_preview_length'] ?? 500;
@@ -663,6 +677,32 @@ class LogEntry extends Model
             $attributes['status'] = LogStatus::Open->value;
         }
 
-        return static::create($attributes);
+        $entry = static::create($attributes);
+
+        static::recordGroup($attributes);
+
+        return $entry;
+    }
+
+    /**
+     * Roll this entry up into its group (#29), for the sync and queue write
+     * paths. Batch writes go through LogBuffer, which records a whole chunk
+     * in one set of statements instead of one per row.
+     *
+     * Failures are reported and swallowed for the same reason they are in
+     * LogBuffer: the entry is already written and is the record of what
+     * happened. A group that failed to update is a counter being wrong, which
+     * `logscope:doctor` surfaces and the backfill repairs — worth far less
+     * than the log itself.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    protected static function recordGroup(array $attributes): void
+    {
+        try {
+            GroupRecorder::record([$attributes]);
+        } catch (Throwable $e) {
+            WriteFailureLogger::report($e, 'group-recorder');
+        }
     }
 }

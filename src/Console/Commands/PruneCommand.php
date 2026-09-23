@@ -6,6 +6,7 @@ namespace LogScope\Console\Commands;
 
 use Illuminate\Console\Command;
 use LogScope\Models\LogEntry;
+use LogScope\Services\GroupRecorder;
 
 class PruneCommand extends Command
 {
@@ -88,6 +89,16 @@ class PruneCommand extends Command
 
         $this->newLine();
         $this->components->info("Deleted {$deleted} log entries.");
+
+        // Groups do not outlive their entries (#29). Run once after the
+        // chunked delete rather than per chunk: a group is only orphaned once
+        // its last entry is gone, so checking earlier would find nothing and
+        // cost a scan per chunk.
+        $orphaned = GroupRecorder::deleteOrphaned();
+
+        if ($orphaned > 0) {
+            $this->components->info("Deleted {$orphaned} empty log groups.");
+        }
 
         return self::SUCCESS;
     }

@@ -22,7 +22,7 @@
                     <option value="source">Source</option>
                     <option value="headers">Headers</option>
                 </select>
-                <button @click="searches[0].exclude = !searches[0].exclude; cursor = null; cursorStack = []; fetchLogs()"
+                <button @click="searches[0].exclude = !searches[0].exclude; resetPagingAndFetch()"
                     class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0 hidden md:flex items-center"
                     :class="searches[0].exclude
                         ? 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
@@ -30,7 +30,7 @@
                     title="Toggle NOT (exclude matching)">
                     NOT
                 </button>
-                <button x-show="features.regex" @click="useRegex = !useRegex; cursor = null; cursorStack = []; fetchLogs()"
+                <button x-show="features.regex" @click="useRegex = !useRegex; resetPagingAndFetch()"
                     class="h-9 px-2 rounded-lg text-xs font-bold font-mono transition-colors border flex-shrink-0 hidden md:flex items-center"
                     :class="useRegex
                         ? 'bg-violet-500/20 text-violet-400 border-violet-500/50 shadow-[0_0_10px_rgba(139,92,246,0.2)]'
@@ -43,7 +43,7 @@
                         :class="searches[0].exclude ? 'text-red-400' : 'text-[var(--text-muted)]'">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" x-model="searches[0].value" @input.debounce.300ms="cursor = null; cursorStack = []; fetchLogs()"
+                    <input type="text" x-model="searches[0].value" @input.debounce.300ms="resetPagingAndFetch()"
                         x-ref="searchInput"
                         :placeholder="useRegex ? 'Regex pattern...' : (searches[0].exclude ? 'Exclude logs containing...' : (features.search_syntax ? 'Search... (try field:value)' : 'Search logs...'))"
                         class="search-input w-full h-9 pl-9 pr-4 border rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
@@ -104,7 +104,7 @@
                             <div>
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs text-[var(--text-secondary)]">From</span>
-                                    <button x-show="filters.from" @click.stop="filters.from = ''; cursor = null; cursorStack = []; fetchLogs()"
+                                    <button x-show="filters.from" @click.stop="filters.from = ''; resetPagingAndFetch()"
                                         class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         type="button">
                                         clear
@@ -113,13 +113,13 @@
                                 <input type="datetime-local"
                                     x-model="filters.from"
                                     :max="filters.to"
-                                    @change="if (filters.to && filters.from > filters.to) filters.to = filters.from; cursor = null; cursorStack = []; fetchLogs()"
+                                    @change="if (filters.to && filters.from > filters.to) filters.to = filters.from; resetPagingAndFetch()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
                             <div>
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs text-[var(--text-secondary)]">To</span>
-                                    <button x-show="filters.to" @click.stop="filters.to = ''; cursor = null; cursorStack = []; fetchLogs()"
+                                    <button x-show="filters.to" @click.stop="filters.to = ''; resetPagingAndFetch()"
                                         class="text-xs text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         type="button">
                                         clear
@@ -128,11 +128,11 @@
                                 <input type="datetime-local"
                                     x-model="filters.to"
                                     :min="filters.from"
-                                    @change="if (filters.from && filters.to < filters.from) filters.from = filters.to; cursor = null; cursorStack = []; fetchLogs()"
+                                    @change="if (filters.from && filters.to < filters.from) filters.from = filters.to; resetPagingAndFetch()"
                                     class="mt-1 w-full h-9 px-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)] focus:border-[var(--accent)]">
                             </div>
                         </div>
-                        <button @click.stop="filters.from = ''; filters.to = ''; cursor = null; cursorStack = []; fetchLogs(); dateOpen = false"
+                        <button @click.stop="filters.from = ''; filters.to = ''; resetPagingAndFetch(); dateOpen = false"
                             type="button"
                             class="w-full h-8 rounded-lg text-xs font-medium transition-colors text-[var(--text-secondary)] hover:bg-red-500/10 hover:text-red-400">
                             Clear all dates
@@ -160,7 +160,7 @@
                     <div x-show="statusFilterOpen" @click.away="statusFilterOpen = false" x-transition
                         class="absolute top-full right-0 mt-1 w-48 glass-panel rounded-lg shadow-xl overflow-hidden z-50">
                         <!-- Default: Open only -->
-                        <button @click="filters.statuses = []; cursor = null; cursorStack = []; fetchLogs(); statusFilterOpen = false"
+                        <button @click="filters.statuses = []; resetPagingAndFetch(); statusFilterOpen = false"
                             class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
                             :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': filters.statuses.length === 0 }">
                             <span class="w-2 h-2 rounded-full bg-[var(--text-muted)]"></span>
@@ -168,7 +168,7 @@
                             <span class="ml-auto text-xs text-[var(--text-muted)]">(default)</span>
                         </button>
                         <!-- Needs Attention: All non-closed statuses -->
-                        <button @click="filters.statuses = getNeedsAttentionStatuses(); cursor = null; cursorStack = []; fetchLogs(); statusFilterOpen = false"
+                        <button @click="filters.statuses = getNeedsAttentionStatuses(); resetPagingAndFetch(); statusFilterOpen = false"
                             class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
                             :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': isNeedsAttentionFilter() }">
                             <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
@@ -195,6 +195,29 @@
                 </div>
             </template>
 
+            <!-- Grouped / All entries (#29) -->
+            <div class="hidden sm:flex items-center h-9 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]"
+                role="group" aria-label="List view">
+                <button @click="setViewMode('grouped')"
+                    class="h-8 px-3 rounded-md text-sm font-medium transition-colors"
+                    :class="viewMode === 'grouped'
+                        ? 'bg-[rgba(var(--accent-rgb),0.15)] text-[var(--accent)]'
+                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
+                    :aria-pressed="viewMode === 'grouped'"
+                    title="Roll repeated entries up into issues">
+                    Grouped
+                </button>
+                <button @click="setViewMode('all')"
+                    class="h-8 px-3 rounded-md text-sm font-medium transition-colors"
+                    :class="viewMode === 'all'
+                        ? 'bg-[rgba(var(--accent-rgb),0.15)] text-[var(--accent)]'
+                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
+                    :aria-pressed="viewMode === 'all'"
+                    title="Show every entry individually">
+                    All entries
+                </button>
+            </div>
+
             <!-- Keyboard shortcuts -->
             <button @click="showKeyboardHelp = true"
                 class="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
@@ -212,7 +235,7 @@
             </button>
 
             <!-- Refresh -->
-            <button @click="fetchLogs(); fetchStats()"
+            <button @click="fetchCurrentView(); fetchStats()"
                 class="btn-primary h-9 px-3 md:px-4 rounded-lg text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -234,7 +257,7 @@
                 <option value="source">Source</option>
                 <option value="headers">Headers</option>
             </select>
-            <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; cursor = null; cursorStack = []; fetchLogs()"
+            <button @click="searches[index + 1].exclude = !searches[index + 1].exclude; resetPagingAndFetch()"
                 class="h-8 px-2 rounded-md text-xs font-bold font-mono transition-colors border"
                 :class="searches[index + 1].exclude
                     ? 'bg-red-500/20 text-red-400 border-red-500/50'
@@ -242,7 +265,7 @@
                 title="Toggle NOT (exclude matching)">
                 NOT
             </button>
-            <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="cursor = null; cursorStack = []; fetchLogs()"
+            <input type="text" x-model="searches[index + 1].value" @input.debounce.300ms="resetPagingAndFetch()"
                 :placeholder="searches[index + 1].exclude ? 'Exclude...' : 'Search...'"
                 class="search-input flex-1 h-8 px-3 border rounded-md text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2"
                 :class="searches[index + 1].exclude

@@ -1,5 +1,5 @@
-<!-- Log List -->
-<div class="flex-1 flex flex-col min-w-0 surface-0">
+<!-- Log List (flat view — the grouped view is log-groups-table, #29) -->
+<div x-show="viewMode === 'all'" x-cloak class="flex-1 flex flex-col min-w-0 surface-0">
     <!-- Loading -->
     <div x-show="loading" class="flex-1 flex items-center justify-center">
         <div class="flex items-center gap-3 text-[var(--text-muted)]">

@@ -27,7 +27,9 @@
         <!-- Content Area -->
         <div class="flex-1 flex overflow-hidden">
             @include('logscope::partials.log-table')
+            @include('logscope::partials.log-groups-table')
             @include('logscope::partials.detail-panel')
+            @include('logscope::partials.group-panel')
         </div>
     </div>
 
@@ -45,10 +47,12 @@ window.logScopeConfig = {
     shortcuts: @json($shortcuts),
     actionShortcuts: @json(config('logscope.keyboard_shortcuts', [])),
     channels: @json($channels),
+    grouping: @json($grouping),
     forbiddenRedirect: @json(config('logscope.routes.forbidden_redirect', '/')),
     unauthenticatedRedirect: @json(config('logscope.routes.unauthenticated_redirect', '/login')),
     routes: {
         logs: '{{ route('logscope.logs') }}',
+        groups: '{{ route('logscope.groups') }}',
         stats: '{{ route('logscope.stats') }}',
         apiBase: '{{ url(config('logscope.routes.prefix', 'logscope')) }}/api',
         dismissFailures: '{{ route('logscope.failures.dismiss') }}'

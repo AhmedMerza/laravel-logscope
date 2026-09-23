@@ -78,6 +78,22 @@ function logScope() {
         channelsVisibleLimit: 8,
         cursor: null,
         cursorStack: [],
+
+        // === GROUPED VIEW (#29) ===
+        // Groups are always recorded server-side; this only chooses which of
+        // the two lists is on screen. 'grouped' rolls occurrences up by
+        // fingerprint, 'all' is the flat entry list.
+        viewMode: (config.grouping && config.grouping.enabled === false) ? 'all' : 'grouped',
+        groups: [],
+        groupMeta: { has_next: false, next_cursor: null, per_page: 50, count: 0, has_next_count: false },
+        selectedGroup: null,
+        groupEntries: [],
+        groupEntriesMeta: { has_next: false, next_cursor: null, per_page: 50, occurrence_count: 0 },
+        groupEntriesLoading: false,
+        groupCursor: null,
+        groupCursorStack: [],
+        _fetchGroupsController: null,
+
         _initPromise: null,
         _initialized: false,
         _fetchLogsDebounceTimer: null,
@@ -132,7 +148,7 @@ function logScope() {
                 // Load filters from URL on init
                 const pendingLogId = this.loadFiltersFromUrl();
 
-                await Promise.all([this.fetchLogs(), this.fetchStats()]);
+                await Promise.all([this.fetchCurrentView(), this.fetchStats()]);
 
                 // Deep link: load specific log if ID in URL
                 if (pendingLogId) {
@@ -276,7 +292,50 @@ function logScope() {
 
         debouncedFetchLogs() {
             clearTimeout(this._fetchLogsDebounceTimer);
-            this._fetchLogsDebounceTimer = setTimeout(() => this.fetchLogs(), 150);
+            // Routed rather than hard-wired to fetchLogs: every filter control
+            // already calls this, so the grouped list picks up the same
+            // filters without touching a dozen call sites (#29).
+            this._fetchLogsDebounceTimer = setTimeout(() => this.fetchCurrentView(), 150);
+        },
+
+        fetchCurrentView() {
+            return this.viewMode === 'grouped' ? this.fetchGroups() : this.fetchLogs();
+        },
+
+        /**
+         * Reset paging and reload whichever list is on screen.
+         *
+         * Every filter control in the templates used to inline
+         * `cursor = null; cursorStack = []; fetchLogs()`, which in the grouped
+         * view reset the wrong cursor and refreshed the wrong list. Naming it
+         * once keeps the two views in step (#29).
+         */
+        resetPagingAndFetch() {
+            this.cursor = null;
+            this.cursorStack = [];
+            this.groupCursor = null;
+            this.groupCursorStack = [];
+
+            return this.fetchCurrentView();
+        },
+
+        /**
+         * Apply a per-occurrence filter — trace id, user, ip, url.
+         *
+         * These identify one request. A group spans many, so it has no single
+         * value for any of them and the grouped endpoint does not accept them.
+         * Switching to the flat list is the honest response: the alternative
+         * is a grouped list that quietly ignores the filter the user just
+         * typed and looks unfiltered (#29).
+         */
+        applyOccurrenceFilter() {
+            if (this.viewMode === 'grouped') {
+                this.viewMode = 'all';
+                this.selectedGroup = null;
+                this.groupEntries = [];
+            }
+
+            return this.resetPagingAndFetch();
         },
 
         hasNonStatusFilters() {
@@ -538,6 +597,240 @@ function logScope() {
             }
         },
 
+        // === GROUPED VIEW (#29) ===
+
+        setViewMode(mode) {
+            if (this.viewMode === mode) return;
+
+            this.viewMode = mode;
+
+            // Both lists page with their own cursors, and a cursor from one
+            // is meaningless to the other — reset rather than carry it over.
+            this.cursor = null;
+            this.cursorStack = [];
+            this.groupCursor = null;
+            this.groupCursorStack = [];
+            this.selectedLog = null;
+            this.selectedGroup = null;
+            this.groupEntries = [];
+
+            this.fetchCurrentView();
+        },
+
+        /**
+         * Fetch the grouped list.
+         *
+         * Sends the subset of filters a group can answer for. Per-occurrence
+         * filters (trace id, user, ip, url, http method) are deliberately not
+         * sent: a group spans many requests and has no single value for them,
+         * so the server would have to ignore them and the list would silently
+         * disagree with the sidebar.
+         */
+        async fetchGroups() {
+            if (this._fetchGroupsController) {
+                this._fetchGroupsController.abort();
+            }
+            this._fetchGroupsController = new AbortController();
+            const signal = this._fetchGroupsController.signal;
+
+            this.loading = true;
+            this.error = null;
+            try {
+                const params = new URLSearchParams();
+                if (this.groupCursor) params.append('cursor', this.groupCursor);
+                this.filters.statuses.forEach(s => params.append('statuses[]', s));
+                this.filters.levels.forEach(l => params.append('levels[]', l));
+                this.filters.excludeLevels.forEach(l => params.append('exclude_levels[]', l));
+                this.filters.channels.forEach(c => params.append('channels[]', c));
+                this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
+
+                // The grouped endpoint takes a plain substring, not the
+                // structured search syntax — see LogGroupController::index.
+                const firstSearch = this.searches.find(s => s.value && !s.exclude);
+                if (firstSearch) params.append('search', firstSearch.value);
+
+                const response = await fetch(`${this.routes.groups}?${params}`, {
+                    headers: { 'Accept': 'application/json' },
+                    signal
+                });
+
+                if (!response.ok) {
+                    this.handleApiError(response, 'fetching groups');
+                    this.groups = [];
+                    this.groupMeta = { has_next: false, next_cursor: null, per_page: 50, count: 0, has_next_count: false };
+                    return;
+                }
+
+                const data = await response.json();
+                this.groups = data.data;
+                this.groupMeta = data.meta;
+                this.error = null;
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                this.handleNetworkError(error, 'fetching groups');
+            } finally {
+                if (!signal.aborted) this.loading = false;
+            }
+        },
+
+        selectGroup(group) {
+            this.selectedGroup = group;
+            this.groupEntries = [];
+            this.groupEntriesMeta = { has_next: false, next_cursor: null, per_page: 50, occurrence_count: group.occurrence_count };
+
+            if (!this.detailPanelWidth) {
+                this.detailPanelWidth = this.getDefaultPanelWidth();
+            }
+
+            this.fetchGroupEntries();
+        },
+
+        closeGroupPanel() {
+            this.selectedGroup = null;
+            this.groupEntries = [];
+        },
+
+        /**
+         * Load a page of the selected group's occurrences, appending rather
+         * than replacing so "load more" builds a list instead of jumping.
+         */
+        async fetchGroupEntries(cursor = null) {
+            if (!this.selectedGroup) return;
+
+            this.groupEntriesLoading = true;
+            try {
+                const params = new URLSearchParams();
+                if (cursor) params.append('cursor', cursor);
+
+                const response = await fetch(
+                    `${this.routes.apiBase}/groups/${this.selectedGroup.id}/entries?${params}`,
+                    { headers: { 'Accept': 'application/json' } }
+                );
+
+                if (!response.ok) {
+                    this.handleApiError(response, 'fetching occurrences');
+                    return;
+                }
+
+                const data = await response.json();
+                this.groupEntries = cursor ? [...this.groupEntries, ...data.data] : data.data;
+                this.groupEntriesMeta = data.meta;
+            } catch (error) {
+                this.handleNetworkError(error, 'fetching occurrences');
+            } finally {
+                this.groupEntriesLoading = false;
+            }
+        },
+
+        loadMoreGroupEntries() {
+            if (this.groupEntriesMeta.has_next) {
+                this.fetchGroupEntries(this.groupEntriesMeta.next_cursor);
+            }
+        },
+
+        /**
+         * Set the status of the selected group, which is the status of every
+         * occurrence in it.
+         *
+         * Optimistic, like setStatus() for entries: the row leaves the list
+         * immediately when the new status is filtered out, and is put back if
+         * the request fails.
+         */
+        async setGroupStatus(status, note = null) {
+            if (!this.selectedGroup) return;
+
+            const targetId = this.selectedGroup.id;
+            const snapshot = { ...this.selectedGroup };
+            const index = this.groups.findIndex(g => g.id === targetId);
+
+            const hidesRow = this.filters.statuses.length > 0
+                ? !this.filters.statuses.includes(status)
+                : status !== 'open';
+
+            if (hidesRow && index !== -1) {
+                this.groups.splice(index, 1);
+            }
+
+            this.selectedGroup = { ...this.selectedGroup, status, regressed_at: null };
+
+            const restore = () => {
+                if (this.groups.findIndex(g => g.id === targetId) !== -1) return;
+                if (index === -1) return;
+                this.groups.splice(Math.min(index, this.groups.length), 0, snapshot);
+            };
+
+            try {
+                const body = { status };
+                if (note) body.note = note;
+
+                const response = await fetch(`${this.routes.apiBase}/groups/${targetId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    restore();
+                    if (this.selectedGroup?.id === targetId) {
+                        this.selectedGroup = snapshot;
+                    }
+                    this.handleApiError(response, 'updating status');
+                    this.showToast('Status update failed — restored.', 'error', 4000);
+                    return;
+                }
+
+                const data = await response.json();
+                if (this.selectedGroup?.id === targetId) {
+                    this.selectedGroup = { ...this.selectedGroup, ...data.data };
+                }
+            } catch (error) {
+                restore();
+                this.handleNetworkError(error, 'updating status');
+            }
+        },
+
+        async updateGroupNote(note) {
+            if (!this.selectedGroup) return;
+            try {
+                const response = await fetch(`${this.routes.apiBase}/groups/${this.selectedGroup.id}/note`, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ note })
+                });
+                if (!response.ok) {
+                    this.handleApiError(response, 'saving note');
+                    return;
+                }
+                const data = await response.json();
+                this.selectedGroup = data.data;
+            } catch (error) {
+                this.handleNetworkError(error, 'saving note');
+            }
+        },
+
+        nextGroupPage() {
+            if (this.groupMeta.has_next) {
+                this.groupCursorStack.push(this.groupCursor);
+                this.groupCursor = this.groupMeta.next_cursor;
+                this.fetchGroups();
+            }
+        },
+
+        prevGroupPage() {
+            if (this.groupCursorStack.length > 0) {
+                this.groupCursor = this.groupCursorStack.pop();
+                this.fetchGroups();
+            }
+        },
+
         async fetchStats() {
             try {
                 const response = await fetch(this.routes.stats, {
@@ -579,7 +872,7 @@ function logScope() {
                 this.showDeleteDialog = false;
                 this.selectedLog = null;
                 this.showToast('Log deleted successfully', 'success', 2000);
-                await Promise.all([this.fetchLogs(), this.fetchStats()]);
+                await Promise.all([this.fetchCurrentView(), this.fetchStats()]);
             } catch (error) {
                 this.handleNetworkError(error, 'deleting log');
             }
@@ -1109,6 +1402,10 @@ function logScope() {
 
         closePanel() {
             this.selectedLog = null;
+            // Escape closes whichever panel is open; in the grouped view that
+            // is the group's occurrence list (#29).
+            this.selectedGroup = null;
+            this.groupEntries = [];
             this.syncFiltersToUrl();
         },
 
@@ -1149,7 +1446,7 @@ function logScope() {
 
         getMessagePreviewWidth() {
             const sidebarWidth = this.isDesktop() ? (this.sidebarOpen ? 256 : 0) : 0;
-            const panelWidth = (this.selectedLog && !this.isMobile())
+            const panelWidth = ((this.selectedLog || this.selectedGroup) && !this.isMobile())
                 ? (this.detailPanelWidth || this.getDefaultPanelWidth()) : 0;
             const tableOverhead = this.isMobile() ? 180 : 350;
             return Math.max(120, window.innerWidth - sidebarWidth - panelWidth - tableOverhead);
@@ -1403,7 +1700,7 @@ function logScope() {
 
         clearFilters() {
             this.resetFilters();
-            this.fetchLogs();
+            this.fetchCurrentView();
         },
 
         applyQuickFilter(index) {
@@ -1432,7 +1729,7 @@ function logScope() {
                 this.filters.to = parsed.from;
             }
 
-            this.fetchLogs();
+            this.fetchCurrentView();
         },
 
         parseRelativeTime(timeStr) {
@@ -1509,15 +1806,15 @@ function logScope() {
             const actionShortcut = [
                 {
                     key: this.actionShortcuts.refresh,
-                    run: () => Promise.all([this.fetchLogs(), this.fetchStats()])
+                    run: () => Promise.all([this.fetchCurrentView(), this.fetchStats()])
                 },
                 {
                     key: this.actionShortcuts.prev_page,
-                    run: () => this.prevPage()
+                    run: () => this.viewMode === 'grouped' ? this.prevGroupPage() : this.prevPage()
                 },
                 {
                     key: this.actionShortcuts.next_page,
-                    run: () => this.nextPage()
+                    run: () => this.viewMode === 'grouped' ? this.nextGroupPage() : this.nextPage()
                 }
             ].find(shortcut => shortcut.key && shortcut.key === event.key);
 
@@ -1582,7 +1879,12 @@ function logScope() {
                         event.preventDefault();
                         const targetStatus = this.shortcuts[event.key];
 
-                        if (this.selectedLog) {
+                        // In the grouped view the same keys triage the group,
+                        // so one keystroke closes every occurrence of an error
+                        // rather than one row of it (#29).
+                        if (this.selectedGroup) {
+                            this.setGroupStatus(targetStatus);
+                        } else if (this.selectedLog) {
                             this.setStatus(targetStatus);
                         } else {
                             this.filters.statuses = [targetStatus];

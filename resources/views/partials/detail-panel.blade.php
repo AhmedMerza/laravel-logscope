@@ -14,7 +14,19 @@
         @mousedown.prevent="startResize($event)"></div>
     <!-- Panel Header -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-        <h3 class="font-semibold text-[var(--text-primary)]">Log Details</h3>
+        <div class="flex items-center gap-2 min-w-0">
+            <!-- Reached from a group's occurrence list: go back to the issue
+                 rather than closing the panel outright (#29). -->
+            <button x-show="selectedGroup" x-cloak @click="selectedLog = null"
+                class="p-1 -ml-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors shrink-0"
+                title="Back to issue">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <h3 class="font-semibold text-[var(--text-primary)] truncate"
+                x-text="selectedGroup ? 'Occurrence' : 'Log Details'"></h3>
+        </div>
         <div class="flex items-center gap-1">
             <button x-show="detailPanelWidth" @click="resetPanelWidth()"
                 class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors hidden md:flex items-center justify-center"

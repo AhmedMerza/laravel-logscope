@@ -9,12 +9,14 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use LogScope\Models\LogGroup;
 use LogScope\Services\ContextSanitizer;
 use LogScope\Services\WriteFailureLogger;
 use Throwable;
@@ -36,6 +38,7 @@ class DoctorCommand extends Command
     public function handle(): int
     {
         $this->checkTable();
+        $this->checkGrouping();
         $this->checkCaptureMode();
         $this->checkWriteMode();
         $this->checkMiddleware();
@@ -76,6 +79,73 @@ class DoctorCommand extends Command
             $this->markPass('Table', "{$table} exists ({$this->formatCount($count)} rows)");
         } catch (Throwable $e) {
             $this->markFail('Table', "could not query {$table}: ".$e->getMessage());
+        }
+    }
+
+    /**
+     * Report whether entries are fingerprinted and groups are in step (#29).
+     *
+     * Deliberately not a count comparison. occurrence_count is a running
+     * total of everything a group has ever seen, while retention deletes the
+     * entries underneath it, so a group legitimately counts more occurrences
+     * than it has rows the moment anything is pruned. Comparing the two would
+     * warn on every healthy install with retention enabled. What is checked
+     * instead is what can only be wrong: entries with no fingerprint, a
+     * fingerprint with no group, a group with no entries, and a count that
+     * has fallen *below* the rows still present.
+     */
+    protected function checkGrouping(): void
+    {
+        $groupsTable = (string) config('logscope.groups_table', 'log_groups');
+        $enabled = config('logscope.grouping.enabled', true) ? 'grouped view on' : 'grouped view off';
+
+        try {
+            if (! Schema::hasTable($groupsTable)) {
+                $this->markFail('Grouping', "{$groupsTable} does not exist — run `php artisan migrate`");
+
+                return;
+            }
+
+            $unfingerprinted = LogEntry::query()->whereNull('fingerprint')->count();
+
+            if ($unfingerprinted > 0) {
+                $this->markWarn('Grouping', "{$this->formatCount($unfingerprinted)} entries have no fingerprint — run `php artisan logscope:backfill-fingerprints`");
+
+                return;
+            }
+
+            $ungrouped = LogEntry::query()
+                ->whereNotNull('fingerprint')
+                ->whereNotExists(fn ($query) => $query
+                    ->select(DB::raw(1))
+                    ->from($groupsTable)
+                    ->whereColumn($groupsTable.'.fingerprint', (new LogEntry)->getTable().'.fingerprint'))
+                ->count();
+
+            if ($ungrouped > 0) {
+                $this->markWarn('Grouping', "{$this->formatCount($ungrouped)} fingerprinted entries have no group — run `php artisan logscope:backfill-fingerprints --groups-only`");
+
+                return;
+            }
+
+            $orphaned = LogGroup::query()
+                ->whereNotExists(fn ($query) => $query
+                    ->select(DB::raw(1))
+                    ->from((new LogEntry)->getTable())
+                    ->whereColumn((new LogEntry)->getTable().'.fingerprint', $groupsTable.'.fingerprint'))
+                ->count();
+
+            if ($orphaned > 0) {
+                $this->markWarn('Grouping', "{$this->formatCount($orphaned)} groups have no entries left — run `php artisan logscope:prune` to clear them");
+
+                return;
+            }
+
+            $groups = LogGroup::query()->count();
+
+            $this->markPass('Grouping', "{$this->formatCount($groups)} groups, all entries fingerprinted ({$enabled})");
+        } catch (Throwable $e) {
+            $this->markFail('Grouping', "could not query {$groupsTable}: ".$e->getMessage());
         }
     }
 
