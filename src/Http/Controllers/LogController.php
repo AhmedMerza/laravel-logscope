@@ -7,6 +7,7 @@ namespace LogScope\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use LogScope\Concerns\ResolvesStatuses;
@@ -159,10 +160,10 @@ class LogController extends Controller
             try {
                 $timezone = $request->input('timezone', config('app.timezone', 'UTC'));
                 $from = $request->filled('from')
-                    ? \Illuminate\Support\Carbon::parse($request->input('from'), $timezone)->utc()
+                    ? Carbon::parse($request->input('from'), $timezone)->utc()
                     : null;
                 $to = $request->filled('to')
-                    ? \Illuminate\Support\Carbon::parse($request->input('to'), $timezone)->utc()
+                    ? Carbon::parse($request->input('to'), $timezone)->utc()
                     : null;
                 $query->dateRange($from, $to);
             } catch (\Throwable $e) {

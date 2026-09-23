@@ -374,7 +374,7 @@ class ContextSanitizer implements ContextSanitizerInterface
                 'class' => get_class($value),
                 'data' => $this->sanitizeArray(get_object_vars($value), $depth + 1, $path),
             ];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Fall through to return class name
         }
 

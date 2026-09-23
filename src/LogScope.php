@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
+use LogScope\Services\WriteFailureLogger;
 
 class LogScope
 {
@@ -201,7 +202,7 @@ class LogScope
         try {
             return (static::$captureContextUsing)($request) ?? [];
         } catch (\Throwable $e) {
-            \LogScope\Services\WriteFailureLogger::report($e, 'captureContext-callback');
+            WriteFailureLogger::report($e, 'captureContext-callback');
 
             // Return an empty array so the original log still lands.
             // Add a marker the user can search for in the captured

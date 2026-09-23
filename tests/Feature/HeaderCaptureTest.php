@@ -109,7 +109,7 @@ it('survives a header value that is not valid UTF-8', function () {
     config(['logscope.context.headers.allowlist' => ['referer']]);
 
     $this->get('/logscope-test/headers', [
-        'Referer' => "https://shop.test/cart/".chr(0xB1).chr(0x1F),
+        'Referer' => 'https://shop.test/cart/'.chr(0xB1).chr(0x1F),
     ])->assertOk();
 
     $entry = LogEntry::query()->latest('occurred_at')->first();

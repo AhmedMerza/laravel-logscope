@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 
@@ -367,7 +369,7 @@ it('returns has_next_count true and caps count at 1000 when filtered results exc
     $rows = [];
     for ($i = 0; $i < 1001; $i++) {
         $rows[] = [
-            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'id' => (string) Str::ulid(),
             'level' => 'info',
             'message' => "Log {$i}",
             'message_preview' => "Log {$i}",
@@ -381,7 +383,7 @@ it('returns has_next_count true and caps count at 1000 when filtered results exc
     // Chunk to stay within SQLite's bind-parameter limit
     $table = config('logscope.table', 'log_entries');
     foreach (array_chunk($rows, 100) as $chunk) {
-        \Illuminate\Support\Facades\DB::table($table)->insert($chunk);
+        DB::table($table)->insert($chunk);
     }
 
     // Level filter activates the capped count path

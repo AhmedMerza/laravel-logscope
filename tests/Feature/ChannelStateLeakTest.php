@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
+use Laravel\Octane\Events\RequestReceived;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
+use Monolog\Level;
+use Monolog\LogRecord;
 
 uses(RefreshDatabase::class);
 
@@ -29,7 +33,7 @@ it('does not attribute a stale channel to a fresh log fired without a channel pr
 
     // Dispatch a MessageLogged directly — bypassing Laravel's logger lets
     // us simulate a runtime channel that has no processor installed.
-    event(new \Illuminate\Log\Events\MessageLogged('error', 'fresh-log', []));
+    event(new MessageLogged('error', 'fresh-log', []));
 
     $entry = LogEntry::where('message', 'fresh-log')->first();
 
@@ -42,10 +46,10 @@ it('consumeLastChannel returns the channel on first call and null on the second'
     // produces exactly one consumable channel value. A second consume
     // (or any consume after a non-processor log) returns null.
     $processor = new ChannelContextProcessor('single');
-    $processor(new \Monolog\LogRecord(
-        new \DateTimeImmutable,
+    $processor(new LogRecord(
+        new DateTimeImmutable,
         'app',
-        \Monolog\Level::Error,
+        Level::Error,
         'msg',
         []
     ));
@@ -75,9 +79,9 @@ it('getLastChannel returns the raw value regardless of freshness (deprecated pat
 it('registers an Octane RequestReceived listener when Octane is installed', function () {
     // Skip if Octane isn't installed — the listener registration is
     // gated on the class existing.
-    if (! class_exists(\Laravel\Octane\Events\RequestReceived::class)) {
+    if (! class_exists(RequestReceived::class)) {
         $this->markTestSkipped('Laravel Octane is not installed in the test environment.');
     }
 
-    expect($this->app['events']->hasListeners(\Laravel\Octane\Events\RequestReceived::class))->toBeTrue();
+    expect($this->app['events']->hasListeners(RequestReceived::class))->toBeTrue();
 });

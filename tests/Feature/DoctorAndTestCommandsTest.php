@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use LogScope\Http\Middleware\CaptureRequestContext;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
@@ -220,7 +222,7 @@ it('logscope:doctor recognises a user-scheduled prune entry when auto_schedule i
     config(['logscope.retention.auto_schedule' => false]);
 
     // Pretend the user wired prune in their own console kernel.
-    app(\Illuminate\Console\Scheduling\Schedule::class)
+    app(Schedule::class)
         ->command('logscope:prune')
         ->dailyAt('02:00');
 
@@ -334,7 +336,7 @@ it('logscope:test restores write_mode even when the verify query throws', functi
     // Drop the table so the verify query throws inside the command. The
     // log emit will also fail (the sync writer can't insert), but the
     // command catches both and the finally block must still fire.
-    \Illuminate\Support\Facades\Schema::drop('log_entries');
+    Schema::drop('log_entries');
 
     Artisan::call('logscope:test');
 

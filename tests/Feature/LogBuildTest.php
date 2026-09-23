@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use LogScope\Jobs\WriteLogEntry;
 use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
@@ -147,7 +148,7 @@ it('dispatches Log::build() logs with null channel in queue mode', function () {
     $logger->info('Test log from Log::build()');
 
     // In queue mode, jobs are dispatched - verify the job was dispatched
-    Queue::assertPushed(\LogScope\Jobs\WriteLogEntry::class, function ($job) {
+    Queue::assertPushed(WriteLogEntry::class, function ($job) {
         // Access the job's data property to check channel is null
         $reflection = new ReflectionClass($job);
         $property = $reflection->getProperty('data');
@@ -170,7 +171,7 @@ it('does not inherit channel in queue mode', function () {
     $logger->info('Second log');
 
     $dispatched = [];
-    Queue::assertPushed(\LogScope\Jobs\WriteLogEntry::class, function ($job) use (&$dispatched) {
+    Queue::assertPushed(WriteLogEntry::class, function ($job) use (&$dispatched) {
         $reflection = new ReflectionClass($job);
         $property = $reflection->getProperty('data');
         $property->setAccessible(true);

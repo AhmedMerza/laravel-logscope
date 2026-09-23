@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -37,7 +38,7 @@ afterEach(function () {
     // fixture counts.
     $dispatcher = DB::connection()->getEventDispatcher();
     if ($dispatcher !== null) {
-        $dispatcher->forget(\Illuminate\Database\Events\QueryExecuted::class);
+        $dispatcher->forget(QueryExecuted::class);
     }
 
     // The Log::warning calls fired by the listener above land in LogBuffer's
@@ -116,7 +117,7 @@ it('drops re-entrant query-listener logs in batch mode at flush time', function 
     config(['logscope.write_mode' => 'batch']);
 
     $queryListenerFireCount = 0;
-    DB::listen(function (\Illuminate\Database\Events\QueryExecuted $event) use (&$queryListenerFireCount) {
+    DB::listen(function (QueryExecuted $event) use (&$queryListenerFireCount) {
         // Only count log_entries inserts so other queries (begin/commit/etc.)
         // don't pollute the assertion.
         if (! str_contains($event->sql, 'log_entries')) {

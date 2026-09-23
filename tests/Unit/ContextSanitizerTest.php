@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Http\Request;
 use LogScope\Services\ContextSanitizer;
+use LogScope\Tests\Fixtures\ServiceWithRequiredArg;
 
 enum TestBackedEnum: string
 {
@@ -79,12 +82,12 @@ describe('sanitize', function () {
     it('remaps file/line in sanitized exception for ArgumentCountError', function () {
         // Throw via a closure so we can ask reflection where the `new` lives.
         // Robust under formatter reflows — line is read from the closure itself.
-        $thrower = fn () => new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
+        $thrower = fn () => new ServiceWithRequiredArg;
         $callerLine = (new ReflectionFunction($thrower))->getStartLine();
 
         try {
             $thrower();
-        } catch (\ArgumentCountError $e) {
+        } catch (ArgumentCountError $e) {
             $exception = $e;
         }
 
@@ -751,7 +754,7 @@ describe('compound keys split across array levels', function () {
         // The fallback branch had a test; JsonSerializable, Arrayable and
         // Jsonable take different routes through sanitizeObject() and were
         // threaded in the same commit, untested.
-        $arrayable = new class implements Illuminate\Contracts\Support\Arrayable
+        $arrayable = new class implements Arrayable
         {
             public function toArray(): array
             {
@@ -767,7 +770,7 @@ describe('compound keys split across array levels', function () {
             }
         };
 
-        $jsonable = new class implements Illuminate\Contracts\Support\Jsonable
+        $jsonable = new class implements Jsonable
         {
             public function toJson($options = 0): string
             {
@@ -793,7 +796,7 @@ describe('compound keys and the request boundary (#81 review)', function () {
         // ['api' => ['key' => …]] and ['api' => $dto] both redact, so
         // ['api' => $request] with ?key= must too. It did not: the Request
         // branch of sanitizeValue() dropped the path it was handed.
-        $request = Illuminate\Http\Request::create('/x?key=SECRET', 'GET');
+        $request = Request::create('/x?key=SECRET', 'GET');
 
         $result = (new ContextSanitizer)->sanitize(['api' => $request]);
 
@@ -801,7 +804,7 @@ describe('compound keys and the request boundary (#81 review)', function () {
     });
 
     it('carries the context key into a logged Request body', function () {
-        $request = Illuminate\Http\Request::create('/pay', 'POST', ['number' => '4111', 'brand' => 'visa']);
+        $request = Request::create('/pay', 'POST', ['number' => '4111', 'brand' => 'visa']);
 
         $result = (new ContextSanitizer)->sanitize(['card' => $request]);
 
@@ -812,7 +815,7 @@ describe('compound keys and the request boundary (#81 review)', function () {
     it('redacts the url of that same entry, not only its query', function () {
         // Redacting `query` while leaving `url` intact leaves the secret
         // readable one field away, in the same row.
-        $request = Illuminate\Http\Request::create('/x?key=SECRET', 'GET');
+        $request = Request::create('/x?key=SECRET', 'GET');
 
         $result = (new ContextSanitizer)->sanitize(['api' => $request]);
 
@@ -1006,8 +1009,8 @@ describe('extractSource', function () {
 
     it('uses caller file for ArgumentCountError instead of constructor declaration', function () {
         try {
-            new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
-        } catch (\ArgumentCountError $e) {
+            new ServiceWithRequiredArg;
+        } catch (ArgumentCountError $e) {
             $exception = $e;
         }
 
@@ -1021,8 +1024,8 @@ describe('extractSource', function () {
 
     it('uses caller file for argument-validation TypeError', function () {
         try {
-            new \LogScope\Tests\Fixtures\ServiceWithRequiredArg(123); // strict_types=1 → TypeError
-        } catch (\TypeError $e) {
+            new ServiceWithRequiredArg(123); // strict_types=1 → TypeError
+        } catch (TypeError $e) {
             $exception = $e;
         }
 
@@ -1037,8 +1040,8 @@ describe('extractSource', function () {
 
     it('does NOT remap return-type TypeError to caller (getFile() is already correct)', function () {
         try {
-            \LogScope\Tests\Fixtures\ServiceWithRequiredArg::returnsBadType();
-        } catch (\TypeError $e) {
+            ServiceWithRequiredArg::returnsBadType();
+        } catch (TypeError $e) {
             $exception = $e;
         }
 
@@ -1054,8 +1057,8 @@ describe('extractSource', function () {
 
     it('does NOT remap user-thrown TypeError to caller', function () {
         try {
-            \LogScope\Tests\Fixtures\ServiceWithRequiredArg::userThrowsTypeError();
-        } catch (\TypeError $e) {
+            ServiceWithRequiredArg::userThrowsTypeError();
+        } catch (TypeError $e) {
             $exception = $e;
         }
 
@@ -1095,12 +1098,12 @@ describe('extractSourceLine', function () {
     it('uses caller line for ArgumentCountError instead of constructor declaration', function () {
         // Throw via a closure so reflection can tell us the line of `new`,
         // independent of any formatter reflows in the surrounding test body.
-        $thrower = fn () => new \LogScope\Tests\Fixtures\ServiceWithRequiredArg;
+        $thrower = fn () => new ServiceWithRequiredArg;
         $callerLine = (new ReflectionFunction($thrower))->getStartLine();
 
         try {
             $thrower();
-        } catch (\ArgumentCountError $e) {
+        } catch (ArgumentCountError $e) {
             $exception = $e;
         }
 

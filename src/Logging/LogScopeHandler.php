@@ -11,6 +11,7 @@ use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use LogScope\Services\LogBuffer;
 use LogScope\Services\TransactionSavepoint;
+use LogScope\Services\WriteFailureLogger;
 use LogScope\Services\WriteGuard;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
@@ -114,7 +115,7 @@ class LogScopeHandler extends AbstractProcessingHandler
             // production DB outages caused silent total log loss with zero
             // observability. WriteFailureLogger dedupes per-process so a
             // sustained outage doesn't dump thousands of identical lines.
-            \LogScope\Services\WriteFailureLogger::report($e, 'channel-handler');
+            WriteFailureLogger::report($e, 'channel-handler');
         }
     }
 
@@ -253,5 +254,4 @@ class LogScopeHandler extends AbstractProcessingHandler
 
         return null;
     }
-
 }
