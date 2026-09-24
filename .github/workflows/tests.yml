@@ -3,7 +3,17 @@ name: Tests
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'art/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'art/**'
+      - 'LICENSE'
 
 permissions:
   contents: read
