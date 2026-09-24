@@ -401,7 +401,11 @@ class LogController extends Controller
             'ids.*' => 'string',
         ]);
 
-        $deleted = LogEntry::whereIn('id', $request->input('ids'))->delete();
+        $deleted = 0;
+
+        foreach (array_chunk((array) $request->input('ids'), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+            $deleted += LogEntry::query()->whereIn('id', $chunk)->delete();
+        }
 
         $this->clearFilterCaches();
 
