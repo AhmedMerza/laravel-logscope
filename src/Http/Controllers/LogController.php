@@ -369,7 +369,7 @@ class LogController extends Controller
         ];
         $updated = 0;
 
-        foreach (array_chunk((array) $request->input('ids'), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+        foreach (array_chunk(array_unique((array) $request->input('ids')), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
             $updated += LogEntry::query()->whereIn('id', $chunk)->update($values);
         }
 
@@ -407,7 +407,7 @@ class LogController extends Controller
 
         $deleted = 0;
 
-        foreach (array_chunk((array) $request->input('ids'), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+        foreach (array_chunk(array_unique((array) $request->input('ids')), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
             $deleted += LogEntry::query()->whereIn('id', $chunk)->delete();
         }
 

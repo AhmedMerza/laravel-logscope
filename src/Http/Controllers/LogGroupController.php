@@ -226,7 +226,7 @@ class LogGroupController extends Controller
         ];
         $updated = 0;
 
-        foreach (array_chunk((array) $request->input('ids'), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+        foreach (array_chunk(array_unique((array) $request->input('ids')), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
             $updated += LogGroup::query()->whereIn('id', $chunk)->update($values);
         }
 

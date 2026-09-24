@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use LogScope\Enums\LogStatus;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
 use LogScope\Models\LogGroup;
@@ -95,6 +96,9 @@ it('updates entry statuses in chunks across a large selection', function () {
     $total = LogEntry::DELETE_CHUNK_SIZE + 3;
     $ids = seedManyEntries($total);
 
+    // Outside the selection, so an update that lost its id scope would show.
+    LogEntry::createEntry(['level' => 'info', 'message' => 'bystander', 'channel' => 'single']);
+
     $perUpdate = idsBoundPerUpdate($ids, function () use ($ids, $total) {
         $this->postJson('/logscope/api/logs/status-many', ['ids' => $ids, 'status' => 'resolved'])
             ->assertOk()
@@ -105,12 +109,25 @@ it('updates entry statuses in chunks across a large selection', function () {
         ->and(LogEntry::query()->where('status', 'resolved')->count())->toBe($total);
 });
 
+it('counts an id repeated across chunks once', function () {
+    $total = LogEntry::DELETE_CHUNK_SIZE + 3;
+    $ids = seedManyEntries($total);
+
+    // The repeat lands in the second chunk; without deduping, SQLite and
+    // Postgres report the row as updated twice.
+    $this->postJson('/logscope/api/logs/status-many', ['ids' => [...$ids, $ids[0]], 'status' => 'resolved'])
+        ->assertOk()
+        ->assertJson(['message' => "{$total} log entries updated to resolved"]);
+});
+
 it('updates group statuses in chunks across a large selection', function () {
     LogEntry::createEntry(['level' => 'error', 'message' => 'grouped', 'channel' => 'single']);
     $group = LogGroup::query()->firstOrFail();
+    $group->forceFill(['regressed_at' => now()])->save();
 
-    // Only one group exists; the rest are ids a client could still post.
-    $ids = [$group->id, ...array_map(fn ($i) => "missing-{$i}", range(1, LogEntry::DELETE_CHUNK_SIZE + 2))];
+    // Only one group exists; the rest are ids a client could still post. The
+    // group is named again at the end, in the second chunk, and still counts once.
+    $ids = [$group->id, ...array_map(fn ($i) => "missing-{$i}", range(1, LogEntry::DELETE_CHUNK_SIZE + 2)), $group->id];
 
     $perUpdate = idsBoundPerUpdate($ids, function () use ($ids) {
         $this->postJson('/logscope/api/groups/status-many', ['ids' => $ids, 'status' => 'resolved'])
@@ -118,5 +135,7 @@ it('updates group statuses in chunks across a large selection', function () {
             ->assertJson(['message' => '1 groups updated to resolved']);
     });
 
-    expect($perUpdate)->toBe([LogEntry::DELETE_CHUNK_SIZE, 3]);
+    expect($perUpdate)->toBe([LogEntry::DELETE_CHUNK_SIZE, 3])
+        ->and($group->fresh()->status)->toBe(LogStatus::Resolved)
+        ->and($group->fresh()->regressed_at)->toBeNull();
 });
