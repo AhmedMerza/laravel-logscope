@@ -5,6 +5,12 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Laravel 13 is now tested, and supported versions are capped at 11–13** (#75). LogScope already worked on Laravel 13, but `>=11.0` let composer install it on any future major with no test behind it — which is how Laravel 13 got deployed before CI had ever run on it. CI now runs the suite on Laravel 11, 12 and 13, and `composer.json` requires `^11.0|^12.0|^13.0`. Laravel 14 will install once a release adds it to CI, not before.
+
 ## [2.2.0] — 2026-09-24
 
 Repeated entries now roll up into groups, with triage on the group (#29). Two

@@ -27,8 +27,11 @@ jobs:
       matrix:
         include:
           # Laravel 10 isn't tested: the Context facade LogScope uses needs 11.
-          - { php: '8.2', laravel: '11', testbench: '9.*' }
-          - { php: '8.4', laravel: '12', testbench: '10.*' }
+          # Pest is pinned per row: pest-plugin-laravel 3 stops at Laravel 12,
+          # and Pest 4 breaks the error_log-redirecting tests on Laravel 11 (#75).
+          - { php: '8.2', laravel: '11', testbench: '9.*', pest: '3.*' }
+          - { php: '8.4', laravel: '12', testbench: '10.*', pest: '3.*' }
+          - { php: '8.4', laravel: '13', testbench: '11.*', pest: '5.*' }
     steps:
       - uses: actions/checkout@v5
 
@@ -40,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-update --no-interaction
+          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" "pestphp/pest:${{ matrix.pest }}" "pestphp/pest-plugin-laravel:${{ matrix.pest }}" --no-update --no-interaction
           composer update --prefer-dist --prefer-stable --no-interaction --no-progress
 
       - run: vendor/bin/pest
