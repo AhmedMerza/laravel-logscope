@@ -6,8 +6,7 @@
 
 A beautiful, database-backed log viewer for Laravel applications. Production-ready.
 
-<!-- TODO: Add screenshot here -->
-![LogScope Screenshot](art/logscope-preview.png)
+![LogScope demo: structured search, NOT filter, keyboard triage, dark mode](https://raw.githubusercontent.com/AhmedMerza/laravel-logscope/master/art/logscope-demo.gif)
 
 ## Quick Start
 
