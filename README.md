@@ -4,7 +4,9 @@
 [![License](https://img.shields.io/packagist/l/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 [![PHP Version](https://img.shields.io/packagist/php-v/ahmedmerza/logscope.svg?style=flat-square)](https://packagist.org/packages/ahmedmerza/logscope)
 
-A beautiful, database-backed log viewer for Laravel applications. Production-ready.
+A log viewer for Laravel that stores your logs in your own database, so you can search, filter and triage them from the browser.
+
+Search by field (`level:error`, `user_id:42`) or across everything. Repeated errors are grouped into one issue with a count, and when you mark an issue resolved it stays resolved, unless it happens again. LogScope is designed to be left on in production, and it works alongside Telescope in development or an exception tracker like Sentry.
 
 ![LogScope demo: structured search, NOT filter, keyboard triage, dark mode](https://raw.githubusercontent.com/AhmedMerza/laravel-logscope/master/art/logscope-demo.gif)
 
@@ -22,13 +24,9 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v2.2.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.2.0)** — **Run `php artisan migrate`, then `php artisan logscope:backfill-fingerprints`.**
+**[v2.2.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.2.0):** repeated entries are now grouped into issues, and a resolved issue reopens if it fires again. Log writes no longer happen inside your transactions.
 
-Repeated entries now roll up into groups with an occurrence count, and status and notes move to the group, so resolving an error resolves every occurrence of it. A resolved group that fires again reopens itself; Ignored is the status that stays silent (#29). Logs written inside your transaction are now held until it ends instead of joining it (#45), Clear and prune delete by id in chunks rather than locking by filter (#46), and bulk actions on large selections no longer exceed the database's bind-parameter limit (#94).
-
-Behaviour change: `sensitive_keys` now adds to the default redacted keys instead of replacing them (#79). If you used it to drop a default, name that field in `sensitive_keys_except` instead — the changelog has the before/after.
-
-See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
+**Upgrading:** run `php artisan migrate`, then `php artisan logscope:backfill-fingerprints`. Full notes, including one behaviour change to `sensitive_keys`, are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
 ---
 
@@ -59,7 +57,8 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change no
 | **Channel Search** | Search and filter channels when you have many |
 | **JSON Viewer** | Syntax-highlighted, collapsible JSON with copy support |
 | **Smart Context** | Auto-expand Request/Model objects, redact sensitive data |
-| **Status Workflow** | Track logs as open, investigating, resolved, or ignored |
+| **Issue Grouping** | Repeated entries roll up into one issue with an occurrence count |
+| **Status Workflow** | Mark issues open, investigating, resolved, or ignored; resolved issues reopen if they recur |
 | **Log Notes** | Add investigation notes to any log entry |
 | **Quick Filters** | One-click filters for common queries |
 | **Keyboard Shortcuts** | 14 shortcuts for navigation, status changes, and actions |
@@ -920,4 +919,4 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## 📄 License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](https://github.com/AhmedMerza/laravel-logscope/blob/master/LICENSE) for details.
