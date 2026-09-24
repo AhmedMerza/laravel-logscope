@@ -215,7 +215,7 @@ class LogGroupController extends Controller
             return response()->json(['error' => 'Invalid status'], 422);
         }
 
-        $updated = LogGroup::whereIn('id', $request->input('ids'))->update([
+        $values = [
             'status' => $status,
             'status_changed_at' => now(),
             'status_changed_by' => LogScope::getStatusChangedBy($request),
@@ -223,7 +223,12 @@ class LogGroupController extends Controller
             // marks a group as "came back" is cleared here too — otherwise it
             // would stay set forever. Mirrors LogGroup::setStatus().
             'regressed_at' => null,
-        ]);
+        ];
+        $updated = 0;
+
+        foreach (array_chunk(array_unique((array) $request->input('ids')), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+            $updated += LogGroup::query()->whereIn('id', $chunk)->update($values);
+        }
 
         return response()->json(['message' => "{$updated} groups updated to {$status}"]);
     }
