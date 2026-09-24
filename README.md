@@ -30,41 +30,15 @@ Visit `/logscope` in your browser. That's it!
 
 ---
 
-## Table of Contents
-
-- [Features](#-features)
-- [Requirements](#-requirements)
-- [When to Use LogScope](#-when-to-use-logscope)
-- [Installation](#-installation)
-- [Authorization](#-authorization)
-- [Documentation](#-documentation)
-- [Extensions](#%EF%B8%8F-extensions)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
-
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| **Zero-Config Capture** | Automatically captures ALL logs from ALL channels |
-| **Request Context** | Trace ID, user ID, IP, URL, and user agent for every log |
-| **Advanced Search** | Search syntax (`field:value`), regex support, NOT toggle |
-| **Smart Filters** | Include/exclude by level, channel, HTTP method, date range |
-| **Active Filters Bar** | See all active filters at a glance, clear individually |
-| **Channel Search** | Search and filter channels when you have many |
-| **JSON Viewer** | Syntax-highlighted, collapsible JSON with copy support |
-| **Smart Context** | Auto-expand Request/Model objects, redact sensitive data |
-| **Issue Grouping** | Repeated entries roll up into one issue with an occurrence count |
-| **Status Workflow** | Mark issues open, investigating, resolved, or ignored; resolved issues reopen if they recur |
-| **Log Notes** | Add investigation notes to any log entry |
-| **Quick Filters** | One-click filters for common queries |
-| **Keyboard Shortcuts** | 14 shortcuts for navigation, status changes, and actions |
-| **Dark Mode** | Full dark mode support with persistence |
-| **Shareable URLs** | Current filters reflected in URL for sharing |
-| **Deep Linking** | Link directly to specific log entries |
-| **Performance** | Keyset pagination, batch writes, query optimization, proper indexing |
+- **Captures everything, no setup.** Every log from every channel, each with its trace ID, user ID, IP, URL and user agent.
+- **Search and filters.** `field:value` search, regex and a NOT toggle. Include or exclude by level, channel, HTTP method and date range, with one-click quick filters.
+- **Issues and triage.** Repeated entries are grouped into one issue with an occurrence count. Mark an issue open, investigating, resolved or ignored, and add notes. A resolved issue reopens if it happens again.
+- **Readable context.** Collapsible, syntax-highlighted JSON. Request and model objects are expanded, and passwords, tokens and other sensitive keys are redacted.
+- **Keyboard-first.** Vim-style navigation, and one key to change an issue's status and move to the next. Dark mode included.
+- **Shareable.** Filters live in the URL, and every entry has its own link.
+- **Fast on big tables.** Keyset pagination, writes batched until after the response, and indexes on the common filters.
 
 ---
 
@@ -98,23 +72,6 @@ LogScope stores logs in your database - a deliberate choice that works great for
 | Database bloat | Retention policies with scheduled pruning (default: 30 days) |
 | Performance | Batch mode writes logs *after* response is sent |
 | Query speed | Proper indexes on common filter combinations |
-
----
-
-## 📦 Installation
-
-```bash
-composer require ahmedmerza/logscope
-```
-
-Run the install command:
-
-```bash
-php artisan logscope:install
-php artisan migrate
-```
-
-Access the dashboard at `/logscope`.
 
 ---
 
