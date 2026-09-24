@@ -51,8 +51,17 @@ jobs:
   # tests/Transactions and MigrationsTest test engine-specific behaviour, so
   # they also run on the engines. See TransactionTestCase.
   databases:
-    name: Postgres 16 / MySQL 8
+    name: Postgres 16 / MySQL 8 / Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Laravel 11 isn't here yet: its MySQL schema builder ignores the
+          # database in a qualified `db.table` name, which LogScope's migrations
+          # rely on (#106).
+          - { laravel: '12', testbench: '10.*', pest: '3.*' }
+          - { laravel: '13', testbench: '11.*', pest: '5.*' }
     services:
       postgres:
         image: postgres:16
@@ -84,7 +93,9 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        run: composer update --prefer-dist --prefer-stable --no-interaction --no-progress
+        run: |
+          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" "pestphp/pest:${{ matrix.pest }}" "pestphp/pest-plugin-laravel:${{ matrix.pest }}" --no-update --no-interaction
+          composer update --prefer-dist --prefer-stable --no-interaction --no-progress
 
       - name: Postgres
         run: vendor/bin/pest tests/Transactions tests/Feature/MigrationsTest.php
