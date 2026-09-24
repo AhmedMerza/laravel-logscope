@@ -5,7 +5,12 @@ All notable changes to LogScope are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] — 2026-09-24
+
+Repeated entries now roll up into groups, with triage on the group (#29). Two
+fixes stop LogScope from contending with your application's database work
+(#45, #46), and `sensitive_keys` can no longer switch off the default redaction
+(#79). **Run `php artisan migrate`, then `php artisan logscope:backfill-fingerprints`.**
 
 ### Changed
 
@@ -61,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   One bound, which also settles the buffer cap reverted in f147bf8 (#28): a transaction that logs more than ten times `LOGSCOPE_BATCH_MAX_ENTRIES` (5,000 by default) would grow the buffer until the process ran out of memory, so at that point the buffer is written inside the transaction after all. That was the original cap's behaviour; it was reverted because a failed write there aborted the whole transaction on Postgres. Savepoints (#40, v2.1.0) closed that hole, so the cap returns as planned — losing a log to an OOM is worse than writing one inside a transaction that can't be damaged by it.
 
   Deferring is switched off in the `testing` environment. `RefreshDatabase` wraps each test in a transaction it never commits and unsets the event dispatcher around it, so a deferred log would never be written and any assertion against it would fail — and nothing distinguishes that wrapping transaction from a real one at runtime. Test writes stay immediate, protected by savepoints as before. Tests that manage their own transactions can opt back in with `config(['logscope.defer_in_transactions' => true])`.
+
+- **Clear, `logscope:prune` and `import --fresh` delete by id in chunks instead of by filter** (#46). A filtered `DELETE` made MySQL lock every row and gap it scanned, and wait on any row another session had not yet committed, so a large Clear or prune both waited on the application's transactions and held locks the application then had to wait on. Matching ids are now read with a plain `SELECT` and deleted by primary key, 1,000 at a time. Chunking alone was not enough: a chunked range delete still timed out at 5,000 rows where the by-id form passed.
+
+- **Acting on a large selection no longer fails** (#94). Bulk delete and both bulk status endpoints (entries and groups) bound every selected id into a single statement, so a big enough selection exceeded the database's bind-parameter limit and returned an error. The ids are now deduplicated and sent in chunks of 1,000; a status change still stamps one `status_changed_at` across every chunk, and the "N updated" count no longer counts an id twice.
+
+### Removed
+
+- **The Watchtower block button is gone from the log detail panel** (#95, #57). Blocking an IP belongs on Watchtower's own dashboard, so LogScope no longer embeds its `ip-actions` partial. Nothing to change on your side: the partial gated itself server-side and read nothing from LogScope's config.
 
 ## [2.1.0] — 2026-09-20
 

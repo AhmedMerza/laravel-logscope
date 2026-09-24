@@ -22,11 +22,11 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**Latest: [v2.1.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.1.0)** — **a redaction release. Upgrade if you log request data.** No migration.
+**Latest: [v2.2.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.2.0)** — **Run `php artisan migrate`, then `php artisan logscope:backfill-fingerprints`.**
 
-`sensitive_keys` only ever redacted a logged `Request` object, so the arrays you log yourself stored passwords, card numbers and API tokens in clear — and `['request' => $request->all()]` is the common spelling (#76). The Monolog handler carried its own copy of the context walk with no redaction in it at all, storing Symfony's raw HTTP dump — `Authorization` header, `Cookie`, form body — for everyone using `capture => channel` or `pushHandler()` (#77). A compound key split across array levels was missed too, which is what Laravel makes of a bracketed form field like `card[number]` (#80). Keys are now matched per word, with `sensitive_keys_except` to name the false positives. `logscope:import` also works for the first time (#77).
+Repeated entries now roll up into groups with an occurrence count, and status and notes move to the group, so resolving an error resolves every occurrence of it. A resolved group that fires again reopens itself; Ignored is the status that stays silent (#29). Logs written inside your transaction are now held until it ends instead of joining it (#45), Clear and prune delete by id in chunks rather than locking by filter (#46), and bulk actions on large selections no longer exceed the database's bind-parameter limit (#94).
 
-Breaking: the API returns `user_id` as a string (#26) — the one change likely to reach your code. Four narrower ones are in the changelog: Laravel 11 is now the minimum (#52), and `ContextSanitizerInterface` gained two methods, which only matters if you bound your own implementation.
+Behaviour change: `sensitive_keys` now adds to the default redacted keys instead of replacing them (#79). If you used it to drop a default, name that field in `sensitive_keys_except` instead — the changelog has the before/after.
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history and behavior-change notes.
 
