@@ -362,12 +362,16 @@ class LogController extends Controller
 
         $changedBy = LogScope::getStatusChangedBy($request);
 
-        $updated = LogEntry::whereIn('id', $request->input('ids'))
-            ->update([
-                'status' => $status,
-                'status_changed_at' => now(),
-                'status_changed_by' => $changedBy,
-            ]);
+        $values = [
+            'status' => $status,
+            'status_changed_at' => now(),
+            'status_changed_by' => $changedBy,
+        ];
+        $updated = 0;
+
+        foreach (array_chunk((array) $request->input('ids'), LogEntry::DELETE_CHUNK_SIZE) as $chunk) {
+            $updated += LogEntry::query()->whereIn('id', $chunk)->update($values);
+        }
 
         return response()->json(['message' => "{$updated} log entries updated to {$status}"]);
     }
