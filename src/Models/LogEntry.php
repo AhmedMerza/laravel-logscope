@@ -151,8 +151,10 @@ class LogEntry extends Model
      * fdiv(1, 0) used to cost every sibling field and store '' (#69). Those
      * become the strings 'INF' / '-INF' / 'NAN' rather than a silent 0.
      * JSON_PARTIAL_OUTPUT_ON_ERROR covers what the walk cannot reach (an
-     * object's properties, a resource) by nulling just that value, so the
-     * result is never '' — which MySQL and Postgres reject as JSON.
+     * object's properties, a resource) by replacing just that value — 0 for
+     * a float, null otherwise — so the result is never '', which MySQL and
+     * Postgres reject as JSON. Logged context reaches here sanitized, with
+     * objects already turned into arrays, so that is the direct-caller case.
      */
     public static function encodeContext(array $context): string
     {

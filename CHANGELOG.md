@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`INF` or `NAN` in log context no longer wipes the whole context** (#69). `json_encode()` fails the entire document on a non-finite float, so one `fdiv(1, 0)` — or a decoded API response with an overflowing number — lost every sibling field: sqlite stored `''`, and MySQL and Postgres rejected the insert and wrote a fallback row instead. Non-finite floats are now stored as the strings `"INF"`, `"-INF"` and `"NAN"`, and any other value that still can't be encoded becomes `null` without taking its siblings with it.
+- **`INF` or `NAN` in log context no longer wipes the whole context** (#69). `json_encode()` fails the entire document on a non-finite float, so one `fdiv(1, 0)` — or a decoded API response with an overflowing number — lost every sibling field: sqlite stored `''`, and MySQL and Postgres rejected the insert and wrote a fallback row instead. Non-finite floats are now stored as the strings `"INF"`, `"-INF"` and `"NAN"`, and a value that still can't be encoded is replaced on its own (`0` for a float, `null` otherwise) without taking its siblings with it.
 
 ## [2.2.0] — 2026-09-24
 
