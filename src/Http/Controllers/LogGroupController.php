@@ -166,7 +166,7 @@ class LogGroupController extends Controller
     }
 
     /**
-     * Update the status of a group — and so of every occurrence in it.
+     * Update the status of a group. Its entries keep their own statuses.
      */
     public function setStatus(Request $request, string $id): JsonResponse
     {

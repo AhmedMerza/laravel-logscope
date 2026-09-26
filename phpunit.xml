@@ -20,6 +20,9 @@
         <testsuite name="EagerProvider">
             <directory>tests/EagerProvider</directory>
         </testsuite>
+        <testsuite name="Api">
+            <directory>tests/Api</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

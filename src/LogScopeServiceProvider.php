@@ -521,6 +521,10 @@ class LogScopeServiceProvider extends ServiceProvider
         if (config('logscope.routes.enabled', true)) {
             $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         }
+
+        if (config('logscope.routes.api.enabled', false)) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        }
     }
 
     /**

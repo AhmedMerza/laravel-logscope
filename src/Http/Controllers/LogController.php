@@ -26,6 +26,43 @@ class LogController extends Controller
     public function index(Request $request): View
     {
         return view('logscope::index', [
+            ...$this->clientConfig(),
+            'shortcuts' => $this->getShortcuts(),
+            'failureBanner' => config('logscope.failure_banner.enabled', true)
+                ? WriteFailureLogger::recentFailures()
+                : null,
+        ]);
+    }
+
+    /**
+     * Filter options and settings for a token client (#64): the page data
+     * plus the theme, so a native client matches the host's web UI.
+     */
+    public function config(Request $request): JsonResponse
+    {
+        $theme = config('logscope.theme', []);
+
+        return response()->json(['data' => [
+            ...$this->clientConfig(),
+            // Same fallbacks as layout.blade.php.
+            'theme' => [
+                'primary' => $theme['primary'] ?? '#10b981',
+                'dark_mode_default' => $theme['dark_mode_default'] ?? true,
+                'fonts' => $theme['fonts'] ?? ['sans' => 'Outfit', 'mono' => 'JetBrains Mono'],
+                'levels' => $theme['levels'] ?? [],
+            ],
+        ]]);
+    }
+
+    /**
+     * Page data shared by the Blade view and the API's config endpoint, so
+     * the two can't drift apart.
+     *
+     * @return array<string, mixed>
+     */
+    protected function clientConfig(): array
+    {
+        return [
             'levels' => $this->getAvailableLevels(),
             'channels' => $this->getAvailableChannels(),
             'httpMethods' => $this->getAvailableHttpMethods(),
@@ -41,16 +78,12 @@ class LogController extends Controller
                 'collapseThreshold' => config('logscope.json_viewer.collapse_threshold', 5),
                 'autoCollapseKeys' => config('logscope.json_viewer.auto_collapse_keys', ['trace', 'stack_trace', 'stacktrace', 'backtrace']),
             ],
-            'shortcuts' => $this->getShortcuts(),
             'grouping' => [
                 // Whether the list opens in the grouped view. Groups are
                 // recorded either way — this only picks the default tab (#29).
                 'enabled' => (bool) config('logscope.grouping.enabled', true),
             ],
-            'failureBanner' => config('logscope.failure_banner.enabled', true)
-                ? WriteFailureLogger::recentFailures()
-                : null,
-        ]);
+        ];
     }
 
     /**
