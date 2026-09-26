@@ -83,8 +83,8 @@ it('keeps a context holding INF and NAN in batch mode', function () {
 });
 
 it('keeps a context holding INF and NAN in queue mode, which serializes before storage', function () {
-    // dispatch() encodes the job payload itself, so without the coercion in
-    // WriteLogEntry no job is queued and FallbackWriter writes a marker row.
+    // The job is serialize()d at dispatch, which represents INF fine; the
+    // worker's handle() then stores it through the same encodeContext().
     config(['logscope.write_mode' => 'queue', 'queue.default' => 'database']);
 
     Schema::dropIfExists('jobs');
@@ -114,4 +114,22 @@ it('keeps the siblings of a value the array walk cannot reach', function () {
 
     expect(json_decode(LogEntry::encodeContext($context), true))
         ->toBe(['o' => ['v' => 0], 'r' => null, 'keep' => 'me']);
+});
+
+it('keeps a context holding an overflowing number through logscope:import', function () {
+    // json_decode() turns 1e400 into INF without an error, so an imported
+    // line reaches encodeContext() carrying one.
+    $logFile = sys_get_temp_dir().'/logscope-import-'.uniqid().'.log';
+    file_put_contents($logFile, '['.now()->format('Y-m-d H:i:s').'] testing.WARNING: rate check {"ratio":1e400,"keep":"me"}');
+
+    try {
+        $this->artisan('logscope:import', ['path' => $logFile, '--days' => 0])->assertExitCode(0);
+    } finally {
+        @unlink($logFile);
+    }
+
+    $entry = LogEntry::query()->where('message', 'like', 'rate check%')->latest('id')->first();
+
+    expect($entry)->not->toBeNull()
+        ->and(json_decode($entry->getRawOriginal('context'), true))->toBe(['ratio' => 'INF', 'keep' => 'me']);
 });
