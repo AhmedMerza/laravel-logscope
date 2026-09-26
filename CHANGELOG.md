@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Retention by level** (#31). `retention.levels` gives chosen levels their own window, e.g. `['debug' => 3, 'error' => 90]`; every other level keeps `retention.days`. A config with only `days` prunes exactly as before. `logscope:prune --dry-run` now shows a per-level breakdown with each window, `logscope:doctor` prints the effective policy and warns about unknown level names, and `model:prune` follows the same policy. Deletes stay chunked by primary key (#46).
+
 ### Changed
 
 - **Laravel 13 is now tested, and supported versions are capped at 11–13** (#75). LogScope already worked on Laravel 13, but `>=11.0` let composer install it on any future major with no test behind it — which is how Laravel 13 got deployed before CI had ever run on it. CI now runs the suite on Laravel 11, 12 and 13 (the MySQL/Postgres tests on 12 and 13; Laravel 11 there is #106), and `composer.json` requires `^11.0|^12.0|^13.0`. Laravel 14 will install once a release adds it to CI, not before.
