@@ -98,6 +98,7 @@ Gate::define('viewLogScope', fn ($user) => $user->hasRole('admin'));
 - **[Configuration](https://github.com/AhmedMerza/laravel-logscope/blob/master/docs/configuration.md)** — capture and write modes, writes during transactions, retention, noise filters, routes, theme, redaction of sensitive keys and headers, and every environment variable.
 - **[Usage](https://github.com/AhmedMerza/laravel-logscope/blob/master/docs/usage.md)** — search syntax, the status workflow and custom statuses, quick filters, keyboard shortcuts, custom context, and the Artisan commands.
 - **[Production Deployment](https://github.com/AhmedMerza/laravel-logscope/blob/master/docs/production.md)** — recommended settings, scheduling `logscope:prune`, and high-traffic apps.
+- **[JSON API](https://github.com/AhmedMerza/laravel-logscope/blob/master/docs/api.md)** — the opt-in, token-authenticated v1 API for native clients: setup with Sanctum, access, and every endpoint.
 - **[Known Limitations](https://github.com/AhmedMerza/laravel-logscope/blob/master/docs/known-limitations.md)** — the few kinds of log that bypass Laravel's logger, and what to do about each.
 
 ---

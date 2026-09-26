@@ -107,6 +107,15 @@ return [
         'domain' => env('LOGSCOPE_DOMAIN'),
         'forbidden_redirect' => env('LOGSCOPE_FORBIDDEN_REDIRECT', '/'), // Where to redirect on 403, null to show default 403 page
         'unauthenticated_redirect' => env('LOGSCOPE_UNAUTHENTICATED_REDIRECT', '/login'), // Where to redirect on 401/419 (session expired)
+
+        // Token-authenticated JSON API for native clients, off by default.
+        // Needs Sanctum (or swap in your own guard). Uses the same access
+        // check as the web UI. See docs/api.md.
+        'api' => [
+            'enabled' => env('LOGSCOPE_API_ENABLED', false),
+            'prefix' => env('LOGSCOPE_API_PREFIX', 'api/logscope/v1'),
+            'middleware' => ['api', 'auth:sanctum'],
+        ],
     ],
 
     /*

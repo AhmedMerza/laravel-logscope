@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Token-authenticated JSON API for native clients** (#64). Off by default; set `LOGSCOPE_API_ENABLED=true` and it serves `api/logscope/v1` behind `auth:sanctum` and the same access check as the web UI. It reads config, logs, stats and groups and sets entry and group statuses, and has no destructive endpoints. Every response is JSON, so a missing token is a `401` rather than a redirect to a login route. Needs `laravel/sanctum`, or your own guard. See [docs/api.md](docs/api.md).
 - **Retention by level** (#31). `retention.levels` gives chosen levels their own window, e.g. `['debug' => 3, 'error' => 90]`; every other level keeps `retention.days`. A config with only `days` prunes exactly as before. `logscope:prune --dry-run` now shows a per-level breakdown with each window, `logscope:doctor` prints the effective policy and warns about unknown level names, and `model:prune` follows the same policy. Deletes stay chunked by primary key (#46).
 
 ### Changed
