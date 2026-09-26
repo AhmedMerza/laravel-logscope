@@ -38,6 +38,11 @@ return [
     | Control how long log entries are kept in the database. Set enabled to
     | false to keep logs indefinitely, or specify the number of days.
     |
+    | 'levels'        - Optional per-level windows in days, e.g.
+    |                   ['debug' => 3, 'info' => 14, 'error' => 90].
+    |                   A level not listed keeps 'days'. Empty (the
+    |                   default) applies 'days' to every level.
+    |
     | 'auto_schedule' - Opt-in. When true, LogScope registers the
     |                   `logscope:prune` command on Laravel's scheduler so
     |                   you don't need to wire it yourself. Default false:
@@ -54,6 +59,7 @@ return [
     'retention' => [
         'enabled' => env('LOGSCOPE_RETENTION_ENABLED', true),
         'days' => env('LOGSCOPE_RETENTION_DAYS', 30),
+        'levels' => [],
         'auto_schedule' => env('LOGSCOPE_RETENTION_AUTO_SCHEDULE', false),
         'schedule_at' => env('LOGSCOPE_RETENTION_SCHEDULE_AT', '03:00'),
     ],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LogScope\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use LogScope\Models\LogEntry;
 use LogScope\Services\GroupRecorder;
 
@@ -33,9 +34,6 @@ class PruneCommand extends Command
     public function handle(): int
     {
         $configEnabled = config('logscope.retention.enabled', true);
-        $configDays = config('logscope.retention.days', 30);
-
-        $days = $this->option('days') ? (int) $this->option('days') : $configDays;
         $dryRun = $this->option('dry-run');
         $chunkSize = (int) $this->option('chunk');
 
@@ -47,24 +45,31 @@ class PruneCommand extends Command
             return self::SUCCESS;
         }
 
-        $cutoff = now()->subDays($days);
+        // --days is one window for every level, overriding the per-level
+        // policy as well as retention.days.
+        $policy = $this->option('days')
+            ? ['*' => (int) $this->option('days')]
+            : LogEntry::retentionPolicy();
 
-        // Count records to be deleted
-        $count = LogEntry::query()
-            ->where('occurred_at', '<', $cutoff)
-            ->count();
+        $query = LogEntry::pastRetention($policy);
+
+        $window = count($policy) === 1
+            ? "older than {$policy['*']} days"
+            : 'past their retention window';
+
+        $count = (clone $query)->count();
 
         if ($count === 0) {
-            $this->components->info("No log entries older than {$days} days found.");
+            $this->components->info("No log entries {$window} found.");
 
             return self::SUCCESS;
         }
 
-        $this->components->info("Found {$count} log entries older than {$days} days.");
+        $this->components->info("Found {$count} log entries {$window}.");
 
         if ($dryRun) {
             $this->components->warn('Dry run - no records will be deleted.');
-            $this->showBreakdown($cutoff);
+            $this->showBreakdown($query, $policy);
 
             return self::SUCCESS;
         }
@@ -78,11 +83,8 @@ class PruneCommand extends Command
         // Delete in chunks, by id, so the statements stay short and don't
         // wait on rows another session has open (#46).
         $deleted = 0;
-        $this->components->task('Pruning old log entries', function () use ($cutoff, $chunkSize, &$deleted) {
-            $deleted = LogEntry::deleteInChunks(
-                LogEntry::query()->where('occurred_at', '<', $cutoff),
-                $chunkSize,
-            );
+        $this->components->task('Pruning old log entries', function () use ($query, $chunkSize, &$deleted) {
+            $deleted = LogEntry::deleteInChunks($query, $chunkSize);
 
             return true;
         });
@@ -104,12 +106,14 @@ class PruneCommand extends Command
     }
 
     /**
-     * Show breakdown of entries to be deleted by level.
+     * Show breakdown of entries to be deleted by level, with the window
+     * each level is kept for.
+     *
+     * @param  array<string, int>  $policy
      */
-    protected function showBreakdown(\DateTimeInterface $cutoff): void
+    protected function showBreakdown(Builder $query, array $policy): void
     {
-        $breakdown = LogEntry::query()
-            ->where('occurred_at', '<', $cutoff)
+        $breakdown = (clone $query)
             ->selectRaw('level, count(*) as count')
             ->groupBy('level')
             ->orderByDesc('count')
@@ -124,9 +128,10 @@ class PruneCommand extends Command
 
         $rows = $breakdown->map(fn ($row) => [
             'Level' => strtoupper($row->level),
+            'Kept for' => ($policy[$row->level] ?? $policy['*']).' days',
             'Count' => number_format($row->count),
         ])->toArray();
 
-        $this->table(['Level', 'Count'], $rows);
+        $this->table(['Level', 'Kept for', 'Count'], $rows);
     }
 }

@@ -84,6 +84,17 @@ LOGSCOPE_RETENTION_SCHEDULE_AT=03:00
 
 > **Note:** Retention requires either flipping `LOGSCOPE_RETENTION_AUTO_SCHEDULE=true` or scheduling `logscope:prune` yourself - see [Schedule Pruning](production.md#schedule-pruning).
 
+**Per-level windows.** Keep noisy levels briefly and serious ones longer in `config/logscope.php`:
+
+```php
+'retention' => [
+    'days' => 30,          // every level not listed below
+    'levels' => ['debug' => 3, 'info' => 14, 'error' => 90],
+],
+```
+
+`logscope:prune --dry-run` breaks the count down per level with each level's window, and `logscope:doctor` prints the effective policy (and warns about a misspelt level name, which would otherwise never match an entry). `--days=N` still applies one window to every level. `model:prune` uses the same policy. Groups follow their entries: a group whose last entry is pruned goes with it.
+
 ## Features
 
 ```env

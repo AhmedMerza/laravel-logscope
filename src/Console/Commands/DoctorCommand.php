@@ -21,6 +21,7 @@ use LogScope\Models\LogEntry;
 use LogScope\Models\LogGroup;
 use LogScope\Services\ContextSanitizer;
 use LogScope\Services\WriteFailureLogger;
+use Psr\Log\LogLevel;
 use Throwable;
 
 class DoctorCommand extends Command
@@ -289,12 +290,33 @@ class DoctorCommand extends Command
             return;
         }
 
-        $days = (int) config('logscope.retention.days', 30);
+        $policy = LogEntry::retentionPolicy();
+        $fallback = array_pop($policy);
+
+        // A misspelt level ('eror') would otherwise fall back to `days`
+        // without a word — the misconfiguration this check exists to show.
+        $unknown = array_diff(array_keys($policy), (new \ReflectionClass(LogLevel::class))->getConstants());
+
+        if ($unknown !== []) {
+            $this->markWarn('Retention', 'retention.levels names unknown level(s): '.implode(', ', $unknown).' — no entry is logged at that level, so its window never applies');
+
+            return;
+        }
+
+        $window = "{$fallback}-day window";
+
+        if ($policy !== []) {
+            $window = collect($policy)
+                ->map(fn (int $days, string $level) => "{$level} {$days}d")
+                ->push("others {$fallback}d")
+                ->implode(', ');
+        }
+
         $auto = (bool) config('logscope.retention.auto_schedule', false);
         $at = (string) config('logscope.retention.schedule_at', '03:00');
 
         if ($auto) {
-            $this->markPass('Retention', "{$days}-day window, auto-scheduled daily at {$at}");
+            $this->markPass('Retention', "{$window}, auto-scheduled daily at {$at}");
 
             return;
         }
@@ -306,19 +328,19 @@ class DoctorCommand extends Command
         $detection = $this->scanScheduleForPrune();
 
         if ($detection === true) {
-            $this->markPass('Retention', "{$days}-day window, prune is scheduled by your app");
+            $this->markPass('Retention', "{$window}, prune is scheduled by your app");
 
             return;
         }
 
         if ($detection === false) {
-            $this->markWarn('Retention', "{$days}-day window, but no schedule entry for `logscope:prune` was found — set retention.auto_schedule=true or wire it in your console kernel");
+            $this->markWarn('Retention', "{$window}, but no schedule entry for `logscope:prune` was found — set retention.auto_schedule=true or wire it in your console kernel");
 
             return;
         }
 
         // $detection === null: we couldn't check without side effects.
-        $this->markWarn('Retention', "{$days}-day window — auto_schedule is off; confirm you've wired `logscope:prune` in your console kernel or set retention.auto_schedule=true");
+        $this->markWarn('Retention', "{$window} — auto_schedule is off; confirm you've wired `logscope:prune` in your console kernel or set retention.auto_schedule=true");
     }
 
     protected function checkHeaderCapture(): void

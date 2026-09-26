@@ -170,9 +170,62 @@ class LogEntry extends Model
             return static::query()->whereRaw('1 = 0');
         }
 
-        $days = config('logscope.retention.days', 30);
+        return static::pastRetention();
+    }
 
-        return static::query()->where('occurred_at', '<', now()->subDays($days));
+    /**
+     * Retention in days per level (#31): every level listed in
+     * retention.levels, lowercased, then '*' for any level not listed,
+     * which falls back to retention.days.
+     *
+     * @return array<string, int>
+     */
+    public static function retentionPolicy(): array
+    {
+        $policy = [];
+
+        foreach ((array) config('logscope.retention.levels', []) as $level => $days) {
+            $policy[strtolower((string) $level)] = (int) $days;
+        }
+
+        $policy['*'] = (int) config('logscope.retention.days', 30);
+
+        return $policy;
+    }
+
+    /**
+     * Entries older than their level's retention window.
+     *
+     * @param  array<string, int>|null  $policy  shaped like retentionPolicy(), which it defaults to
+     */
+    public static function pastRetention(?array $policy = null): Builder
+    {
+        $policy ??= static::retentionPolicy();
+        $now = now();
+
+        // The shortest window bounds the whole set, so the outer range can
+        // use the occurred_at index before the per-level conditions apply.
+        // With no levels listed this is the only condition — the same query
+        // as a plain `days` policy.
+        $query = static::query()->where('occurred_at', '<', $now->copy()->subDays(min($policy)));
+
+        if (count($policy) === 1) {
+            return $query;
+        }
+
+        $fallback = array_pop($policy);
+
+        return $query->where(function (Builder $query) use ($policy, $fallback, $now) {
+            foreach ($policy as $level => $days) {
+                $query->orWhere(fn (Builder $q) => $q
+                    ->where('level', $level)
+                    ->where('occurred_at', '<', $now->copy()->subDays($days)));
+            }
+
+            $query->orWhere(fn (Builder $q) => $q
+                ->whereNotIn('level', array_keys($policy))
+                ->where('occurred_at', '<', $now->copy()->subDays($fallback)));
+        });
     }
 
     /**
