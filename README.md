@@ -44,7 +44,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## 📋 Requirements
 
-- PHP 8.2+
+- PHP 8.2+ (8.3+ for Laravel 13)
 - Laravel 11, 12 or 13
 - SQLite, MySQL, or PostgreSQL
 
