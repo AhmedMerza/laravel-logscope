@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-09-26
+
+An opt-in, token-authenticated JSON API for native clients (#64), retention
+windows per log level (#31), and a fix for `INF`/`NAN` wiping a log's whole
+context (#69). Laravel 13 is now tested and supported versions are capped at
+11–13 (#75). No migration.
+
 ### Added
 
 - **Token-authenticated JSON API for native clients** (#64). Off by default; set `LOGSCOPE_API_ENABLED=true` and it serves `api/logscope/v1` behind `auth:sanctum` and the same access check as the web UI. It reads config, logs, stats and groups and sets entry and group statuses, and has no destructive endpoints. Every response is JSON, so a missing token is a `401` rather than a redirect to a login route. Needs `laravel/sanctum`, or your own guard. See [docs/api.md](docs/api.md).

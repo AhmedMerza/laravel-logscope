@@ -24,9 +24,9 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**[v2.2.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.2.0):** repeated entries are now grouped into issues, and a resolved issue reopens if it fires again. Log writes no longer happen inside your transactions.
+**[v2.3.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.0):** an opt-in JSON API for native clients, authenticated with Sanctum tokens ([docs/api.md](docs/api.md)); retention by level, so debug logs can expire before errors do; and a log whose context holds `INF` or `NAN` keeps its context instead of losing it.
 
-**Upgrading:** run `php artisan migrate`, then `php artisan logscope:backfill-fingerprints`. Full notes, including one behaviour change to `sensitive_keys`, are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
+**Upgrading:** no migration. Supported Laravel versions are now 11–13. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
 ---
 
