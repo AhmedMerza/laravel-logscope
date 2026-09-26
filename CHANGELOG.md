@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Laravel 13 is now tested, and supported versions are capped at 11–13** (#75). LogScope already worked on Laravel 13, but `>=11.0` let composer install it on any future major with no test behind it — which is how Laravel 13 got deployed before CI had ever run on it. CI now runs the suite on Laravel 11, 12 and 13 (the MySQL/Postgres tests on 12 and 13; Laravel 11 there is #106), and `composer.json` requires `^11.0|^12.0|^13.0`. Laravel 14 will install once a release adds it to CI, not before.
 
+### Fixed
+
+- **`INF` or `NAN` in log context no longer wipes the whole context** (#69). `json_encode()` fails the entire document on a non-finite float, so one `fdiv(1, 0)` — or a decoded API response with an overflowing number — lost every sibling field: sqlite stored `''`, and MySQL and Postgres rejected the insert and wrote a fallback row instead. Non-finite floats are now stored as the strings `"INF"`, `"-INF"` and `"NAN"`, and a value that still can't be encoded is replaced on its own (`0` for a float, `null` otherwise) without taking its siblings with it.
+
 ## [2.2.0] — 2026-09-24
 
 Repeated entries now roll up into groups, with triage on the group (#29). Two
