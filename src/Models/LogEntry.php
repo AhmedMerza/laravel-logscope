@@ -146,10 +146,23 @@ class LogEntry extends Model
      * cast this replaces used none, and `context:` search is a substring
      * LIKE over these bytes. Valid input stays byte-identical to what
      * previous versions stored.
+     *
+     * A non-finite float makes json_encode() fail the whole document, so one
+     * fdiv(1, 0) used to cost every sibling field and store '' (#69). Those
+     * become the strings 'INF' / '-INF' / 'NAN' rather than a silent 0.
+     * JSON_PARTIAL_OUTPUT_ON_ERROR covers what the walk cannot reach (an
+     * object's properties, a resource) by nulling just that value, so the
+     * result is never '' — which MySQL and Postgres reject as JSON.
      */
     public static function encodeContext(array $context): string
     {
-        return (string) json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE);
+        array_walk_recursive($context, function (mixed &$value): void {
+            if (is_float($value) && ! is_finite($value)) {
+                $value = (string) $value;
+            }
+        });
+
+        return (string) json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
     }
 
     public function getTable(): string
