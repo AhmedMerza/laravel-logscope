@@ -41,6 +41,13 @@ jobs:
           extensions: pdo_sqlite
           coverage: none
 
+      # Every Laravel 11 release is covered by advisory PKSA-mdq4-51ck-6kdq, so
+      # composer's insecure-package blocking falls back to 11.x-dev instead of
+      # the latest release — which is what this row is meant to test.
+      - name: Allow advisory-flagged Laravel 11 releases
+        if: matrix.laravel == '11'
+        run: composer config audit.block-insecure false
+
       - name: Install dependencies
         run: |
           composer require --dev "orchestra/testbench:${{ matrix.testbench }}" "pestphp/pest:${{ matrix.pest }}" "pestphp/pest-plugin-laravel:${{ matrix.pest }}" --no-update --no-interaction
