@@ -7,6 +7,7 @@ namespace LogScope\Services;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogScope\Concerns\ClassifiesTransientDatabaseErrors;
 use LogScope\Enums\LogStatus;
 use LogScope\Models\LogEntry;
 use LogScope\Models\LogGroup;
@@ -30,10 +31,13 @@ use LogScope\Models\LogGroup;
  *
  * Each of the three statements is retried independently on a transient DB
  * error (see retrying()) — a batched insertOrIgnore/update keyed on a unique
- * index is a known InnoDB deadlock shape under concurrent flushes.
+ * index is a known InnoDB deadlock shape under concurrent flushes. Only
+ * outside an open app transaction, though; see retrying()'s docblock.
  */
 final class GroupRecorder
 {
+    use ClassifiesTransientDatabaseErrors;
+
     /**
      * Record occurrences for a set of prepared entry rows.
      *
@@ -68,35 +72,34 @@ final class GroupRecorder
      * time rather than the whole record() sequence: bumpCounts() is
      * additive, so replaying it after it already succeeded — because a
      * later statement then failed — would double-count.
+     *
+     * Never retries while an app transaction is open (transactionLevel() >
+     * 0). On MySQL a deadlock kills the *whole* transaction, not just the
+     * statement — the connection then autocommits again, so a "successful"
+     * retry there actually writes standalone, outside the transaction the
+     * app still believes it's in (verified: it leaves an orphaned log_groups
+     * row after a forced deadlock + rollback, self-healing via
+     * deleteOrphaned() but real). TransactionSavepoint's own contract for
+     * that case is to propagate immediately and let the caller's fallback
+     * handle it — defer to that instead of retrying blind.
      */
     private static function retrying(callable $statement): void
     {
+        $connection = (new LogGroup)->getConnection();
+
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             try {
                 $statement();
 
                 return;
             } catch (QueryException $e) {
-                if ($attempt === 3 || ! self::isTransientFailure($e)) {
+                if ($attempt === 3 || $connection->transactionLevel() > 0 || ! self::isTransientFailure($e)) {
                     throw $e;
                 }
 
                 usleep(random_int(1_000, 5_000) * $attempt);
             }
         }
-    }
-
-    /**
-     * SQLSTATE classes 08 (Connection Exception) and 40 (Transaction
-     * Rollback — deadlock/serialization failure) are worth a retry;
-     * anything else is a code/data problem a retry won't fix. Mirrors
-     * WriteLogEntry::isTransientFailure().
-     */
-    private static function isTransientFailure(QueryException $e): bool
-    {
-        $sqlState = (string) $e->getCode();
-
-        return str_starts_with($sqlState, '08') || str_starts_with($sqlState, '40');
     }
 
     /**
