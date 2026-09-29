@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace LogScope\Services;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogScope\Concerns\ClassifiesTransientDatabaseErrors;
 use LogScope\Enums\LogStatus;
 use LogScope\Models\LogEntry;
 use LogScope\Models\LogGroup;
@@ -26,9 +28,16 @@ use LogScope\Models\LogGroup;
  * future occurrence of it too, so an error that comes back is invisible in the
  * one view that is supposed to show you what is wrong. Ignored groups are left
  * alone — staying quiet is exactly what that status is for.
+ *
+ * Each of the three statements is retried independently on a transient DB
+ * error (see retrying()) — a batched insertOrIgnore/update keyed on a unique
+ * index is a known InnoDB deadlock shape under concurrent flushes. Only
+ * outside an open app transaction, though; see retrying()'s docblock.
  */
 final class GroupRecorder
 {
+    use ClassifiesTransientDatabaseErrors;
+
     /**
      * Record occurrences for a set of prepared entry rows.
      *
@@ -42,9 +51,56 @@ final class GroupRecorder
             return;
         }
 
-        self::insertMissing($summaries);
-        self::bumpCounts($summaries);
-        self::reopenRegressed(array_keys($summaries));
+        // Sorted so two concurrent flushes touching overlapping fingerprints
+        // take their unique-index locks in the same order — the standard
+        // mitigation for the InnoDB deadlock a batched insertOrIgnore/update
+        // on a unique index is otherwise prone to.
+        ksort($summaries);
+
+        self::retrying(fn () => self::insertMissing($summaries));
+        self::retrying(fn () => self::bumpCounts($summaries));
+        self::retrying(fn () => self::reopenRegressed(array_keys($summaries)));
+    }
+
+    /**
+     * Retry a single statement on a transient DB error (deadlock, lost
+     * connection). Deliberately not `DB::transaction($callback, $retries)`:
+     * that only retries at the outermost transaction level, so it silently
+     * does nothing when this runs inside TransactionSavepoint's raw-PDO
+     * savepoint — i.e. whenever the app already has a transaction open (see
+     * TransactionSavepoint's docblock). And deliberately one statement at a
+     * time rather than the whole record() sequence: bumpCounts() is
+     * additive, so replaying it after it already succeeded — because a
+     * later statement then failed — would double-count.
+     *
+     * Never retries while an app transaction is open (transactionLevel() >
+     * 0). On MySQL a deadlock kills the *whole* transaction, not just the
+     * statement — the connection then autocommits again, so retrying there
+     * would "succeed" by writing standalone, outside the transaction the app
+     * still believes it's in. Verified against a real forced deadlock: with
+     * this guard removed, that retry leaves an orphaned log_groups row once
+     * the app's own (now-dead) transaction rolls back — see
+     * GroupRecorderTransactionSafetyTest. TransactionSavepoint's own
+     * contract for that case is to propagate immediately and let the
+     * caller's fallback handle it — defer to that instead of retrying blind.
+     */
+    private static function retrying(callable $statement): void
+    {
+        $connection = (new LogGroup)->getConnection();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $statement();
+
+                return;
+            } catch (QueryException $e) {
+                if ($attempt === 3 || $connection->transactionLevel() > 0 || ! self::isTransientFailure($e)) {
+                    throw $e;
+                }
+
+                usleep(random_int(1_000, 5_000) * $attempt);
+            }
+        }
     }
 
     /**

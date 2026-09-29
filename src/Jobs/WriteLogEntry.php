@@ -6,10 +6,10 @@ namespace LogScope\Jobs;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use LogScope\Concerns\ClassifiesTransientDatabaseErrors;
 use LogScope\Contracts\ContextSanitizerInterface;
 use LogScope\Models\LogEntry;
 use LogScope\Services\FallbackWriter;
@@ -20,7 +20,7 @@ use Throwable;
 
 class WriteLogEntry implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use ClassifiesTransientDatabaseErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * Create a new job instance.
@@ -85,27 +85,5 @@ class WriteLogEntry implements ShouldQueue
                 // last-resort: error_log already covered observability
             }
         }
-    }
-
-    /**
-     * Classify a write failure as transient (retry-eligible) or
-     * persistent. We treat ONLY SQLSTATE classes 08 (Connection Exception)
-     * and 40 (Transaction Rollback — 40001 serialization failure / 40P01
-     * postgres deadlock) as transient. Everything else is assumed to be
-     * a code/data problem where a retry would just fail the same way.
-     *
-     * Non-QueryException throws (TypeError, autoload failures, etc.)
-     * are always persistent — those are the cases that motivated the
-     * fallback row in the first place.
-     */
-    private function isTransientFailure(Throwable $e): bool
-    {
-        if (! $e instanceof QueryException) {
-            return false;
-        }
-
-        $sqlState = (string) $e->getCode();
-
-        return str_starts_with($sqlState, '08') || str_starts_with($sqlState, '40');
     }
 }

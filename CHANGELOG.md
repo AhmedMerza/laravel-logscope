@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deadlock on `log_groups` insertOrIgnore under concurrent flushes** (#112). A batched `insert ignore` keyed on the unique `fingerprint` index is a known InnoDB deadlock shape (`SQLSTATE 40001`) when two flushes insert overlapping-but-differently-ordered new fingerprints. `GroupRecorder`'s three statements now retry independently on a transient SQLSTATE (08/40) instead of failing the whole rollup, and fingerprints are processed in a consistent (sorted) order across concurrent flushes to reduce how often the deadlock happens at all. The retry never engages while an app transaction is already open — verified against a real MySQL deadlock that a blind retry there would otherwise commit standalone, outside the transaction the app still believes it's in.
+
 ## [2.3.0] — 2026-09-26
 
 An opt-in, token-authenticated JSON API for native clients (#64), retention
