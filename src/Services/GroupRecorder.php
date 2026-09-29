@@ -75,13 +75,14 @@ final class GroupRecorder
      *
      * Never retries while an app transaction is open (transactionLevel() >
      * 0). On MySQL a deadlock kills the *whole* transaction, not just the
-     * statement — the connection then autocommits again, so a "successful"
-     * retry there actually writes standalone, outside the transaction the
-     * app still believes it's in (verified: it leaves an orphaned log_groups
-     * row after a forced deadlock + rollback, self-healing via
-     * deleteOrphaned() but real). TransactionSavepoint's own contract for
-     * that case is to propagate immediately and let the caller's fallback
-     * handle it — defer to that instead of retrying blind.
+     * statement — the connection then autocommits again, so retrying there
+     * would "succeed" by writing standalone, outside the transaction the app
+     * still believes it's in. Verified against a real forced deadlock: with
+     * this guard removed, that retry leaves an orphaned log_groups row once
+     * the app's own (now-dead) transaction rolls back — see
+     * GroupRecorderTransactionSafetyTest. TransactionSavepoint's own
+     * contract for that case is to propagate immediately and let the
+     * caller's fallback handle it — defer to that instead of retrying blind.
      */
     private static function retrying(callable $statement): void
     {
