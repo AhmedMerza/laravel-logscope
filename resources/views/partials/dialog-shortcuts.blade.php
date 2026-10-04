@@ -1,7 +1,6 @@
 <!-- Keyboard Shortcuts Help Dialog -->
 <div x-show="showKeyboardHelp" x-cloak
     class="fixed inset-0 z-50 flex items-center justify-center"
-    @keydown.escape.window="showKeyboardHelp = false"
     x-transition:enter="ease-out duration-200"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"

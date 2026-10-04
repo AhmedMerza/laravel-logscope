@@ -713,6 +713,8 @@ function logScope() {
         },
 
         closeGroupPanel() {
+            this._fetchGroupEntriesController?.abort();
+            this.groupEntriesLoading = false;
             this.selectedGroup = null;
             this.groupEntries = [];
         },
@@ -1468,6 +1470,16 @@ function logScope() {
          * back to the group; anything else closes (#29).
          */
         stepBack(event = null) {
+            // A dialog on top takes the Escape, and nothing behind it moves —
+            // deselecting under the delete dialog left it confirming nothing.
+            if (this.showDeleteDialog) {
+                this.cancelDelete();
+                return;
+            }
+            if (this.showKeyboardHelp) {
+                this.showKeyboardHelp = false;
+                return;
+            }
             // Escape while typing never closes the panel (it would throw the
             // typing away). A note box keeps focus so letters stay in it rather
             // than reaching the shortcuts; the search and selects let go.
@@ -1491,6 +1503,8 @@ function logScope() {
         },
 
         closePanel() {
+            this._fetchGroupEntriesController?.abort();
+            this.groupEntriesLoading = false;
             this.selectedLog = null;
             this.selectedGroup = null;
             this.groupEntries = [];
@@ -1892,6 +1906,11 @@ function logScope() {
             if (event.ctrlKey || event.metaKey || event.altKey) {
                 return;
             }
+
+            // Nothing moves behind a dialog: j/k under the delete confirm
+            // changed which log Delete would remove. Help only toggles itself.
+            if (this.showDeleteDialog) return;
+            if (this.showKeyboardHelp && event.key !== '?') return;
 
             const actionShortcut = [
                 {
