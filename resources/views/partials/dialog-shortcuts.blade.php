@@ -1,7 +1,6 @@
 <!-- Keyboard Shortcuts Help Dialog -->
 <div x-show="showKeyboardHelp" x-cloak
     class="fixed inset-0 z-50 flex items-center justify-center"
-    @keydown.escape.window="showKeyboardHelp = false"
     x-transition:enter="ease-out duration-200"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
@@ -38,11 +37,11 @@
                 <kbd>k</kbd>
             </div>
             <div class="flex items-center justify-between">
-                <span class="text-sm text-[var(--text-secondary)]">Open detail panel</span>
+                <span class="text-sm text-[var(--text-secondary)]" x-text="viewMode === 'grouped' ? 'Open first occurrence' : 'Open detail panel'"></span>
                 <kbd>Enter</kbd>
             </div>
             <div class="flex items-center justify-between">
-                <span class="text-sm text-[var(--text-secondary)]">Close panel</span>
+                <span class="text-sm text-[var(--text-secondary)]" x-text="viewMode === 'grouped' ? 'Back to issue / close panel' : 'Close panel'"></span>
                 <kbd>Esc</kbd>
             </div>
             <div x-show="actionShortcuts.prev_page" class="flex items-center justify-between">
@@ -64,7 +63,7 @@
                     <template x-for="(status, key) in shortcuts" :key="key">
                         <div class="flex items-center justify-between mt-2">
                             <span class="text-sm text-[var(--text-secondary)] capitalize" x-text="getStatusLabel(status)"></span>
-                            <kbd x-text="key"></kbd>
+                            <kbd x-text="formatShortcut(key)"></kbd>
                         </div>
                     </template>
                 </div>

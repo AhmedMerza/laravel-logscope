@@ -1,7 +1,9 @@
 <!-- Header -->
 <header class="surface-1 border-b border-[var(--border)]">
     <!-- Main header row -->
-    <div class="h-14 flex items-center gap-4 px-4">
+    <!-- Between md and xl the search controls and the toolbar don't fit on one
+         row (they used to draw over each other), so search wraps below. -->
+    <div class="min-h-14 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:max-xl:py-2">
         <!-- Sidebar Toggle -->
         <button @click="sidebarOpen = !sidebarOpen"
             class="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors">
@@ -11,7 +13,7 @@
         </button>
 
         <!-- Primary Search -->
-        <div class="flex-1 flex items-center gap-2 min-w-0">
+        <div class="flex-1 flex items-center gap-2 min-w-0 md:max-xl:order-last md:max-xl:basis-full">
             <!-- Search input group -->
             <div class="flex-1 flex items-center gap-2 min-w-0">
                 <select x-model="searches[0].field"
@@ -77,9 +79,13 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-1 flex-shrink-0 ml-auto">
             <!-- Date Range Dropdown -->
-            <div class="relative" x-data="{ dateOpen: false }" @click.away="dateOpen = false">
+            <!-- While open, Escape closes just the menu: the capture-phase window
+                 listener runs before the page's stepBack and stops it there.
+                 Closed, Escape passes through untouched. -->
+            <div class="relative" x-data="{ dateOpen: false }" @click.away="dateOpen = false"
+                @keydown.escape.window.capture="if (dateOpen) { dateOpen = false; $event.stopPropagation() }">
                 <button @click="dateOpen = !dateOpen"
                     class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
                     :class="(filters.from || filters.to)
@@ -97,7 +103,7 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute right-0 mt-2 w-72 glass-panel rounded-lg shadow-xl p-4 z-50">
+                    class="absolute right-0 mt-2 w-72 glass-panel rounded-lg shadow-xl p-4 z-50 max-sm:fixed max-sm:left-2 max-sm:right-2 max-sm:top-14 max-sm:mt-0 max-sm:w-auto">
                     <div class="space-y-3">
                         <div class="section-header">Date Range</div>
                         <div class="space-y-2">
@@ -143,7 +149,8 @@
 
             <!-- Status Filter -->
             <template x-if="features.status">
-                <div class="relative" x-data="{ statusFilterOpen: false }">
+                <div class="relative" x-data="{ statusFilterOpen: false }"
+                    @keydown.escape.window.capture="if (statusFilterOpen) { statusFilterOpen = false; $event.stopPropagation() }">
                     <button @click="statusFilterOpen = !statusFilterOpen"
                         class="h-9 w-9 md:w-auto md:px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
                         :class="filters.statuses.length > 0
@@ -157,15 +164,17 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
+                    <!-- Below sm the trigger sits near the left edge; pin the menu to the
+                         viewport so it is never cut off. -->
                     <div x-show="statusFilterOpen" @click.away="statusFilterOpen = false" x-transition
-                        class="absolute top-full right-0 mt-1 w-48 glass-panel rounded-lg shadow-xl overflow-hidden z-50">
+                        class="absolute top-full right-0 mt-1 w-48 glass-panel rounded-lg shadow-xl overflow-hidden z-50 max-sm:fixed max-sm:left-2 max-sm:right-2 max-sm:top-14 max-sm:mt-0 max-sm:w-auto">
                         <!-- Default: Open only -->
                         <button @click="filters.statuses = []; resetPagingAndFetch(); statusFilterOpen = false"
                             class="w-full px-3 py-2 text-sm text-left hover:bg-[var(--surface-2)] flex items-center gap-2"
                             :class="{ 'bg-[rgba(var(--accent-rgb),0.1)] text-[var(--accent)]': filters.statuses.length === 0 }">
                             <span class="w-2 h-2 rounded-full bg-[var(--text-muted)]"></span>
-                            <span class="text-[var(--text-secondary)]">Open</span>
-                            <span class="ml-auto text-xs text-[var(--text-muted)]">(default)</span>
+                            <span class="text-[var(--text-secondary)]">Default</span>
+                            <span class="ml-auto text-xs text-[var(--text-muted)]">open only</span>
                         </button>
                         <!-- Needs Attention: All non-closed statuses -->
                         <button @click="filters.statuses = getNeedsAttentionStatuses(); resetPagingAndFetch(); statusFilterOpen = false"

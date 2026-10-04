@@ -4,12 +4,9 @@
     :style="screenWidth >= 768 ? { width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' } : {}"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0 scale-[0.98]"
-    x-transition:enter-end="opacity-100 scale-100"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 scale-100"
-    x-transition:leave-end="opacity-0 scale-[0.98]">
+    x-transition:enter-end="opacity-100 scale-100">
     <!-- Resize Handle -->
-    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden md:block"
+    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden lg:block"
         :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"
         @mousedown.prevent="startResize($event)"></div>
     <!-- Panel Header -->
@@ -17,7 +14,7 @@
         <div class="flex items-center gap-2 min-w-0">
             <!-- Reached from a group's occurrence list: go back to the issue
                  rather than closing the panel outright (#29). -->
-            <button x-show="selectedGroup" x-cloak @click="selectedLog = null"
+            <button x-show="selectedGroup" x-cloak @click="stepBack()"
                 class="p-1 -ml-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors shrink-0"
                 title="Back to issue">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,9 +43,11 @@
     </div>
 
     <!-- Panel Content -->
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+    <!-- Each entry opens at its top, not at the last one's scroll offset. -->
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4"
+        x-init="$watch('selectedLog?.id', () => $el.scrollTop = 0)">
         <!-- Meta -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 min-[360px]:grid-cols-3 gap-3">
             <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
                 <p class="section-header mb-1">Level</p>
                 <p class="mt-1">
@@ -255,7 +254,10 @@
 
     <!-- Panel Footer -->
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
-        <template x-if="features.status">
+        <!-- Inside an issue, status belongs to the issue (set from its panel or
+             the O/I/R/X keys); a per-occurrence control here reads as the same
+             thing and isn't. -->
+        <template x-if="features.status && !selectedGroup">
             <div class="flex-1 relative" x-data="{ statusOpen: false }">
                 <button @click="statusOpen = !statusOpen"
                     class="w-full h-9 px-3 rounded-lg text-sm font-medium flex items-center justify-between gap-2 transition-colors"
