@@ -64,7 +64,7 @@
                     <template x-for="(status, key) in shortcuts" :key="key">
                         <div class="flex items-center justify-between mt-2">
                             <span class="text-sm text-[var(--text-secondary)] capitalize" x-text="getStatusLabel(status)"></span>
-                            <kbd x-text="key"></kbd>
+                            <kbd x-text="formatShortcut(key)"></kbd>
                         </div>
                     </template>
                 </div>

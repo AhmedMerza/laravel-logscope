@@ -23,7 +23,8 @@
     </div>
 
     <template x-if="selectedGroup">
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4"
+            x-init="$watch('selectedGroup?.id', () => $el.scrollTop = 0)">
             <!-- Regression notice. The count alone doesn't say that this was
                  closed and came back, which is the thing worth acting on. -->
             <div x-show="selectedGroup.regressed_at" x-cloak
@@ -51,7 +52,7 @@
             </div>
 
             <!-- Meta -->
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 min-[360px]:grid-cols-3 gap-3">
                 <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
                     <p class="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-mono">Events</p>
                     <p class="mt-1 text-sm font-medium text-[var(--text-primary)] tabular-nums font-mono"
@@ -84,7 +85,7 @@
                                     : 'bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-primary)]'">
                                 <span class="w-2 h-2 rounded-full" :class="'bg-' + status.color + '-500'"></span>
                                 <span x-text="status.label"></span>
-                                <span x-show="status.shortcut" class="opacity-50 font-mono" x-text="status.shortcut"></span>
+                                <span x-show="status.shortcut" class="opacity-50 font-mono" x-text="formatShortcut(status.shortcut)"></span>
                             </button>
                         </template>
                     </div>
@@ -93,7 +94,8 @@
 
             <!-- Note -->
             <template x-if="features.notes">
-                <div x-data="{ editing: false, noteText: '' }">
+                <!-- A half-typed note belongs to the issue it was typed on. -->
+                <div x-data="{ editing: false, noteText: '' }" x-init="$watch('selectedGroup?.id', () => { editing = false; noteText = ''; })">
                     <p class="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-mono mb-2">Note</p>
                     <template x-if="!editing">
                         <button @click="noteText = selectedGroup.note || ''; editing = true"
@@ -104,7 +106,9 @@
                     </template>
                     <template x-if="editing">
                         <div class="space-y-2">
-                            <textarea x-model="noteText" rows="3"
+                            <!-- Focus on open: unfocused, typed letters reach the global
+                                 shortcuts, and capitals change the issue's status. -->
+                            <textarea x-init="$nextTick(() => $el.focus())" x-model="noteText" rows="3"
                                 class="w-full p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(var(--accent-rgb),0.5)]"></textarea>
                             <div class="flex gap-2">
                                 <button @click="updateGroupNote(noteText); editing = false"

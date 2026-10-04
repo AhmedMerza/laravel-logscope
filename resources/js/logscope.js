@@ -669,6 +669,13 @@ function logScope() {
                 const data = await response.json();
                 this.groups = data.data;
                 this.groupMeta = data.meta;
+
+                // A filter or page change can drop the open issue from the
+                // list; a panel for a row that isn't there is easy to mistake
+                // for one of the rows that is.
+                if (this.selectedGroup && !this.groups.some(g => g.id === this.selectedGroup.id)) {
+                    this.closePanel();
+                }
                 this.error = null;
             } catch (error) {
                 if (error.name === 'AbortError') return;
@@ -686,11 +693,18 @@ function logScope() {
             this.groupEntries = [];
             this.groupEntriesMeta = { has_next: false, next_cursor: null, per_page: 50, occurrence_count: group.occurrence_count };
 
-            if (!this.detailPanelWidth) {
-                this.detailPanelWidth = this.getDefaultPanelWidth();
-            }
-
             this.fetchGroupEntries();
+        },
+
+        /**
+         * Apply server/optimistic changes to a group in both places it lives:
+         * the list row and the open panel's copy. Updating only the panel
+         * meant re-selecting the row brought back the old note/status.
+         */
+        patchGroup(id, changes) {
+            const i = this.groups.findIndex(g => g.id === id);
+            if (i !== -1) this.groups[i] = { ...this.groups[i], ...changes };
+            if (this.selectedGroup?.id === id) this.selectedGroup = { ...this.selectedGroup, ...changes };
         },
 
         closeGroupPanel() {
@@ -744,7 +758,12 @@ function logScope() {
          * immediately when the new status is filtered out, and is put back if
          * the request fails.
          */
-        async setGroupStatus(status, note = null) {
+        /**
+         * `advance` is the keyboard triage flow: when the issue leaves the
+         * list, move on to the next one. A click stays on the issue, since
+         * the next thing is often a note on it.
+         */
+        async setGroupStatus(status, note = null, { advance = false } = {}) {
             if (!this.selectedGroup) return;
 
             const targetId = this.selectedGroup.id;
@@ -757,26 +776,31 @@ function logScope() {
 
             const removed = hidesRow && index !== -1;
 
+            this.patchGroup(targetId, { status, regressed_at: null });
+
             if (removed) {
-                // Same triage flow as setStatus(): the row leaves the list and
-                // the panel moves on to the issue that took its place.
                 this.groups.splice(index, 1);
                 this.groupMeta = { ...this.groupMeta, count: Math.max(0, this.groupMeta.count - 1) };
-                const next = this.groups[Math.min(index, this.groups.length - 1)];
-                if (next) {
-                    this.selectGroup(next);
-                    this.scrollToSelectedLog();
-                } else {
-                    this.closePanel();
+                // The row vanishing is otherwise the only sign it worked, and
+                // reads as "deleted".
+                this.showToast(`Issue marked ${this.getStatusLabel(status)}, so it's hidden by the status filter`, 'success', 3000);
+                if (advance) {
+                    const next = this.groups[Math.min(index, this.groups.length - 1)];
+                    if (next) {
+                        this.selectGroup(next);
+                        this.scrollToSelectedLog();
+                    } else {
+                        this.closePanel();
+                    }
                 }
-            } else {
-                this.selectedGroup = { ...this.selectedGroup, status, regressed_at: null };
             }
 
             const restore = () => {
-                if (!removed || this.groups.findIndex(g => g.id === targetId) !== -1) return;
-                this.groups.splice(Math.min(index, this.groups.length), 0, snapshot);
-                this.groupMeta = { ...this.groupMeta, count: this.groupMeta.count + 1 };
+                if (removed && this.groups.findIndex(g => g.id === targetId) === -1) {
+                    this.groups.splice(Math.min(index, this.groups.length), 0, snapshot);
+                    this.groupMeta = { ...this.groupMeta, count: this.groupMeta.count + 1 };
+                }
+                this.patchGroup(targetId, snapshot);
             };
 
             try {
@@ -795,18 +819,13 @@ function logScope() {
 
                 if (!response.ok) {
                     restore();
-                    if (this.selectedGroup?.id === targetId) {
-                        this.selectedGroup = snapshot;
-                    }
                     this.handleApiError(response, 'updating status');
                     this.showToast('Status update failed — restored.', 'error', 4000);
                     return;
                 }
 
                 const data = await response.json();
-                if (this.selectedGroup?.id === targetId) {
-                    this.selectedGroup = { ...this.selectedGroup, ...data.data };
-                }
+                this.patchGroup(targetId, data.data);
             } catch (error) {
                 restore();
                 this.handleNetworkError(error, 'updating status');
@@ -830,7 +849,7 @@ function logScope() {
                     return;
                 }
                 const data = await response.json();
-                this.selectedGroup = data.data;
+                this.patchGroup(data.data.id, data.data);
             } catch (error) {
                 this.handleNetworkError(error, 'saving note');
             }
@@ -1045,6 +1064,12 @@ function logScope() {
         },
 
         // === STATUS HELPERS ===
+        // Status shortcuts are matched on event.key, so 'R' means Shift+R;
+        // a bare "R" reads as r, which is refresh.
+        formatShortcut(key) {
+            return /^[A-Z]$/.test(key) ? '⇧' + key : key;
+        },
+
         getStatusLabel(status) {
             const found = this.statuses.find(s => s.value === status);
             return found ? found.label : (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Open');
@@ -1424,7 +1449,19 @@ function logScope() {
          * Escape and the back arrow: an occurrence opened from a group steps
          * back to the group; anything else closes (#29).
          */
-        stepBack() {
+        stepBack(event = null) {
+            // Escape while typing (a note, the search) leaves the field, not
+            // the panel — closing it would throw the typing away.
+            const tag = event?.target?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+                event.target.blur();
+                return;
+            }
+            // The sidebar drawer (below lg) sits on top of everything else.
+            if (this.sidebarOpen && !this.isDesktop()) {
+                this.sidebarOpen = false;
+                return;
+            }
             if (this.selectedLog && this.selectedGroup) {
                 this.selectedLog = null;
                 this.syncFiltersToUrl();
@@ -1469,6 +1506,7 @@ function logScope() {
             const width = window.innerWidth;
             if (width < 768)  return 0;
             if (width < 1024) return Math.floor(width * 0.88);
+            if (width >= 2560) return 800;
             if (width >= 1920) return 640;
             if (width >= 1536) return 560;
             if (width >= 1280) return 480;
@@ -1477,7 +1515,8 @@ function logScope() {
 
         getMessagePreviewWidth() {
             const sidebarWidth = this.isDesktop() ? (this.sidebarOpen ? 256 : 0) : 0;
-            const panelWidth = ((this.selectedLog || this.selectedGroup) && !this.isMobile())
+            // Below lg the panel overlays the table rather than taking width from it.
+            const panelWidth = ((this.selectedLog || this.selectedGroup) && this.isDesktop())
                 ? (this.detailPanelWidth || this.getDefaultPanelWidth()) : 0;
             const tableOverhead = this.isMobile() ? 180 : 350;
             return Math.max(120, window.innerWidth - sidebarWidth - panelWidth - tableOverhead);
@@ -1894,7 +1933,7 @@ function logScope() {
                     break;
                 case 'n':
                     event.preventDefault();
-                    if (this.selectedLog && this.features.notes && this.detailPanelWidth) {
+                    if (this.selectedLog && this.features.notes && !this.isMobile()) {
                         this.$dispatch('focus-note');
                     }
                     break;
@@ -1919,7 +1958,7 @@ function logScope() {
                         // so one keystroke closes every occurrence of an error
                         // rather than one row of it (#29).
                         if (this.selectedGroup) {
-                            this.setGroupStatus(targetStatus);
+                            this.setGroupStatus(targetStatus, null, { advance: true });
                         } else if (this.selectedLog) {
                             this.setStatus(targetStatus);
                         } else {

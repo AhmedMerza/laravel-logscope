@@ -28,7 +28,9 @@
             <thead>
                 <tr>
                     <th class="w-[3px] p-0"></th>
-                    <th class="px-2 py-3 text-left w-20 sm:px-4 sm:w-24">Level</th>
+                    <!-- Under 360px the row's colour stripe carries the level, and the
+                         title needs the room. -->
+                    <th class="px-2 py-3 text-left w-20 sm:px-4 sm:w-24 hidden min-[360px]:table-cell">Level</th>
                     <th class="px-2 py-3 text-left sm:px-4">Issue</th>
                     <th class="px-2 py-3 text-right w-20 sm:px-4">Events</th>
                     <!-- First seen and channel are in the open panel's tiles; dropping them
@@ -66,7 +68,7 @@
                                 </template>
                             </div>
                         </td>
-                        <td class="px-2 py-3 sm:px-4">
+                        <td class="px-2 py-3 sm:px-4 hidden min-[360px]:table-cell">
                             <span class="level-badge" :class="'level-' + group.level" x-text="group.level"></span>
                         </td>
                         <!-- w-full + max-w-0 lets the table give this column whatever the

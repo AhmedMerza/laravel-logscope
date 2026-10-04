@@ -526,6 +526,22 @@ kbd {
     }
 }
 
+/* --- Detail panel: tablet drawer ---
+   In flow, an 88% panel left the table a ~90px strip with no readable
+   titles. Overlaying from the right keeps the table full width, its
+   level + title edge visible to pick the next issue. */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .logscope-detail-panel {
+        position: fixed !important;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(88vw, 480px) !important;
+        z-index: 60;
+        box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+    }
+}
+
 /* --- Table: compact on mobile --- */
 @media (max-width: 767px) {
     .log-table thead th,

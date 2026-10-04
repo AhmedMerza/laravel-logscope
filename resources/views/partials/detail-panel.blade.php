@@ -43,9 +43,11 @@
     </div>
 
     <!-- Panel Content -->
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+    <!-- Each entry opens at its top, not at the last one's scroll offset. -->
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4"
+        x-init="$watch('selectedLog?.id', () => $el.scrollTop = 0)">
         <!-- Meta -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 min-[360px]:grid-cols-3 gap-3">
             <div class="p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
                 <p class="section-header mb-1">Level</p>
                 <p class="mt-1">
