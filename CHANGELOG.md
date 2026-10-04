@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Grouped view: issue/occurrence panel navigation.** Escape and the back arrow now step from an occurrence back to its issue instead of closing both; selecting another issue while an occurrence is open shows that issue instead of the stale occurrence; the panel swap no longer briefly shows both panels side by side (which squeezed the table); `j`/`k` walk the issues, or the open issue's occurrences, instead of the hidden entries list; Enter on an issue opens its newest occurrence.
+- **Grouped view: table overflow beside an open panel.** The issue column is now sized by the table rather than a width estimate tuned for the entries table, and First seen / Channel hide while a panel is open, so Last seen is no longer clipped behind a horizontal scrollbar.
+- **Grouped view: triage.** Resolving or ignoring an issue that leaves the list moves the panel to the next issue and updates the issue count; the occurrence footer no longer shows a per-entry status control inside an issue, where it read as the issue's status.
+- **Relative times agree.** Every "5m ago" reads one clock that ticks every 30s, so the list and the panel no longer drift apart.
+
 - **Deadlock on `log_groups` insertOrIgnore under concurrent flushes** (#112). A batched `insert ignore` keyed on the unique `fingerprint` index is a known InnoDB deadlock shape (`SQLSTATE 40001`) when two flushes insert overlapping-but-differently-ordered new fingerprints. `GroupRecorder`'s three statements now retry independently on a transient SQLSTATE (08/40) instead of failing the whole rollup, and fingerprints are processed in a consistent (sorted) order across concurrent flushes to reduce how often the deadlock happens at all. The retry never engages while an app transaction is already open — verified against a real MySQL deadlock that a blind retry there would otherwise commit standalone, outside the transaction the app still believes it's in.
 
 ## [2.3.0] — 2026-09-26

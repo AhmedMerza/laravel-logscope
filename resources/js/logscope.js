@@ -90,6 +90,9 @@ function logScope() {
         groupEntries: [],
         groupEntriesMeta: { has_next: false, next_cursor: null, per_page: 50, occurrence_count: 0 },
         groupEntriesLoading: false,
+        // One clock for every "5m ago": rows and the panel read it, so they
+        // agree and move together instead of freezing at their last render.
+        now: Date.now(),
         groupCursor: null,
         groupCursorStack: [],
         _fetchGroupsController: null,
@@ -125,6 +128,8 @@ function logScope() {
                 this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
                 this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
                 this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
+
+                setInterval(() => { this.now = Date.now(); }, 30000);
 
                 // Responsive: update screenWidth on resize, manage sidebar and panel
                 const onResize = () => {
@@ -750,16 +755,28 @@ function logScope() {
                 ? !this.filters.statuses.includes(status)
                 : status !== 'open';
 
-            if (hidesRow && index !== -1) {
+            const removed = hidesRow && index !== -1;
+
+            if (removed) {
+                // Same triage flow as setStatus(): the row leaves the list and
+                // the panel moves on to the issue that took its place.
                 this.groups.splice(index, 1);
+                this.groupMeta = { ...this.groupMeta, count: Math.max(0, this.groupMeta.count - 1) };
+                const next = this.groups[Math.min(index, this.groups.length - 1)];
+                if (next) {
+                    this.selectGroup(next);
+                    this.scrollToSelectedLog();
+                } else {
+                    this.closePanel();
+                }
+            } else {
+                this.selectedGroup = { ...this.selectedGroup, status, regressed_at: null };
             }
 
-            this.selectedGroup = { ...this.selectedGroup, status, regressed_at: null };
-
             const restore = () => {
-                if (this.groups.findIndex(g => g.id === targetId) !== -1) return;
-                if (index === -1) return;
+                if (!removed || this.groups.findIndex(g => g.id === targetId) !== -1) return;
                 this.groups.splice(Math.min(index, this.groups.length), 0, snapshot);
+                this.groupMeta = { ...this.groupMeta, count: this.groupMeta.count + 1 };
             };
 
             try {
@@ -1625,7 +1642,7 @@ function logScope() {
 
         formatRelativeTime(dateStr) {
             if (!dateStr) return '';
-            const now = new Date();
+            const now = new Date(this.now);
             const d = new Date(dateStr);
             const diffMs = now - d;
             const diffSec = Math.floor(diffMs / 1000);
@@ -1857,7 +1874,12 @@ function logScope() {
                     break;
                 case 'Enter':
                     event.preventDefault();
-                    if (this.selectedLog && !this.detailPanelWidth) {
+                    // On an issue, Enter steps into its newest occurrence;
+                    // j/k then walk the rest and Escape comes back out.
+                    if (this.selectedGroup && !this.selectedLog && this.groupEntries.length) {
+                        this.selectedLog = this.groupEntries[0];
+                        this.ensureLogDetailLoaded(this.selectedLog);
+                    } else if (this.selectedLog && !this.detailPanelWidth) {
                         this.detailPanelWidth = 500;
                         localStorage.setItem('logscope_panel_width', '500');
                     }

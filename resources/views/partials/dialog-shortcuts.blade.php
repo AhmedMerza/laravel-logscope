@@ -38,11 +38,11 @@
                 <kbd>k</kbd>
             </div>
             <div class="flex items-center justify-between">
-                <span class="text-sm text-[var(--text-secondary)]">Open detail panel</span>
+                <span class="text-sm text-[var(--text-secondary)]" x-text="viewMode === 'grouped' ? 'Open first occurrence' : 'Open detail panel'"></span>
                 <kbd>Enter</kbd>
             </div>
             <div class="flex items-center justify-between">
-                <span class="text-sm text-[var(--text-secondary)]">Close panel</span>
+                <span class="text-sm text-[var(--text-secondary)]" x-text="viewMode === 'grouped' ? 'Back to issue / close panel' : 'Close panel'"></span>
                 <kbd>Esc</kbd>
             </div>
             <div x-show="actionShortcuts.prev_page" class="flex items-center justify-between">
