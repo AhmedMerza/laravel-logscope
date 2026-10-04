@@ -31,9 +31,11 @@
                     <th class="px-2 py-3 text-left w-20 sm:px-4 sm:w-24">Level</th>
                     <th class="px-2 py-3 text-left sm:px-4">Issue</th>
                     <th class="px-2 py-3 text-right w-20 sm:px-4">Events</th>
-                    <th class="px-4 py-3 text-left w-28 hidden md:table-cell">First seen</th>
+                    <!-- First seen and channel are in the open panel's tiles; dropping them
+                         here keeps the table inside the space beside it. -->
+                    <th x-show="!selectedGroup" class="px-4 py-3 text-left w-28 hidden md:table-cell">First seen</th>
                     <th class="px-4 py-3 text-left w-28 hidden sm:table-cell">Last seen</th>
-                    <th class="px-4 py-3 text-left w-28 hidden lg:table-cell">Channel</th>
+                    <th x-show="!selectedGroup" class="px-4 py-3 text-left w-28 hidden lg:table-cell">Channel</th>
                 </tr>
             </thead>
             <tbody>
@@ -67,8 +69,11 @@
                         <td class="px-2 py-3 sm:px-4">
                             <span class="level-badge" :class="'level-' + group.level" x-text="group.level"></span>
                         </td>
-                        <td class="px-2 py-3 sm:px-4">
-                            <div class="flex items-center gap-2">
+                        <!-- w-full + max-w-0 lets the table give this column whatever the
+                             fixed columns leave, so the message truncates instead of
+                             pushing the table wider than the space beside the panel. -->
+                        <td class="px-2 py-3 sm:px-4 w-full max-w-0">
+                            <div class="flex items-center gap-2 min-w-0">
                                 <!-- A resolved issue that fired again. Without this it
                                      would read as something nobody has triaged yet. -->
                                 <span x-show="group.regressed_at"
@@ -76,8 +81,7 @@
                                     title="Resolved, then happened again">
                                     Regressed
                                 </span>
-                                <p class="text-sm text-[var(--text-primary)] truncate"
-                                    :style="{ maxWidth: getMessagePreviewWidth() + 'px' }"
+                                <p class="text-sm text-[var(--text-primary)] truncate min-w-0"
                                     x-text="group.sample_message"></p>
                             </div>
                         </td>
@@ -85,7 +89,7 @@
                             <span class="text-sm font-medium tabular-nums font-mono text-[var(--text-secondary)]"
                                 x-text="group.occurrence_count?.toLocaleString()"></span>
                         </td>
-                        <td class="px-4 py-3 hidden md:table-cell">
+                        <td x-show="!selectedGroup" class="px-4 py-3 hidden md:table-cell">
                             <span class="text-sm text-[var(--text-muted)] tabular-nums whitespace-nowrap font-mono"
                                 :title="formatFullDateTime(group.first_seen_at)"
                                 x-text="formatRelativeTime(group.first_seen_at)"></span>
@@ -95,7 +99,7 @@
                                 :title="formatFullDateTime(group.last_seen_at)"
                                 x-text="formatRelativeTime(group.last_seen_at)"></span>
                         </td>
-                        <td class="px-4 py-3 hidden lg:table-cell">
+                        <td x-show="!selectedGroup" class="px-4 py-3 hidden lg:table-cell">
                             <span class="text-xs text-[var(--text-muted)] truncate block max-w-[120px] font-mono" :title="group.channel" x-text="group.channel"></span>
                         </td>
                     </tr>

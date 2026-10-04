@@ -252,7 +252,10 @@
 
     <!-- Panel Footer -->
     <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 px-4 py-3 border-t border-[var(--border)]">
-        <template x-if="features.status">
+        <!-- Inside an issue, status belongs to the issue (set from its panel or
+             the O/I/R/X keys); a per-occurrence control here reads as the same
+             thing and isn't. -->
+        <template x-if="features.status && !selectedGroup">
             <div class="flex-1 relative" x-data="{ statusOpen: false }">
                 <button @click="statusOpen = !statusOpen"
                     class="w-full h-9 px-3 rounded-lg text-sm font-medium flex items-center justify-between gap-2 transition-colors"
