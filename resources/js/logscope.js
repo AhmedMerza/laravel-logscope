@@ -96,6 +96,7 @@ function logScope() {
         groupCursor: null,
         groupCursorStack: [],
         _fetchGroupsController: null,
+        _fetchGroupEntriesController: null,
 
         _initPromise: null,
         _initialized: false,
@@ -722,6 +723,12 @@ function logScope() {
         async fetchGroupEntries(cursor = null) {
             if (!this.selectedGroup) return;
 
+            // j/k and triage switch issues faster than this responds; a
+            // late page for the previous issue must not land in this one.
+            this._fetchGroupEntriesController?.abort();
+            this._fetchGroupEntriesController = new AbortController();
+            const signal = this._fetchGroupEntriesController.signal;
+
             this.groupEntriesLoading = true;
             try {
                 const params = new URLSearchParams();
@@ -729,7 +736,7 @@ function logScope() {
 
                 const response = await fetch(
                     `${this.routes.apiBase}/groups/${this.selectedGroup.id}/entries?${params}`,
-                    { headers: { 'Accept': 'application/json' } }
+                    { headers: { 'Accept': 'application/json' }, signal }
                 );
 
                 if (!response.ok) {
@@ -741,9 +748,10 @@ function logScope() {
                 this.groupEntries = cursor ? [...this.groupEntries, ...data.data] : data.data;
                 this.groupEntriesMeta = data.meta;
             } catch (error) {
+                if (error.name === 'AbortError') return;
                 this.handleNetworkError(error, 'fetching occurrences');
             } finally {
-                this.groupEntriesLoading = false;
+                if (!signal.aborted) this.groupEntriesLoading = false;
             }
         },
 

@@ -81,10 +81,11 @@
         <!-- Actions -->
         <div class="flex items-center gap-1 flex-shrink-0 ml-auto">
             <!-- Date Range Dropdown -->
-            <!-- Escape from inside the menu closes just the menu (.stop keeps it
-                 from also stepping the panel back). -->
+            <!-- While open, Escape closes just the menu: the capture-phase window
+                 listener runs before the page's stepBack and stops it there.
+                 Closed, Escape passes through untouched. -->
             <div class="relative" x-data="{ dateOpen: false }" @click.away="dateOpen = false"
-                @keydown.escape.stop="dateOpen = false" @keydown.escape.window="dateOpen = false">
+                @keydown.escape.window.capture="if (dateOpen) { dateOpen = false; $event.stopPropagation() }">
                 <button @click="dateOpen = !dateOpen"
                     class="h-9 w-9 flex items-center justify-center rounded-lg transition-colors"
                     :class="(filters.from || filters.to)
@@ -149,7 +150,7 @@
             <!-- Status Filter -->
             <template x-if="features.status">
                 <div class="relative" x-data="{ statusFilterOpen: false }"
-                    @keydown.escape.stop="statusFilterOpen = false" @keydown.escape.window="statusFilterOpen = false">
+                    @keydown.escape.window.capture="if (statusFilterOpen) { statusFilterOpen = false; $event.stopPropagation() }">
                     <button @click="statusFilterOpen = !statusFilterOpen"
                         class="h-9 w-9 md:w-auto md:px-3 flex items-center gap-2 rounded-lg text-sm transition-colors"
                         :class="filters.statuses.length > 0
