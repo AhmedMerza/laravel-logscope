@@ -2,7 +2,7 @@
 
 @section('content')
 <div x-data="logScope()" x-init="init()" class="h-full flex overflow-hidden"
-    @keydown.escape.window="closePanel()"
+    @keydown.escape.window="stepBack()"
     @keydown.window="handleKeydown($event)">
 
     @include('logscope::partials.sidebar')

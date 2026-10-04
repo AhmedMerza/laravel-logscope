@@ -674,6 +674,9 @@ function logScope() {
         },
 
         selectGroup(group) {
+            // An open occurrence belongs to the previous group; leaving it
+            // set would keep it on screen over the newly picked one.
+            this.selectedLog = null;
             this.selectedGroup = group;
             this.groupEntries = [];
             this.groupEntriesMeta = { has_next: false, next_cursor: null, per_page: 50, occurrence_count: group.occurrence_count };
@@ -1400,10 +1403,21 @@ function logScope() {
             if (this.screenWidth < 1024) this.sidebarOpen = false;
         },
 
+        /**
+         * Escape and the back arrow: an occurrence opened from a group steps
+         * back to the group; anything else closes (#29).
+         */
+        stepBack() {
+            if (this.selectedLog && this.selectedGroup) {
+                this.selectedLog = null;
+                this.syncFiltersToUrl();
+                return;
+            }
+            this.closePanel();
+        },
+
         closePanel() {
             this.selectedLog = null;
-            // Escape closes whichever panel is open; in the grouped view that
-            // is the group's occurrence list (#29).
             this.selectedGroup = null;
             this.groupEntries = [];
             this.syncFiltersToUrl();
@@ -1898,39 +1912,40 @@ function logScope() {
         },
 
         selectNextLog() {
-            if (this.logs.length === 0) return;
-
-            const prevId = this.selectedLog?.id;
-            if (!this.selectedLog) {
-                this.selectedLog = this.logs[0];
-            } else {
-                const currentIndex = this.logs.findIndex(log => log.id === this.selectedLog.id);
-                if (currentIndex < this.logs.length - 1) {
-                    this.selectedLog = this.logs[currentIndex + 1];
-                }
-            }
-            this.scrollToSelectedLog();
-            if (this.selectedLog?.id !== prevId) {
-                this.ensureLogDetailLoaded(this.selectedLog);
-            }
+            this.stepSelection(1);
         },
 
         selectPrevLog() {
-            if (this.logs.length === 0) return;
+            this.stepSelection(-1);
+        },
 
-            const prevId = this.selectedLog?.id;
-            if (!this.selectedLog) {
-                this.selectedLog = this.logs[0];
-            } else {
-                const currentIndex = this.logs.findIndex(log => log.id === this.selectedLog.id);
-                if (currentIndex > 0) {
-                    this.selectedLog = this.logs[currentIndex - 1];
+        /**
+         * Move the j/k selection through whatever list is on screen: the
+         * open group's occurrences, the groups themselves, or the log list.
+         * Nothing selected yet picks the first row.
+         */
+        stepSelection(delta) {
+            if (this.viewMode === 'grouped' && !this.selectedLog) {
+                if (this.groups.length === 0) return;
+                const index = this.groups.findIndex(g => g.id === this.selectedGroup?.id);
+                const next = index === -1 ? this.groups[0] : this.groups[index + delta];
+                if (next && next.id !== this.selectedGroup?.id) {
+                    this.selectGroup(next);
+                    this.scrollToSelectedLog();
                 }
+                return;
             }
+
+            const list = this.selectedGroup ? this.groupEntries : this.logs;
+            if (list.length === 0) return;
+
+            const index = list.findIndex(log => log.id === this.selectedLog?.id);
+            const next = index === -1 ? list[0] : list[index + delta];
+            if (!next || next.id === this.selectedLog?.id) return;
+
+            this.selectedLog = next;
             this.scrollToSelectedLog();
-            if (this.selectedLog?.id !== prevId) {
-                this.ensureLogDetailLoaded(this.selectedLog);
-            }
+            this.ensureLogDetailLoaded(next);
         },
 
         scrollToSelectedLog() {

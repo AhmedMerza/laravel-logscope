@@ -4,10 +4,7 @@
     :style="screenWidth >= 768 ? { width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' } : {}"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0 scale-[0.98]"
-    x-transition:enter-end="opacity-100 scale-100"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 scale-100"
-    x-transition:leave-end="opacity-0 scale-[0.98]">
+    x-transition:enter-end="opacity-100 scale-100">
     <!-- Resize Handle -->
     <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden md:block"
         :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"

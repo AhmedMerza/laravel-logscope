@@ -4,10 +4,7 @@
     :style="screenWidth >= 768 ? { width: (detailPanelWidth || getDefaultPanelWidth()) + 'px' } : {}"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0 scale-[0.98]"
-    x-transition:enter-end="opacity-100 scale-100"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 scale-100"
-    x-transition:leave-end="opacity-0 scale-[0.98]">
+    x-transition:enter-end="opacity-100 scale-100">
     <!-- Resize Handle -->
     <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden md:block"
         :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"
@@ -17,7 +14,7 @@
         <div class="flex items-center gap-2 min-w-0">
             <!-- Reached from a group's occurrence list: go back to the issue
                  rather than closing the panel outright (#29). -->
-            <button x-show="selectedGroup" x-cloak @click="selectedLog = null"
+            <button x-show="selectedGroup" x-cloak @click="stepBack()"
                 class="p-1 -ml-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors shrink-0"
                 title="Back to issue">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
