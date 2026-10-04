@@ -6,7 +6,7 @@
     x-transition:enter-start="opacity-0 scale-[0.98]"
     x-transition:enter-end="opacity-100 scale-100">
     <!-- Resize Handle -->
-    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden md:block"
+    <div class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent)] active:bg-[var(--accent)] transition-colors z-10 hidden lg:block"
         :class="isResizing ? 'bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' : 'bg-transparent hover:bg-[rgba(var(--accent-rgb),0.5)]'"
         @mousedown.prevent="startResize($event)"></div>
 

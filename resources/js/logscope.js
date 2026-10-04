@@ -130,7 +130,8 @@ function logScope() {
                 this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
                 this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
 
-                setInterval(() => { this.now = Date.now(); }, 30000);
+                setInterval(() => { if (!document.hidden) this.now = Date.now(); }, 30000);
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) this.now = Date.now(); });
 
                 // Responsive: update screenWidth on resize, manage sidebar and panel
                 const onResize = () => {
@@ -768,8 +769,7 @@ function logScope() {
          * Optimistic, like setStatus() for entries: the row leaves the list
          * immediately when the new status is filtered out, and is put back if
          * the request fails.
-         */
-        /**
+         *
          * `advance` is the keyboard triage flow: when the issue leaves the
          * list, move on to the next one. A click stays on the issue, since
          * the next thing is often a note on it.
@@ -919,13 +919,17 @@ function logScope() {
                     this.handleApiError(response, 'deleting log');
                     return;
                 }
+                const deletedId = this.selectedLog.id;
                 this.showDeleteDialog = false;
                 this.selectedLog = null;
+                // Deleted from inside an issue: drop it from the occurrence
+                // list (it would 404 when clicked), keeping pages already loaded.
+                if (this.selectedGroup) {
+                    this.groupEntries = this.groupEntries.filter(e => e.id !== deletedId);
+                    this.groupEntriesMeta = { ...this.groupEntriesMeta, occurrence_count: Math.max(0, (this.groupEntriesMeta.occurrence_count || 0) - 1) };
+                }
                 this.showToast('Log deleted successfully', 'success', 2000);
                 await Promise.all([this.fetchCurrentView(), this.fetchStats()]);
-                // Deleted from inside an issue: its occurrence list still
-                // holds the row, which would 404 when clicked.
-                if (this.selectedGroup) this.fetchGroupEntries();
             } catch (error) {
                 this.handleNetworkError(error, 'deleting log');
             }
@@ -1464,10 +1468,12 @@ function logScope() {
          * back to the group; anything else closes (#29).
          */
         stepBack(event = null) {
-            // Escape while typing (a note, the search) leaves the field, not
-            // the panel — closing it would throw the typing away.
+            // Escape while typing never closes the panel (it would throw the
+            // typing away). A note box keeps focus so letters stay in it rather
+            // than reaching the shortcuts; the search and selects let go.
             const tag = event?.target?.tagName?.toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+            if (tag === 'textarea') return;
+            if (tag === 'input' || tag === 'select') {
                 event.target.blur();
                 return;
             }
@@ -2016,6 +2022,12 @@ function logScope() {
 
             const index = list.findIndex(log => log.id === this.selectedLog?.id);
             const next = index === -1 ? list[0] : list[index + delta];
+            if (!next && delta > 0 && this.selectedGroup && this.groupEntriesMeta.has_next && !this.groupEntriesLoading) {
+                // Past the last loaded occurrence: fetch the next page; the
+                // next j lands on it.
+                this.loadMoreGroupEntries();
+                return;
+            }
             if (!next || next.id === this.selectedLog?.id) return;
 
             this.selectedLog = next;
