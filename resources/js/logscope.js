@@ -673,8 +673,11 @@ function logScope() {
                 // A filter or page change can drop the open issue from the
                 // list; a panel for a row that isn't there is easy to mistake
                 // for one of the rows that is.
-                if (this.selectedGroup && !this.groups.some(g => g.id === this.selectedGroup.id)) {
+                const fresh = this.groups.find(g => g.id === this.selectedGroup?.id);
+                if (this.selectedGroup && !fresh) {
                     this.closePanel();
+                } else if (fresh) {
+                    this.selectedGroup = fresh;
                 }
                 this.error = null;
             } catch (error) {
@@ -912,6 +915,9 @@ function logScope() {
                 this.selectedLog = null;
                 this.showToast('Log deleted successfully', 'success', 2000);
                 await Promise.all([this.fetchCurrentView(), this.fetchStats()]);
+                // Deleted from inside an issue: its occurrence list still
+                // holds the row, which would 404 when clicked.
+                if (this.selectedGroup) this.fetchGroupEntries();
             } catch (error) {
                 this.handleNetworkError(error, 'deleting log');
             }
