@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-10-04
+
+Fixes only. Grouped rollups no longer fail on an InnoDB deadlock under
+concurrent flushes (#112), and the grouped view's issue/occurrence panel,
+keyboard handling and layout work from a 240px phone to an ultrawide screen
+(#114). No migration.
+
 ### Fixed
 
 - **Grouped view: issue/occurrence panel navigation.** Escape and the back arrow now step from an occurrence back to its issue instead of closing both; selecting another issue while an occurrence is open shows that issue instead of the stale occurrence; the panel swap no longer briefly shows both panels side by side (which squeezed the table); `j`/`k` walk the issues, or the open issue's occurrences, instead of the hidden entries list; Enter on an issue opens its newest occurrence.
@@ -15,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Grouped view: notes.** A saved note no longer disappears after switching to another issue and back (only the panel's copy was updated, not the list row; status had the same gap). "Add a note…" focuses the box, so typing no longer falls through to the status shortcuts; Escape while typing leaves the box instead of closing the panel and losing the text; a half-typed note no longer follows you to another issue.
 - **Small and large screens.** Tablets (768–1023px) get the panel as a drawer over a full-width table instead of squeezing it to a strip; between 768 and 1279px the search row wraps below the toolbar instead of drawing over it; the date and status menus stay on screen and close on Escape; Escape closes the sidebar drawer; entries open scrolled to the top; under 360px the level column gives its room to titles and the panel's tiles stack; screens 2560px+ get an 800px default panel. Selecting an issue no longer pins a custom panel width (which made the reset-width icon appear and then "do nothing").
 - **Relative times agree.** Every "5m ago" reads one clock that ticks every 30s, so the list and the panel no longer drift apart.
+- **Dialogs and the keyboard.** Escape closes only the dialog on top (the delete confirm, the shortcuts sheet, or an open menu) instead of also stepping the panel back; shortcuts do nothing behind the delete confirm, where `j`/`k` could change which log Delete removed; Enter on a focused button presses it; switching issues quickly no longer lets a late response show the previous issue's occurrences.
 
 - **Deadlock on `log_groups` insertOrIgnore under concurrent flushes** (#112). A batched `insert ignore` keyed on the unique `fingerprint` index is a known InnoDB deadlock shape (`SQLSTATE 40001`) when two flushes insert overlapping-but-differently-ordered new fingerprints. `GroupRecorder`'s three statements now retry independently on a transient SQLSTATE (08/40) instead of failing the whole rollup, and fingerprints are processed in a consistent (sorted) order across concurrent flushes to reduce how often the deadlock happens at all. The retry never engages while an app transaction is already open — verified against a real MySQL deadlock that a blind retry there would otherwise commit standalone, outside the transaction the app still believes it's in.
 

@@ -24,9 +24,9 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**[v2.3.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.0):** an opt-in JSON API for native clients, authenticated with Sanctum tokens ([docs/api.md](docs/api.md)); retention by level, so debug logs can expire before errors do; and a log whose context holds `INF` or `NAN` keeps its context instead of losing it.
+**[v2.3.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.1):** grouped rollups survive an InnoDB deadlock under concurrent flushes, and the grouped view's issue/occurrence panel, keyboard shortcuts and layout are fixed on every screen size, from a 240px phone to an ultrawide monitor.
 
-**Upgrading:** no migration. Supported Laravel versions are now 11–13. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
+**Upgrading:** no migration. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
 ---
 
