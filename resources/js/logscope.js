@@ -1912,6 +1912,10 @@ function logScope() {
             if (this.showDeleteDialog) return;
             if (this.showKeyboardHelp && event.key !== '?') return;
 
+            // Enter on a focused button or link presses it; the Enter shortcut
+            // is for the list, not for whatever control has focus.
+            if (event.key === 'Enter' && event.target.closest?.('button, a, [role=button]')) return;
+
             const actionShortcut = [
                 {
                     key: this.actionShortcuts.refresh,
