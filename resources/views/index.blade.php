@@ -41,6 +41,7 @@
 <script>
 window.logScopeConfig = {
     quickFilters: @json($quickFilters),
+    searchableFields: @json($searchableFields),
     features: @json($features),
     jsonViewer: @json($jsonViewer),
     statuses: @json($statuses),
