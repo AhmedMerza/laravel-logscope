@@ -962,6 +962,35 @@ function logScope() {
             this.showDeleteDialog = false;
         },
 
+        /**
+         * A dialog takes focus on its safe button when it opens (never the
+         * destructive one: Enter presses a focused button) and hands focus
+         * back to whatever opened it when it closes (#116).
+         */
+        dialogFocus(open, dialog, safeButton) {
+            if (open) {
+                dialog._opener = document.activeElement;
+                this.$nextTick(() => safeButton.focus());
+            } else if (dialog._opener) {
+                dialog._opener.focus();
+                dialog._opener = null;
+            }
+        },
+
+        /** Tab and Shift+Tab wrap around inside a dialog instead of leaving it. */
+        trapTab(event) {
+            const items = [...event.currentTarget.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+                .filter(el => !el.disabled && el.offsetParent !== null);
+            if (!items.length) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            const atEdge = event.shiftKey ? document.activeElement === first : document.activeElement === last;
+            if (atEdge || !items.includes(document.activeElement)) {
+                event.preventDefault();
+                (event.shiftKey ? last : first).focus();
+            }
+        },
+
         async deleteLog() {
             if (!this.selectedLog) return;
             try {

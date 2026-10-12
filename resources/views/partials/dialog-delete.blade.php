@@ -1,5 +1,6 @@
 <!-- Delete Confirmation Dialog -->
 <div x-show="showDeleteDialog" x-cloak
+    x-effect="dialogFocus(showDeleteDialog, $el, $refs.deleteCancel)"
     class="fixed inset-0 z-50 flex items-center justify-center"
     x-transition:enter="ease-out duration-200"
     x-transition:enter-start="opacity-0"
@@ -11,6 +12,7 @@
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="cancelDelete()"></div>
     <!-- Dialog -->
     <div class="relative glass-panel rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6"
+        role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" @keydown.tab="trapTab($event)"
         x-transition:enter="ease-out duration-200"
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
@@ -24,12 +26,12 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-lg font-semibold text-[var(--text-primary)]">Delete Log Entry</h3>
+                <h3 id="delete-dialog-title" class="text-lg font-semibold text-[var(--text-primary)]">Delete Log Entry</h3>
                 <p class="text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
             </div>
         </div>
         <div class="flex gap-3">
-            <button @click="cancelDelete()"
+            <button x-ref="deleteCancel" @click="cancelDelete()"
                 class="btn-ghost flex-1 h-10 rounded-lg text-sm font-medium">
                 Cancel
             </button>
