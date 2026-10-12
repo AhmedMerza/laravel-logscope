@@ -1,5 +1,6 @@
 <!-- Keyboard Shortcuts Help Dialog -->
 <div x-show="showKeyboardHelp" x-cloak
+    x-effect="dialogFocus(showKeyboardHelp, $el, $refs.helpClose)"
     class="fixed inset-0 z-50 flex items-center justify-center"
     x-transition:enter="ease-out duration-200"
     x-transition:enter-start="opacity-0"
@@ -11,6 +12,7 @@
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showKeyboardHelp = false"></div>
     <!-- Dialog -->
     <div class="relative glass-panel rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6"
+        role="dialog" aria-modal="true" aria-labelledby="shortcuts-dialog-title" @keydown.tab="trapTab($event)"
         x-transition:enter="ease-out duration-200"
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
@@ -18,8 +20,8 @@
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
-            <button @click="showKeyboardHelp = false"
+            <h3 id="shortcuts-dialog-title" class="text-lg font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
+            <button x-ref="helpClose" @click="showKeyboardHelp = false" aria-label="Close"
                 class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
