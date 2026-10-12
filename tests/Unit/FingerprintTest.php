@@ -39,6 +39,29 @@ describe('message normalisation', function () {
         expect(Fingerprint::normalize('abc1234 missing'))->toBe('abc<num> missing');
     });
 
+    // \b\d+\b needs a boundary after the digits, which 172ms doesn't have,
+    // so every duration under four digits used to be its own group (#118).
+    it('collapses a number glued to a unit, keeping the unit', function (string $message, string $expected) {
+        expect(Fingerprint::normalize($message))->toBe($expected);
+    })->with([
+        'milliseconds' => ['Query took 172ms: select * from products', 'Query took <num>ms: select * from products'],
+        'seconds' => ['Cache warmed in 3s', 'Cache warmed in <num>s'],
+        'decimal seconds' => ['Job ran for 1.5s', 'Job ran for <num>s'],
+        'megabytes' => ['Upload of 12MB rejected', 'Upload of <num>MB rejected'],
+    ]);
+
+    it('groups durations that differ only by their value', function () {
+        expect(Fingerprint::normalize('Query took 172ms'))
+            ->toBe(Fingerprint::normalize('Query took 861ms'));
+        expect(Fingerprint::normalize('Job ran for 1.5s'))
+            ->toBe(Fingerprint::normalize('Job ran for 12.25s'));
+    });
+
+    // #118 acceptance: spec names keep the shape the four-digit rule gives them.
+    it('leaves rfc3339 to the four-digit rule', function () {
+        expect(Fingerprint::normalize('Parse rfc3339 failed'))->toBe('Parse rfc<num> failed');
+    });
+
     // Four is the threshold precisely so these survive: collapsing them would
     // merge sha256 with sha512, which are not the same error.
     it('leaves technical tokens of three digits or fewer intact', function (string $message) {
@@ -51,6 +74,12 @@ describe('message normalisation', function () {
         'h264 stream failed',
         'base64 decode failed',
         'x86 build',
+        // Letters after the digits but none before: not a unit, not a value.
+        '1st attempt failed',
+        '2nd retry queued',
+        // Unit after the digits but letters before them: only the leading
+        // \b keeps this out, so it fails if that boundary is ever dropped.
+        'k8s pod evicted',
     ]);
 
     it('normalises decimals to one shape whatever their size', function () {
