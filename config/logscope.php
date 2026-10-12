@@ -658,10 +658,11 @@ return [
         'max_per_page' => 100,
 
         /*
-         * Include the full `message` and `context` in the list response so the
-         * detail panel can render instantly without a second round-trip. Adds
-         * roughly 1-2KB per row to the payload (typical) and is a clear win on
-         * high-latency links. Disable for installs with very large messages
+         * Include the full `message` and `context`, plus the other fields the
+         * detail panel shows (headers, note, user agent, status change), in the
+         * list response so the panel can render instantly without a second
+         * round-trip. Adds roughly 1-2KB per row to the payload (typical) and
+         * is a clear win on high-latency links. Disable for installs with very large messages
          * (multi-MB stack traces, raw HTTP bodies) where the per-page payload
          * could balloon — the show endpoint will fetch on demand instead.
          */

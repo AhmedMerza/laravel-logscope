@@ -27,6 +27,16 @@ beforeEach(function () {
     $this->group = LogGroup::first();
 });
 
+// v1 shares LogController::logs with the web list; a native client renders
+// its detail view from the row too, so a missing note reads as none (#115).
+it('includes the note in the v1 list row', function () {
+    $this->entry->update(['note' => 'Known flaky upstream']);
+
+    $this->withToken($this->token)->getJson(V1.'/logs')
+        ->assertOk()
+        ->assertJsonPath('data.0.note', 'Known flaky upstream');
+});
+
 it('serves every v1 read endpoint with a token', function (string $path, array $structure) {
     $path = strtr($path, ['{entry}' => $this->entry->id, '{group}' => $this->group->id]);
 
