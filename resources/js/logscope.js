@@ -345,6 +345,18 @@ function logScope() {
             return this.resetPagingAndFetch();
         },
 
+        /**
+         * Filters the grouped endpoint has no column for: request fields, HTTP
+         * method, regex, and searches aimed at a field other than the message.
+         */
+        hasOccurrenceOnlyFilters() {
+            return this.filters.httpMethods.length > 0 ||
+                this.filters.excludeHttpMethods.length > 0 ||
+                !!(this.filters.trace_id || this.filters.user_id || this.filters.ip_address || this.filters.url) ||
+                this.useRegex ||
+                this.searches.some(s => s.value && !['any', 'message'].includes(s.field));
+        },
+
         hasNonStatusFilters() {
             return this.filters.levels.length > 0 ||
                 this.filters.excludeLevels.length > 0 ||
@@ -634,6 +646,13 @@ function logScope() {
          * disagree with the sidebar.
          */
         async fetchGroups() {
+            // Every filter control refetches through here, so this is the one
+            // place that can refuse filters a group cannot honour (#29).
+            if (this.hasOccurrenceOnlyFilters()) {
+                this.showToast('Showing all entries: issues can\'t be filtered by request, HTTP method or regex', 'info', 4000);
+                return this.applyOccurrenceFilter();
+            }
+
             if (this._fetchGroupsController) {
                 this._fetchGroupsController.abort();
             }
@@ -650,11 +669,19 @@ function logScope() {
                 this.filters.excludeLevels.forEach(l => params.append('exclude_levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
                 this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
+                if (this.filters.from) params.append('from', this.filters.from);
+                if (this.filters.to) params.append('to', this.filters.to);
+                if (this.filters.from || this.filters.to) {
+                    params.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+                }
 
-                // The grouped endpoint takes a plain substring, not the
-                // structured search syntax — see LogGroupController::index.
-                const firstSearch = this.searches.find(s => s.value && !s.exclude);
-                if (firstSearch) params.append('search', firstSearch.value);
+                // Plain substrings on the sample message, not the structured
+                // search syntax — see LogGroupController::index.
+                this.searches.filter(s => s.value).forEach((s, i) => {
+                    params.append(`searches[${i}][value]`, s.value);
+                    params.append(`searches[${i}][exclude]`, s.exclude ? '1' : '0');
+                });
+                params.append('search_mode', this.searchMode);
 
                 const response = await fetch(`${this.routes.groups}?${params}`, {
                     headers: { 'Accept': 'application/json' },

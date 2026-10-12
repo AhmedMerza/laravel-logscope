@@ -95,6 +95,24 @@ describe('listing', function () {
         expect($this->getJson('/logscope/api/groups')->json('data'))->toHaveCount(2);
     });
 
+    it('filters by time range', function () {
+        occurrences(2, ['occurred_at' => now()->subDays(3)]);
+        occurrences(2, ['message' => 'Gateway timed out']);
+
+        $from = urlencode(now()->subDay()->format('Y-m-d H:i:s'));
+        $response = $this->getJson("/logscope/api/groups?from={$from}&timezone=UTC");
+
+        expect($response->json('data'))->toHaveCount(1)
+            ->and($response->json('data.0.sample_message'))->toBe('Gateway timed out');
+
+        $to = urlencode(now()->subDays(2)->format('Y-m-d H:i:s'));
+        expect($this->getJson("/logscope/api/groups?to={$to}&timezone=UTC")->json('data'))->toHaveCount(1);
+    });
+
+    it('rejects an unparseable date', function () {
+        $this->getJson('/logscope/api/groups?from=not-a-date')->assertStatus(422);
+    });
+
     it('matches on the sample message', function () {
         occurrences(2);
         occurrences(2, ['message' => 'Gateway timed out']);
@@ -102,6 +120,26 @@ describe('listing', function () {
         $response = $this->getJson('/logscope/api/groups?search=Gateway');
 
         expect($response->json('data'))->toHaveCount(1);
+    });
+
+    it('drops groups matching an excluded term', function () {
+        occurrences(2);
+        occurrences(2, ['message' => 'Cache warmed']);
+
+        $response = $this->getJson('/logscope/api/groups?searches[0][value]=Cache&searches[0][exclude]=1');
+
+        expect($response->json('data'))->toHaveCount(1)
+            ->and($response->json('data.0.sample_message'))->not->toContain('Cache');
+    });
+
+    it('combines included terms by search mode', function () {
+        occurrences(2, ['message' => 'Gateway timed out']);
+        occurrences(2, ['message' => 'Disk almost full']);
+
+        $query = 'searches[0][value]=Gateway&searches[1][value]=Disk';
+
+        expect($this->getJson("/logscope/api/groups?{$query}")->json('data'))->toHaveCount(0);
+        expect($this->getJson("/logscope/api/groups?{$query}&search_mode=or")->json('data'))->toHaveCount(2);
     });
 
     it('pages with a cursor', function () {
