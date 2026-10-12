@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] — 2026-10-12
+
+Fixes only. The grouped view applies every filter it shows (or hands off to
+All entries), grouping no longer splits on timings and sizes, the detail panel
+shows a log's note from All entries, and dialogs take keyboard focus. No
+migration.
+
 ### Fixed
+
+- **Grouped view: filters it showed but ignored (#117).** The date range (including the "Recent Errors" and "Last 24 Hours" quick filters) now applies: a group matches when its first-seen..last-seen span overlaps the window. Every search row applies, not only the first, and NOT rows exclude. Filters with no group equivalent (HTTP method, trace/user/IP, regex, `field:value` and context/source/header searches) switch to All entries with a toast instead of returning unfiltered groups. The grouped view's filters are now kept in the URL, so it can be reloaded and bookmarked.
+- **Groups: "First seen" moves back when older entries arrive late (#119).** A late queue flush or `logscope:import` of older logs left "First seen" later than the group's oldest occurrence.
+- **Dialogs: keyboard focus (#116).** The delete confirmation focuses Cancel (never Delete) and the shortcuts sheet focuses its close button when they open; Tab stays inside the dialog, and closing returns focus to the button that opened it.
 
 - **Grouping: numbers glued to a unit no longer split one issue into many groups (#118).** `Query took 172ms` and `Query took 861ms` now share a fingerprint, as do `1.5s`/`12.25s` and `12MB`/`640MB`. Tokens with letters before the digits (`sha256`, `h264`, `k8s`) are unchanged. Existing groups keep their old fingerprints until you run `php artisan logscope:backfill-fingerprints --recompute`.
 - **Detail panel: a log's note now shows when it is opened from All entries (#115).** The list response left out `note`, so the panel showed "Click to add a note…" for a log that had one, and saving would overwrite it. `user_agent`, `status_changed_at` and `status_changed_by` were missing the same way and now show too. This also applies to `GET /api/v1/logs`.

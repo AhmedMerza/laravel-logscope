@@ -24,7 +24,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**[v2.3.1](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.1):** grouped rollups survive an InnoDB deadlock under concurrent flushes, and the grouped view's issue/occurrence panel, keyboard shortcuts and layout are fixed on every screen size, from a 240px phone to an ultrawide monitor.
+**[v2.3.2](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.2):** the grouped view applies the date range, every search row and exclude terms (and hands off to All entries for filters it can't apply), timings and sizes like `172ms` no longer split one issue into many groups, and dialogs take keyboard focus.
 
 **Upgrading:** no migration. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
