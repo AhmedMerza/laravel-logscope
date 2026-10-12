@@ -57,6 +57,11 @@ describe('message normalisation', function () {
             ->toBe(Fingerprint::normalize('Job ran for 12.25s'));
     });
 
+    // #118 acceptance: spec names keep the shape the four-digit rule gives them.
+    it('leaves rfc3339 to the four-digit rule', function () {
+        expect(Fingerprint::normalize('Parse rfc3339 failed'))->toBe('Parse rfc<num> failed');
+    });
+
     // Four is the threshold precisely so these survive: collapsing them would
     // merge sha256 with sha512, which are not the same error.
     it('leaves technical tokens of three digits or fewer intact', function (string $message) {
@@ -72,7 +77,9 @@ describe('message normalisation', function () {
         // Letters after the digits but none before: not a unit, not a value.
         '1st attempt failed',
         '2nd retry queued',
-        '3des cipher disabled',
+        // Unit after the digits but letters before them: only the leading
+        // \b keeps this out, so it fails if that boundary is ever dropped.
+        'k8s pod evicted',
     ]);
 
     it('normalises decimals to one shape whatever their size', function () {

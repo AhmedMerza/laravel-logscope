@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Grouping: numbers glued to a unit no longer split one issue into many groups (#118).** `Query took 172ms` and `Query took 861ms` now share a fingerprint, as do `1.5s`/`12.25s` and `12MB`/`640MB`. Tokens with letters before the digits (`sha256`, `h264`, `k8s`) are unchanged. Existing groups keep their old fingerprints until you run `php artisan logscope:backfill-fingerprints --recompute`.
+
 ## [2.3.1] — 2026-10-04
 
 Fixes only. Grouped rollups no longer fail on an InnoDB deadlock under

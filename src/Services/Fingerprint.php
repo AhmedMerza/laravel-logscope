@@ -94,7 +94,10 @@ final class Fingerprint
             // became its own group (#118). Only the digits go; the unit stays
             // in the shape. The leading \b keeps sha256 and h264 out, and the
             // closed unit list keeps 1st and 3des out. Before the decimal
-            // rule, which has no boundary after 1.5 in 1.5s either.
+            // rule, which has no boundary after 1.5 in 1.5s either. Known
+            // cost: a plural reads as seconds, so "too many 500s" and "too
+            // many 404s" share a group, and colour #12b becomes #<num>b.
+            // Accepted for the same reason as rfc<num> below.
             '/\b\d+(?:\.\d+)?(?=(?:ms|s|m|h|kb|mb|gb|b)\b)/i' => self::PLACEHOLDER_NUMBER,
 
             // Decimals before the digit-run rules below, which would
