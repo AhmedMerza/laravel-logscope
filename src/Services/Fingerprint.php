@@ -88,6 +88,15 @@ final class Fingerprint
             // of [a-f] are English words ("facade", "decade"), not hashes.
             '/\b(?=[0-9a-f]*\d)[0-9a-f]{8,}\b/i' => self::PLACEHOLDER_HEX,
 
+            // A number glued to a unit: 172ms, 1.5s, 12MB. The integer rule
+            // needs a boundary after the digits and the run rule needs four,
+            // so a short duration otherwise reached neither and every value
+            // became its own group (#118). Only the digits go; the unit stays
+            // in the shape. The leading \b keeps sha256 and h264 out, and the
+            // closed unit list keeps 1st and 3des out. Before the decimal
+            // rule, which has no boundary after 1.5 in 1.5s either.
+            '/\b\d+(?:\.\d+)?(?=(?:ms|s|m|h|kb|mb|gb|b)\b)/i' => self::PLACEHOLDER_NUMBER,
+
             // Decimals before the digit-run rules below, which would
             // otherwise take the integer part of 1234.56 and not of 12.30,
             // normalising two prices of the same message to different shapes.
