@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ beforeEach(function () {
 
 afterEach(function () {
     LogScope::resetAuth();
+    LogScope::resetStatusChangedBy();
 });
 
 // =============================================================================
@@ -422,7 +424,7 @@ it('eager-loads every field the detail panel shows', function () {
     $entry->forceFill([
         'note' => 'Known flaky upstream',
         'user_agent' => 'curl/8.5.0',
-        'status_changed_at' => now(),
+        'status_changed_at' => '2026-01-02 03:04:05',
         'status_changed_by' => 'ahmed',
     ])->save();
 
@@ -431,7 +433,29 @@ it('eager-loads every field the detail panel shows', function () {
     expect($first['note'] ?? null)->toBe('Known flaky upstream')
         ->and($first['user_agent'] ?? null)->toBe('curl/8.5.0')
         ->and($first['status_changed_by'] ?? null)->toBe('ahmed')
-        ->and($first['status_changed_at'] ?? null)->not->toBeNull();
+        ->and(Carbon::parse($first['status_changed_at'] ?? null)->equalTo('2026-01-02 03:04:05'))->toBeTrue();
+});
+
+// The same, through the endpoints the panel actually saves with, so a gap
+// between what they persist and what the list returns can't hide (#115).
+it('returns a note and status change saved through the API in the list', function () {
+    LogScope::statusChangedBy(fn () => 'ahmed');
+    $this->travelTo('2026-01-02 03:04:05');
+    $id = LogEntry::createEntry(['level' => 'error', 'message' => 'Round trip'])->id;
+
+    $this->patchJson("/logscope/api/logs/{$id}/status", ['status' => 'investigating', 'note' => 'Looking into it'])->assertOk();
+
+    // Not open any more, so it's off the default list; ask for its status.
+    $list = '/logscope/api/logs?per_page=10&statuses[]=investigating';
+    $first = $this->getJson($list)->assertOk()->json('data.0');
+    expect($first['note'] ?? null)->toBe('Looking into it')
+        ->and($first['status'] ?? null)->toBe('investigating')
+        ->and($first['status_changed_by'] ?? null)->toBe('ahmed')
+        ->and(Carbon::parse($first['status_changed_at'] ?? null)->equalTo('2026-01-02 03:04:05'))->toBeTrue();
+
+    $this->patchJson("/logscope/api/logs/{$id}/note", ['note' => 'Upstream confirmed'])->assertOk();
+
+    expect($this->getJson($list)->json('data.0.note'))->toBe('Upstream confirmed');
 });
 
 it('omits message and context when eager_load_detail is disabled', function () {
