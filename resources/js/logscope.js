@@ -22,6 +22,7 @@ function logScope() {
         detailPanelWidth: parseInt(localStorage.getItem('logscope_panel_width')) || 0,
         isResizing: false,
         quickFilters: config.quickFilters || [],
+        searchableFields: config.searchableFields || [],
         features: config.features || {},
         jsonViewer: config.jsonViewer || { collapseThreshold: 5, autoCollapseKeys: [] },
         jsonCollapseState: {},
@@ -210,7 +211,20 @@ function logScope() {
             if (params.get('ip_address')) this.filters.ip_address = params.get('ip_address');
             if (params.get('url')) this.filters.url = params.get('url');
 
-            // Load search
+            // Load searches. searches[i][...] holds every row; the single-row
+            // search/search_field/search_exclude form is kept for old links.
+            const rows = [];
+            for (const [key, value] of params) {
+                const m = key.match(/^searches\[(\d+)\]\[(field|value|exclude)\]$/);
+                if (!m) continue;
+                rows[m[1]] ??= { field: 'any', value: '', exclude: false };
+                rows[m[1]][m[2]] = m[2] === 'exclude' ? value === '1' : value;
+            }
+            if (rows.some(Boolean)) this.searches = rows.filter(Boolean);
+            if (params.get('search_mode') === 'or') this.searchMode = 'or';
+            if (params.get('regex') === '1') this.useRegex = true;
+            if (params.get('view') === 'all') this.viewMode = 'all';
+
             if (params.get('search')) {
                 this.searches[0].value = params.get('search');
             }
@@ -261,19 +275,20 @@ function logScope() {
             if (this.filters.ip_address) params.set('ip_address', this.filters.ip_address);
             if (this.filters.url) params.set('url', this.filters.url);
 
-            // Add search
-            if (this.searches[0]?.value) {
-                params.set('search', this.searches[0].value);
-                if (this.searches[0].field !== 'any') {
-                    params.set('search_field', this.searches[0].field);
-                }
-                if (this.searches[0].exclude) {
-                    params.set('search_exclude', '1');
-                }
-            }
+            // Add every search row
+            this.searches.filter(s => s.value).forEach((s, i) => {
+                params.set(`searches[${i}][value]`, s.value);
+                if (s.field !== 'any') params.set(`searches[${i}][field]`, s.field);
+                if (s.exclude) params.set(`searches[${i}][exclude]`, '1');
+            });
+            if (this.searchMode === 'or') params.set('search_mode', 'or');
+            if (this.useRegex) params.set('regex', '1');
 
-            // Add cursor if navigated beyond first page
-            if (this.cursor) params.set('cursor', this.cursor);
+            // Grouped is the default view; the flat cursor only pages entries.
+            if (this.viewMode === 'all') {
+                params.set('view', 'all');
+                if (this.cursor) params.set('cursor', this.cursor);
+            }
 
             // Add selected log ID for deep linking
             if (this.selectedLog?.id) params.set('log', this.selectedLog.id);
@@ -343,6 +358,30 @@ function logScope() {
             }
 
             return this.resetPagingAndFetch();
+        },
+
+        /**
+         * Filters the grouped endpoint has no column for: request fields, HTTP
+         * method, regex, and searches aimed at a field other than the message.
+         */
+        hasOccurrenceOnlyFilters() {
+            return this.filters.httpMethods.length > 0 ||
+                this.filters.excludeHttpMethods.length > 0 ||
+                !!(this.filters.trace_id || this.filters.user_id || this.filters.ip_address || this.filters.url) ||
+                this.useRegex ||
+                this.searches.some(s => s.value && (!['any', 'message'].includes(s.field) || this.isStructuredSearch(s.value)));
+        },
+
+        /**
+         * Mirrors LogController::shouldUseStructuredSearch: a quote, a -token,
+         * or field:value turns a search into syntax the grouped endpoint, which
+         * only matches substrings, would read literally and find nothing.
+         */
+        isStructuredSearch(value) {
+            if (this.features.search_syntax === false) return false;
+            if (value.includes('"') || /(^|\s)-\S/.test(value)) return true;
+            const fields = this.searchableFields.join('|');
+            return fields !== '' && new RegExp(`\\b(${fields}):\\S`, 'i').test(value);
         },
 
         hasNonStatusFilters() {
@@ -634,6 +673,13 @@ function logScope() {
          * disagree with the sidebar.
          */
         async fetchGroups() {
+            // Every filter control refetches through here, so this is the one
+            // place that can refuse filters a group cannot honour (#29).
+            if (this.hasOccurrenceOnlyFilters()) {
+                this.showToast('Showing all entries: issues can\'t be filtered by request, HTTP method, regex or field:value search', 'info', 4000);
+                return this.applyOccurrenceFilter();
+            }
+
             if (this._fetchGroupsController) {
                 this._fetchGroupsController.abort();
             }
@@ -650,11 +696,19 @@ function logScope() {
                 this.filters.excludeLevels.forEach(l => params.append('exclude_levels[]', l));
                 this.filters.channels.forEach(c => params.append('channels[]', c));
                 this.filters.excludeChannels.forEach(c => params.append('exclude_channels[]', c));
+                if (this.filters.from) params.append('from', this.filters.from);
+                if (this.filters.to) params.append('to', this.filters.to);
+                if (this.filters.from || this.filters.to) {
+                    params.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+                }
 
-                // The grouped endpoint takes a plain substring, not the
-                // structured search syntax — see LogGroupController::index.
-                const firstSearch = this.searches.find(s => s.value && !s.exclude);
-                if (firstSearch) params.append('search', firstSearch.value);
+                // Plain substrings on the sample message, not the structured
+                // search syntax — see LogGroupController::index.
+                this.searches.filter(s => s.value).forEach((s, i) => {
+                    params.append(`searches[${i}][value]`, s.value);
+                    params.append(`searches[${i}][exclude]`, s.exclude ? '1' : '0');
+                });
+                params.append('search_mode', this.searchMode);
 
                 const response = await fetch(`${this.routes.groups}?${params}`, {
                     headers: { 'Accept': 'application/json' },
@@ -671,6 +725,7 @@ function logScope() {
                 const data = await response.json();
                 this.groups = data.data;
                 this.groupMeta = data.meta;
+                this.syncFiltersToUrl();
 
                 // A filter or page change can drop the open issue from the
                 // list; a panel for a row that isn't there is easy to mistake

@@ -208,12 +208,15 @@
             <div class="hidden sm:flex items-center h-9 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]"
                 role="group" aria-label="List view">
                 <button @click="setViewMode('grouped')"
-                    class="h-8 px-3 rounded-md text-sm font-medium transition-colors"
+                    class="h-8 px-3 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     :class="viewMode === 'grouped'
                         ? 'bg-[rgba(var(--accent-rgb),0.15)] text-[var(--accent)]'
                         : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'"
                     :aria-pressed="viewMode === 'grouped'"
-                    title="Roll repeated entries up into issues">
+                    :disabled="hasOccurrenceOnlyFilters()"
+                    :title="hasOccurrenceOnlyFilters()
+                        ? 'Issues can\'t be filtered by request, HTTP method, regex or field:value search. Remove those filters to group.'
+                        : 'Roll repeated entries up into issues'">
                     Grouped
                 </button>
                 <button @click="setViewMode('all')"

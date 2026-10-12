@@ -68,6 +68,7 @@ class LogController extends Controller
             'httpMethods' => $this->getAvailableHttpMethods(),
             'statuses' => $this->getStatusOptions(),
             'quickFilters' => config('logscope.quick_filters', []),
+            'searchableFields' => $this->getSearchableFields(),
             'features' => [
                 'status' => config('logscope.features.status', true),
                 'notes' => config('logscope.features.notes', true),

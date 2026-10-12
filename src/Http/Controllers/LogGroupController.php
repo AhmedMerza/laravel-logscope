@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LogScope\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -27,7 +28,8 @@ class LogGroupController extends Controller
      * List groups, most recently active first.
      *
      * Filtering is deliberately narrower than the entry list: statuses,
-     * levels and channels, plus a substring match on the sample message. The
+     * levels, channels and time range, plus substring matches (include or
+     * exclude) on the sample message. The
      * entry list's structured search syntax queries per-occurrence fields
      * (trace id, url, ip) that a group does not have, so it is not offered
      * here rather than being silently ignored.
@@ -58,9 +60,47 @@ class LogGroupController extends Controller
             $query->whereNotIn('channel', (array) $request->input('exclude_channels'));
         }
 
+        // Each search row is a plain substring on the sample message. NOT rows
+        // always narrow; the rest combine by search_mode, as on the entry list.
+        $like = fn ($value) => '%'.str_replace(['%', '_'], ['\%', '\_'], (string) $value).'%';
+        $terms = collect((array) $request->input('searches', []))
+            ->filter(fn ($term) => is_array($term) && filled($term['value'] ?? null));
         if ($request->filled('search')) {
-            $term = str_replace(['%', '_'], ['\%', '\_'], (string) $request->input('search'));
-            $query->where('sample_message', 'like', '%'.$term.'%');
+            $terms->push(['value' => $request->input('search')]);
+        }
+        [$excluded, $included] = $terms->partition(fn ($term) => filter_var($term['exclude'] ?? false, FILTER_VALIDATE_BOOLEAN));
+
+        foreach ($excluded as $term) {
+            $query->where('sample_message', 'not like', $like($term['value']));
+        }
+
+        if ($included->isNotEmpty()) {
+            $boolean = $request->input('search_mode') === 'or' ? 'or' : 'and';
+            $query->where(function ($q) use ($included, $like, $boolean) {
+                foreach ($included as $term) {
+                    $q->where('sample_message', 'like', $like($term['value']), $boolean);
+                }
+            });
+        }
+
+        // A group is in range when its active span overlaps the window. A
+        // group with no occurrence inside a wide span can still slip in; exact
+        // per-window matching would mean joining the entries table.
+        if ($request->filled('from') || $request->filled('to')) {
+            try {
+                $timezone = $request->input('timezone', config('app.timezone', 'UTC'));
+                if ($request->filled('from')) {
+                    $query->where('last_seen_at', '>=', Carbon::parse($request->input('from'), $timezone)->utc());
+                }
+                if ($request->filled('to')) {
+                    $query->where('first_seen_at', '<=', Carbon::parse($request->input('to'), $timezone)->utc());
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'error' => 'Invalid date format',
+                    'message' => 'Please provide valid dates in a recognized format (e.g., YYYY-MM-DD)',
+                ], 422);
+            }
         }
 
         $perPage = $this->perPage($request);

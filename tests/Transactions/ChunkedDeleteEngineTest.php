@@ -9,6 +9,7 @@ declare(strict_types=1);
 // filter, so this runs the loop on whichever engine LOGSCOPE_TEST_DB names.
 // See tests/TransactionTestCase.php for pointing it at Postgres/MySQL.
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -86,7 +87,11 @@ it('clamps a chunk size that would defeat chunking', function () {
 
 it('prunes past the retention cutoff and keeps the rows on the boundary', function () {
     // #46's second test bullet. `occurred_at < $cutoff` is exclusive, so a
-    // row landing exactly on the cutoff must survive.
+    // row landing exactly on the cutoff must survive. The clock is frozen on
+    // a whole second: rows are stored to the second, and the prune command
+    // reads now() again later, so a live clock can move the cutoff past the
+    // boundary row (seen on Postgres + Laravel 13 CI).
+    Carbon::setTestNow(now()->startOfSecond());
     $cutoff = now()->subDays(30);
 
     LogEntry::insert([
@@ -108,6 +113,8 @@ it('prunes past the retention cutoff and keeps the rows on the boundary', functi
 
     expect(LogEntry::query()->orderBy('occurred_at')->pluck('message')->all())
         ->toBe(['on the boundary', 'newer']);
+
+    Carbon::setTestNow();
 });
 
 it('empties the table when the query has no filter', function () {
