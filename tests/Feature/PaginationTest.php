@@ -415,6 +415,25 @@ it('eager-loads full message and context in the list response by default', funct
         ->and($first['context'])->toBe(['foo' => 'bar', 'count' => 42]);
 });
 
+// The panel renders straight from the list row, so a field missing here reads
+// as absent: a note shown as "Click to add a note…" invites an overwrite (#115).
+it('eager-loads every field the detail panel shows', function () {
+    $entry = LogEntry::createEntry(['level' => 'error', 'message' => 'Has a note']);
+    $entry->forceFill([
+        'note' => 'Known flaky upstream',
+        'user_agent' => 'curl/8.5.0',
+        'status_changed_at' => now(),
+        'status_changed_by' => 'ahmed',
+    ])->save();
+
+    $first = $this->getJson('/logscope/api/logs?per_page=10')->assertOk()->json('data.0');
+
+    expect($first['note'] ?? null)->toBe('Known flaky upstream')
+        ->and($first['user_agent'] ?? null)->toBe('curl/8.5.0')
+        ->and($first['status_changed_by'] ?? null)->toBe('ahmed')
+        ->and($first['status_changed_at'] ?? null)->not->toBeNull();
+});
+
 it('omits message and context when eager_load_detail is disabled', function () {
     config(['logscope.pagination.eager_load_detail' => false]);
 

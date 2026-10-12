@@ -282,10 +282,14 @@ class LogController extends Controller
         ];
 
         if (config('logscope.pagination.eager_load_detail', true)) {
-            // headers rides with the other detail-panel-only fields: when
-            // eager loading is off, the panel falls back to /logs/{id},
-            // which returns the whole model including headers.
-            array_splice($listColumns, 2, 0, ['message', 'context', 'headers']);
+            // Every field the detail panel shows rides here. The panel only
+            // falls back to /logs/{id} when message/context are missing, so a
+            // field left off this list never loads: a note read as "Click to
+            // add a note…" and got overwritten (#115). When eager loading is
+            // off, that fallback returns the whole model instead.
+            array_splice($listColumns, 2, 0, [
+                'message', 'context', 'headers', 'note', 'user_agent', 'status_changed_at', 'status_changed_by',
+            ]);
         }
 
         $items = $query->select($listColumns)->limit($perPage + 1)->get();
