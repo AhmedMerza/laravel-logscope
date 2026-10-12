@@ -449,6 +449,8 @@ it('omits message and context when eager_load_detail is disabled', function () {
     $first = $response->json('data.0');
     expect($first)->not->toHaveKey('message')
         ->and($first)->not->toHaveKey('context')
+        // The rest of the detail-panel fields come from /logs/{id} instead.
+        ->and($first)->not->toHaveKeys(['headers', 'note', 'user_agent', 'status_changed_at', 'status_changed_by'])
         // Previews still ship in narrow mode so the list view can render.
         ->and($first)->toHaveKeys(['message_preview', 'context_preview']);
 });

@@ -1106,6 +1106,7 @@ function logScope() {
                 // Guarded by id check because in chained-update flows the
                 // selection may have advanced before this fetch resolved.
                 const data = await response.json();
+                this.mergeIntoList(data.data);
                 if (this.selectedLog?.id === targetId) {
                     this.selectedLog = { ...this.selectedLog, ...data.data };
                 }
@@ -1132,9 +1133,21 @@ function logScope() {
                     return;
                 }
                 const data = await response.json();
+                this.mergeIntoList(data.data);
                 this.selectedLog = data.data;
             } catch (error) {
                 this.handleNetworkError(error, 'saving note');
+            }
+        },
+
+        // Reselecting a log renders its list row, not the last server
+        // response, so a save has to land in the row too — otherwise the
+        // panel shows the pre-edit note and the next edit overwrites the
+        // saved one (#115). A row filtered out of the list is skipped.
+        mergeIntoList(fresh) {
+            const idx = this.logs.findIndex(l => l.id === fresh?.id);
+            if (idx !== -1) {
+                this.logs[idx] = { ...this.logs[idx], ...fresh };
             }
         },
 
