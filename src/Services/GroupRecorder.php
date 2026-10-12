@@ -21,7 +21,7 @@ use LogScope\Models\LogGroup;
  * the batching that LogBuffer exists to provide.
  *
  *   1. insertOrIgnore  — create rows for fingerprints not seen before
- *   2. update … case   — add each fingerprint's count, advance last_seen_at
+ *   2. update … case   — add each fingerprint's count, widen first/last_seen_at
  *   3. update … where  — reopen groups that were Resolved and just fired again
  *
  * Step 3 is what makes triage safe. Without it, resolving an error hides every
@@ -182,8 +182,9 @@ final class GroupRecorder
     }
 
     /**
-     * Add each fingerprint's occurrences to its group and advance last_seen_at,
-     * in one statement whatever the batch size.
+     * Add each fingerprint's occurrences to its group and widen its
+     * first_seen_at/last_seen_at window, in one statement whatever the batch
+     * size.
      *
      * @param  array<string, array<string, mixed>>  $summaries
      */
@@ -193,19 +194,28 @@ final class GroupRecorder
         $grammar = $connection->getQueryGrammar();
         $table = $grammar->wrapTable((new LogGroup)->getTable());
 
-        // SQLite spells the two-argument maximum max(); MySQL and Postgres
-        // reserve max() for the aggregate and use greatest() for this.
-        $greatest = $connection->getDriverName() === 'sqlite' ? 'max' : 'greatest';
+        // SQLite spells the two-argument maximum/minimum max()/min(); MySQL
+        // and Postgres reserve those for the aggregates and use
+        // greatest()/least() for this.
+        $sqlite = $connection->getDriverName() === 'sqlite';
+        $greatest = $sqlite ? 'max' : 'greatest';
+        $least = $sqlite ? 'min' : 'least';
 
         $countCase = '';
+        $firstCase = '';
         $seenCase = '';
         $countBindings = [];
+        $firstBindings = [];
         $seenBindings = [];
 
         foreach ($summaries as $fingerprint => $summary) {
             $countCase .= ' when ? then ?';
             $countBindings[] = $fingerprint;
             $countBindings[] = $summary['count'];
+
+            $firstCase .= ' when ? then ?';
+            $firstBindings[] = $fingerprint;
+            $firstBindings[] = $summary['first_seen_at'];
 
             $seenCase .= ' when ? then ?';
             $seenBindings[] = $fingerprint;
@@ -215,17 +225,21 @@ final class GroupRecorder
         $fingerprints = array_keys($summaries);
         $placeholders = implode(', ', array_fill(0, count($fingerprints), '?'));
 
-        // last_seen_at only ever moves forward. A queue worker running late
-        // can flush entries older than ones already recorded, and without the
-        // guard that group would jump backwards in a list ordered by recency.
+        // The seen window only ever widens. A queue worker running late, or
+        // logscope:import loading older logs, can flush entries older than
+        // ones already recorded: last_seen_at must not jump backwards in a
+        // list ordered by recency, and first_seen_at must move back to the
+        // oldest occurrence or it contradicts the group's own entries (#119).
         $sql = "update {$table} set "
             ."occurrence_count = occurrence_count + case fingerprint{$countCase} else 0 end, "
+            ."first_seen_at = {$least}(first_seen_at, case fingerprint{$firstCase} else first_seen_at end), "
             ."last_seen_at = {$greatest}(last_seen_at, case fingerprint{$seenCase} else last_seen_at end), "
             .'updated_at = ? '
             ."where fingerprint in ({$placeholders})";
 
         $connection->update($sql, array_merge(
             $countBindings,
+            $firstBindings,
             $seenBindings,
             [now()->format('Y-m-d H:i:s')],
             $fingerprints,
