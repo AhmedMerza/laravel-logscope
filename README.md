@@ -24,7 +24,7 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**[v2.3.2](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.2):** the grouped view applies the date range, every search row and exclude terms (and hands off to All entries for filters it can't apply), timings and sizes like `172ms` no longer split one issue into many groups, and dialogs take keyboard focus.
+**[v2.3.3](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.3):** a deep link to one entry (`?log=<id>`) opens that entry again instead of the full list.
 
 **Upgrading:** no migration. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
