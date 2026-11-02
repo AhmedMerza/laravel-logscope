@@ -17,6 +17,10 @@ function logScope() {
         loading: true,
         error: null,
         selectedLog: null,
+        // ID of the log the latest fetchLogById call was for. Kept in sync
+        // with selectedLog by a watcher in init() so any selection change
+        // (click, keyboard nav, close) invalidates an in-flight fetch.
+        _requestedLogId: null,
         showDeleteDialog: false,
         showKeyboardHelp: false,
         detailPanelWidth: parseInt(localStorage.getItem('logscope_panel_width')) || 0,
@@ -130,6 +134,11 @@ function logScope() {
                 this.$watch('sections.channels', val => localStorage.setItem('logscope-section-channels', JSON.stringify(val)));
                 this.$watch('sections.httpMethods', val => localStorage.setItem('logscope-section-httpMethods', JSON.stringify(val)));
                 this.$watch('sections.request', val => localStorage.setItem('logscope-section-request', JSON.stringify(val)));
+
+                // Any selection change made outside fetchLogById (click,
+                // keyboard nav, panel close) must invalidate an in-flight
+                // single-log fetch.
+                this.$watch('selectedLog', log => { this._requestedLogId = log?.id ?? null; });
 
                 setInterval(() => { if (!document.hidden) this.now = Date.now(); }, 30000);
                 document.addEventListener('visibilitychange', () => { if (!document.hidden) this.now = Date.now(); });
@@ -1610,6 +1619,7 @@ function logScope() {
 
         // Fetch a single log by ID (for deep linking and detail view)
         async fetchLogById(id) {
+            this._requestedLogId = id;
             try {
                 const response = await fetch(`${this.routes.apiBase}/logs/${id}`, {
                     headers: { 'Accept': 'application/json' }
@@ -1623,8 +1633,12 @@ function logScope() {
                     return;
                 }
                 const data = await response.json();
-                // Discard stale responses — user may have navigated away
-                if (this.selectedLog?.id !== id) return;
+                // Discard stale responses — the user may have selected or
+                // closed another entry while this fetch was in flight. Compare
+                // against the requested ID, not selectedLog: on the initial
+                // deep-link load nothing is selected yet, so a selectedLog
+                // check would always throw the result away.
+                if (this._requestedLogId !== id) return;
                 this.selectedLog = data.data;
                 this.syncFiltersToUrl();
                 this.$dispatch('logscope:log-selected', { log: this.selectedLog });
