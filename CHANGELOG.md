@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.3] — 2026-11-02
+
+### Fixed
+
+- **Deep links: opening `?log=<id>` showed the full list instead of the entry.** The fetch for the deep-linked log discarded its own response with a stale-response guard that compared against `selectedLog` — which is always empty on the initial load, so the result was always thrown away. The guard now tracks the requested log ID (kept in sync with every selection change) and still discards a response that arrives after the user has selected or closed another entry.
+
 ## [2.3.2] — 2026-10-12
 
 Fixes only. The grouped view applies every filter it shows (or hands off to
