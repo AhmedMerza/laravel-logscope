@@ -27,7 +27,10 @@ return new class extends Migration
             $table->string('user_agent', 500)->nullable();
             $table->string('http_method', 10)->nullable()->index();
             $table->string('url', 2000)->nullable();
-            $table->timestamp('occurred_at')->index();
+            // dateTime, not timestamp: MariaDB < 10.10 and MySQL 5.7 give the
+            // first NOT NULL timestamp ON UPDATE CURRENT_TIMESTAMP, so every
+            // status change would rewrite when the log happened.
+            $table->dateTime('occurred_at')->index();
             $table->boolean('is_truncated')->default(false);
             $table->timestamp('created_at')->useCurrent();
 

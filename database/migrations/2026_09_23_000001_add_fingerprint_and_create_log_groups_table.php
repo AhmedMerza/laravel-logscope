@@ -49,8 +49,11 @@ return new class extends Migration
             $table->string('level', 20)->index();
             $table->string('channel', 100)->nullable()->index();
             $table->unsignedBigInteger('occurrence_count')->default(0);
-            $table->timestamp('first_seen_at');
-            $table->timestamp('last_seen_at');
+            // dateTime, not timestamp: MariaDB < 10.10 and MySQL 5.7 give the
+            // first NOT NULL timestamp ON UPDATE CURRENT_TIMESTAMP and reject
+            // the second's implicit zero default.
+            $table->dateTime('first_seen_at');
+            $table->dateTime('last_seen_at');
 
             // Mirrors log_entries: same column names, same types, so the
             // status vocabulary is identical on both sides.
