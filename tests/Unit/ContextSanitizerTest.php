@@ -411,6 +411,29 @@ describe('header bag logged as an array', function () {
         expect((new ContextSanitizer)->sanitize(['referer' => 'https://app.test/?token=T3'])['referer'])
             ->toBe('https://app.test/?token=T3');
     });
+
+    // parse_url() gives no scheme+host for these, and redactUrl() used to
+    // hand them back unchanged with the secret still in them.
+    it('redacts the query of a referer that is not an absolute URL', function (string $referer, string $expected) {
+        $context = $this->sanitizer->sanitize(['referer' => $referer]);
+
+        expect($context['referer'])->not->toContain('S4')
+            ->and(urldecode($context['referer']))->toBe($expected);
+    })->with([
+        'path' => ['/cb?token=S4&page=2', '/cb?token=[REDACTED]&page=2'],
+        'bare query' => ['?token=S4', '?token=[REDACTED]'],
+        'protocol-relative' => ['//x.t/p?token=S4', '//x.t/p?token=[REDACTED]'],
+        'scheme-less' => ['x.t/p?token=S4', 'x.t/p?token=[REDACTED]'],
+        'unparseable port' => ['https://x.t:99999/?token=S4', 'https://x.t:99999/?token=[REDACTED]'],
+        'fragment kept' => ['/cb?token=S4#top', '/cb?token=[REDACTED]#top'],
+    ]);
+
+    it('keeps a leading ? on a query_string', function () {
+        $context = $this->sanitizer->sanitize(['query_string' => '?token=S4&page=2']);
+
+        // Raw, not urldecode()d: the bug stored the '?' as '%3F'.
+        expect($context['query_string'])->toBe('?token=%5BREDACTED%5D&page=2');
+    });
 });
 
 describe('context redaction', function () {

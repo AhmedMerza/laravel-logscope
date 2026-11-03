@@ -56,14 +56,18 @@ it('skips logs below min_level and keeps the rest', function () {
         ->toBe(['alert', 'critical', 'emergency', 'error', 'warning']);
 });
 
-it('matches the level name case-insensitively', function () {
-    config(['logscope.ignore.min_level' => 'INFO']);
+it('matches the level name case-insensitively, and a numeric string as a value', function (string $minLevel) {
+    config(['logscope.ignore.min_level' => $minLevel]);
 
     logEveryLevel();
 
     expect(LogEntry::where('level', 'debug')->exists())->toBeFalse()
         ->and(LogEntry::count())->toBe(7);
-});
+})->with([
+    'upper-case name' => ['INFO'],
+    // What env('LOGSCOPE_MIN_LEVEL') returns for LOGSCOPE_MIN_LEVEL=200.
+    'numeric string from env' => ['200'],
+]);
 
 it('captures everything and reports it when min_level is not a level name', function () {
     // A typo must not turn into "drop every log": shouldIgnoreLog() treats a
@@ -88,6 +92,9 @@ it('accepts a Monolog level value or enum as min_level', function (mixed $minLev
 })->with([
     'int' => [300],
     'enum' => [Level::Warning],
+    // What env('LOGSCOPE_MIN_LEVEL') returns for LOGSCOPE_MIN_LEVEL=300.
+    'numeric string from env' => ['300'],
+    'padded name' => [' warning '],
 ]);
 
 it('captures everything and reports it when min_level is an unknown int', function () {

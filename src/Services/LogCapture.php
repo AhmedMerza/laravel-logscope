@@ -229,6 +229,12 @@ class LogCapture
      */
     protected function isBelowLevel(string $level, mixed $minLevel): bool
     {
+        // env() hands LOGSCOPE_MIN_LEVEL=200 over as the string '200'.
+        if (is_string($minLevel)) {
+            $minLevel = trim($minLevel);
+            $minLevel = ctype_digit($minLevel) ? (int) $minLevel : $minLevel;
+        }
+
         try {
             $min = match (true) {
                 $minLevel instanceof Level => $minLevel,

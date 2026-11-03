@@ -357,10 +357,11 @@ class ContextSanitizer implements ContextSanitizerInterface
         }
 
         $redact = fn ($url) => is_string($url) ? match ($key) {
-            'query_string' => $this->redactQuery($url, $path),
-            'request_uri' => str_contains($url, '?')
-                ? strstr($url, '?', true).'?'.$this->redactQuery(substr(strstr($url, '?'), 1), $path)
-                : $url,
+            // A leading '?' is kept, not encoded into the first key as '%3F'.
+            'query_string' => str_starts_with($url, '?')
+                ? $this->redactQueryAfterMark($url, $path)
+                : $this->redactQuery($url, $path),
+            'request_uri' => $this->redactQueryAfterMark($url, $path),
             default => $this->redactUrl($url, $path),
         } : $url;
 
@@ -372,6 +373,24 @@ class ContextSanitizer implements ContextSanitizerInterface
         parse_str($query, $params);
 
         return http_build_query($this->redactSensitive($params, $path));
+    }
+
+    /**
+     * Redact whatever follows the first '?' of a URL that parse_url() can't
+     * split into scheme and host: a path ('/cb?token='), a bare query, a
+     * protocol-relative or scheme-less URL, or one it rejects outright
+     * (port 99999). A '#fragment' after the query is kept as-is.
+     */
+    protected function redactQueryAfterMark(string $url, string $path): string
+    {
+        if (! str_contains($url, '?')) {
+            return $url;
+        }
+
+        [$base, $rest] = explode('?', $url, 2);
+        [$query, $fragment] = array_pad(explode('#', $rest, 2), 2, null);
+
+        return $base.'?'.$this->redactQuery($query, $path).($fragment === null ? '' : '#'.$fragment);
     }
 
     /**
@@ -1021,9 +1040,10 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         $parsed = parse_url($url);
 
-        // Return original URL if we can't parse it properly
+        // Not an absolute URL (or not one parse_url() accepts): returning it
+        // unchanged kept '/cb?token=…' in the clear.
         if (! isset($parsed['scheme']) || ! isset($parsed['host'])) {
-            return $url;
+            return $this->redactQueryAfterMark($url, $path);
         }
 
         if (! isset($parsed['query'])) {
