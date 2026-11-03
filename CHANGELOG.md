@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-11-03
+
 Redaction gaps closed, MariaDB < 10.10 support fixed, and an opt-in minimum
 level for capture-all mode. **Has a migration** — run `php artisan migrate`.
 It changes nothing on MySQL 8, MariaDB 10.10+, Postgres or SQLite.

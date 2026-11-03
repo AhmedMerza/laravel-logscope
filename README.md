@@ -24,9 +24,9 @@ Visit `/logscope` in your browser. That's it!
 
 ## What's New
 
-**[v2.3.3](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.3):** a deep link to one entry (`?log=<id>`) opens that entry again instead of the full list.
+**[v2.4.0](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.4.0):** secure by default. Cookies, session, XSRF and Basic-auth password fields, and the query string of a Referer header, are now redacted. MariaDB before 10.10 no longer rewrites `occurred_at` on every update or fails creating `log_groups`, and an opt-in `ignore.min_level` (`LOGSCOPE_MIN_LEVEL`) keeps `Log::debug()` out of capture-all mode.
 
-**Upgrading to the next release:** it has a migration (`php artisan migrate`) that repairs MariaDB < 10.10 installs, and redacts more context keys. Read its Upgrading notes in the changelog first. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
+**Upgrading:** this release has a migration, so run `php artisan migrate`. It only changes an install that has the MariaDB < 10.10 bug (a table copy that locks `log_entries` for writes), so prune first (`php artisan logscope:prune`) and run it off-peak. If you published the migrations, republish them with `php artisan vendor:publish --tag=logscope-migrations --force`. Fields such as `cookie_consent` or `session_count` now read `[REDACTED]`; keep them via `context.sensitive_keys_except`. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
 ---
 
