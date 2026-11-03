@@ -12,6 +12,7 @@ use LogScope\Logging\ChannelContextProcessor;
 use LogScope\LogScopeServiceProvider;
 use LogScope\Models\LogEntry;
 use LogScope\Services\WriteFailureLogger;
+use Monolog\Level;
 
 uses(RefreshDatabase::class);
 
@@ -68,6 +69,29 @@ it('captures everything and reports it when min_level is not a level name', func
     // A typo must not turn into "drop every log": shouldIgnoreLog() treats a
     // throw as "skip", so an unchecked lookup would have done exactly that.
     config(['logscope.ignore.min_level' => 'warn']);
+
+    logEveryLevel();
+
+    expect(LogEntry::count())->toBe(8)
+        ->and(file_get_contents($this->errorLogFile))->toContain('LogScope[min-level]');
+});
+
+// A config/logscope.php edited by hand can hold the forms a channel's own
+// 'level' accepts; is_string() alone silently filtered nothing for them.
+it('accepts a Monolog level value or enum as min_level', function (mixed $minLevel) {
+    config(['logscope.ignore.min_level' => $minLevel]);
+
+    logEveryLevel();
+
+    expect(LogEntry::query()->pluck('level')->sort()->values()->all())
+        ->toBe(['alert', 'critical', 'emergency', 'error', 'warning']);
+})->with([
+    'int' => [300],
+    'enum' => [Level::Warning],
+]);
+
+it('captures everything and reports it when min_level is an unknown int', function () {
+    config(['logscope.ignore.min_level' => 275]);
 
     logEveryLevel();
 

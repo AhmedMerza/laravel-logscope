@@ -375,6 +375,42 @@ describe('header bag logged as an array', function () {
             ->and($context['session'])->toBe('[REDACTED]')
             ->and($context['laravel_session'])->toBe('[REDACTED]');
     });
+
+    it('redacts sensitive query parameters in a header bag\'s referer', function () {
+        $request = Request::create('/', server: ['HTTP_REFERER' => 'https://app.test/reset?token=T2&page=2']);
+
+        $headers = $this->sanitizer->sanitize(['h' => $request->headers->all()])['h'];
+
+        expect(urldecode($headers['referer'][0]))->toBe('https://app.test/reset?token=[REDACTED]&page=2');
+    });
+
+    it('redacts the referer, request URI and query string of a server bag', function () {
+        $request = Request::create('https://app.test/reset?token=T1&page=2', server: [
+            'HTTP_REFERER' => 'https://app.test/login?token=T2&page=3',
+        ]);
+
+        $server = $this->sanitizer->sanitize(['s' => $request->server->all()])['s'];
+
+        expect(json_encode($server))->not->toContain('T1')->not->toContain('T2')
+            ->and(urldecode($server['HTTP_REFERER']))->toBe('https://app.test/login?token=[REDACTED]&page=3')
+            ->and(urldecode($server['REQUEST_URI']))->toBe('/reset?token=[REDACTED]&page=2')
+            ->and(urldecode($server['QUERY_STRING']))->toBe('token=[REDACTED]&page=2');
+    });
+
+    it('leaves a URL-valued key alone when redaction is off, and other url keys always', function () {
+        $context = $this->sanitizer->sanitize([
+            'referer' => 'https://app.test/?token=T3',
+            'url' => 'https://app.test/?token=T4',
+        ]);
+
+        expect(urldecode($context['referer']))->toBe('https://app.test/?token=[REDACTED]')
+            ->and($context['url'])->toBe('https://app.test/?token=T4');
+
+        config(['logscope.context.redact_sensitive' => false]);
+
+        expect((new ContextSanitizer)->sanitize(['referer' => 'https://app.test/?token=T3'])['referer'])
+            ->toBe('https://app.test/?token=T3');
+    });
 });
 
 describe('context redaction', function () {

@@ -174,7 +174,7 @@ class LogCapture
     {
         $minLevel = config('logscope.ignore.min_level');
 
-        if (is_string($minLevel) && $minLevel !== '' && $this->isBelowLevel($event->level, $minLevel)) {
+        if ($minLevel !== null && $minLevel !== '' && $this->isBelowLevel($event->level, $minLevel)) {
             return true;
         }
 
@@ -221,14 +221,22 @@ class LogCapture
     /**
      * Whether a log's level is below the configured minimum.
      *
-     * An unknown name (a typo like 'warn') is reported and filters nothing.
+     * Takes a name ('info'), a Monolog value (200) or a Monolog\Level, as
+     * the channel config's own 'level' does. An unknown one (a typo like
+     * 'warn') is reported and filters nothing.
      * Letting it throw would reach shouldIgnoreLog()'s catch, which skips
      * the log — and so every log, for as long as the typo is deployed.
      */
-    protected function isBelowLevel(string $level, string $minLevel): bool
+    protected function isBelowLevel(string $level, mixed $minLevel): bool
     {
         try {
-            return Level::fromName($level)->isLowerThan(Level::fromName($minLevel));
+            $min = match (true) {
+                $minLevel instanceof Level => $minLevel,
+                is_int($minLevel) => Level::fromValue($minLevel),
+                default => Level::fromName((string) $minLevel),
+            };
+
+            return Level::fromName($level)->isLowerThan($min);
         } catch (Throwable $e) {
             WriteFailureLogger::report($e, 'min-level');
 

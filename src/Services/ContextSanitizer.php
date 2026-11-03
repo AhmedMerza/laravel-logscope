@@ -170,6 +170,12 @@ class ContextSanitizer implements ContextSanitizerInterface
      */
     protected const URL_HEADERS = ['referer'];
 
+    /**
+     * Keys of a header or server bag logged as an array whose value is a
+     * URL or a query string. See redactUrlValue().
+     */
+    protected const URL_KEYS = ['referer', 'http_referer', 'request_uri', 'query_string'];
+
     public function __construct()
     {
         $this->expandObjects = config('logscope.context.expand_objects', true);
@@ -259,9 +265,10 @@ class ContextSanitizer implements ContextSanitizerInterface
                 continue;
             }
 
+            $childPath = $this->childPath('', $key, $value);
             $sanitized[$key] = $this->shouldRedactKey($key)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($value, 0, $this->childPath('', $key, $value));
+                : $this->redactUrlValue($key, $this->sanitizeValue($value, 0, $childPath), $childPath);
         }
 
         return $sanitized;
@@ -322,12 +329,49 @@ class ContextSanitizer implements ContextSanitizerInterface
     {
         $result = [];
         foreach ($value as $key => $item) {
+            $childPath = $this->childPath($path, $key, $item);
             $result[$key] = $this->shouldRedactKey($key, $path)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($item, $depth + 1, $this->childPath($path, $key, $item));
+                : $this->redactUrlValue($key, $this->sanitizeValue($item, $depth + 1, $childPath), $childPath);
         }
 
         return $result;
+    }
+
+    /**
+     * Redact the query of a URL-valued key in a header or server bag.
+     *
+     * $request->headers->all() and $request->server->all() are plain arrays,
+     * so their Referer, request URI and query string never reach
+     * sanitizeHeaders() or the entry's url — a ?token= in them was stored
+     * in the clear. Only these exact names are touched: a generic 'url' key
+     * is the application's own data, and the session's _previous url is
+     * already under 'session'.
+     */
+    protected function redactUrlValue(mixed $key, mixed $value, string $path): mixed
+    {
+        $key = strtolower((string) $key);
+
+        if (! $this->redactSensitive || ! in_array($key, self::URL_KEYS, true)) {
+            return $value;
+        }
+
+        $redact = fn ($url) => is_string($url) ? match ($key) {
+            'query_string' => $this->redactQuery($url, $path),
+            'request_uri' => str_contains($url, '?')
+                ? strstr($url, '?', true).'?'.$this->redactQuery(substr(strstr($url, '?'), 1), $path)
+                : $url,
+            default => $this->redactUrl($url, $path),
+        } : $url;
+
+        return is_array($value) ? array_map($redact, $value) : $redact($value);
+    }
+
+    protected function redactQuery(string $query, string $path): string
+    {
+        parse_str($query, $params);
+
+        return http_build_query($this->redactSensitive($params, $path));
     }
 
     /**
