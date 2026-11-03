@@ -574,6 +574,9 @@ return [
     |             php-auth-pw, table growth). Add what you need to 'allowlist'.
     |             Anything matching sensitive_headers is stored as [REDACTED]
     |             even when you allowlist it explicitly.
+    |             A referer's query goes through sensitive_keys like the
+    |             entry's url, so ?token=… is stored as [REDACTED]. 'code' is
+    |             not a default: an OAuth server should add it.
     |
     */
 

@@ -270,6 +270,32 @@ describe('request redaction', function () {
             ->and($headers['authorization'])->toBe(['[REDACTED]']);
     });
 
+    it('redacts sensitive query parameters in a logged request\'s referer', function () {
+        $request = Request::create('/', server: ['HTTP_REFERER' => 'https://app.test/reset?token=abc&page=2']);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect(urldecode($headers['referer'][0]))->toBe('https://app.test/reset?token=[REDACTED]&page=2');
+    });
+
+    it('redacts a configured key in a captured referer, before truncating', function () {
+        // 'code' is not a default — it would blank status_code and
+        // country_code — so an OAuth app opts in and the referer follows.
+        config([
+            'logscope.context.sensitive_keys' => ['code'],
+            'logscope.context.headers.allowlist' => ['referer'],
+            'logscope.context.headers.max_value_length' => 60,
+        ]);
+
+        $captured = (new ContextSanitizer)->captureHeaders([
+            'referer' => ['https://app.test/callback?code=auth-code-123&state='.str_repeat('x', 100)],
+        ]);
+
+        expect($captured['referer'])->not->toContain('auth-code-123')
+            ->and(urldecode($captured['referer']))->toStartWith('https://app.test/callback?code=[REDACTED]&state=')
+            ->and($captured['referer'])->toEndWith('…[truncated]');
+    });
+
     it('redacts custom credential headers by name fragment', function () {
         // Each header contains exactly one default fragment, so dropping any
         // fragment from the defaults fails this test.

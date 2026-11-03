@@ -161,6 +161,15 @@ class ContextSanitizer implements ContextSanitizerInterface
         'session',
     ];
 
+    /**
+     * Headers whose value is a URL, and so can carry a secret in its query.
+     *
+     * A Referer is the page the request came from — an OAuth callback's
+     * ?code=, a reset link's ?token= — so its query goes through the same
+     * key redaction as the entry's own url, keeping the origin and path.
+     */
+    protected const URL_HEADERS = ['referer'];
+
     public function __construct()
     {
         $this->expandObjects = config('logscope.context.expand_objects', true);
@@ -787,6 +796,11 @@ class ContextSanitizer implements ContextSanitizerInterface
         foreach ($headers as $name => $values) {
             if ($this->isSensitiveHeader((string) $name)) {
                 $result[$name] = ['[REDACTED]'];
+            } elseif (in_array(strtolower((string) $name), self::URL_HEADERS, true)) {
+                $result[$name] = array_map(
+                    fn ($value) => is_string($value) ? $this->redactUrl($value) : $value,
+                    (array) $values
+                );
             } else {
                 $result[$name] = $values;
             }
@@ -922,8 +936,16 @@ class ContextSanitizer implements ContextSanitizerInterface
                 continue;
             }
 
+            $value = $this->toValidUtf8(implode(', ', (array) $values));
+
+            if (in_array($name, self::URL_HEADERS, true)) {
+                $value = $this->redactUrl($value);
+            }
+
+            // Cut after redacting, so a long query can't push a secret past
+            // the point where the URL still parses.
             $captured[$name] = Str::limit(
-                $this->toValidUtf8(implode(', ', (array) $values)),
+                $value,
                 $maxLength,
                 '…[truncated]'
             );

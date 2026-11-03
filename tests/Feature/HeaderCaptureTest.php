@@ -63,6 +63,20 @@ it('redacts a sensitive header even when it is explicitly allowlisted', function
         ->and(json_encode($headers))->not->toContain('super-secret-token');
 });
 
+// referer is in the default allowlist, and the page a request came from can
+// carry a secret in its query, such as a password-reset ?token=. Its query is
+// redacted by the same keys as the entry's url; the origin, path and harmless
+// parameters stay readable.
+it('redacts sensitive query parameters in the referer', function () {
+    $this->get('/logscope-test/headers', [
+        'Referer' => 'https://app.test/password/reset?token=reset-456&page=2',
+    ])->assertOk();
+
+    $referer = lastEntryHeaders()['referer'];
+
+    expect(urldecode($referer))->toBe('https://app.test/password/reset?token=[REDACTED]&page=2');
+});
+
 it('matches the allowlist case-insensitively and stores lowercased names', function () {
     config(['logscope.context.headers.allowlist' => ['X-Request-ID']]);
 
