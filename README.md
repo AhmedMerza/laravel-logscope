@@ -26,7 +26,7 @@ Visit `/logscope` in your browser. That's it!
 
 **[v2.3.3](https://github.com/AhmedMerza/laravel-logscope/releases/tag/v2.3.3):** a deep link to one entry (`?log=<id>`) opens that entry again instead of the full list.
 
-**Upgrading:** no migration. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
+**Upgrading to the next release:** it has a migration (`php artisan migrate`) that repairs MariaDB < 10.10 installs, and redacts more context keys. Read its Upgrading notes in the changelog first. Full notes are in the [changelog](https://github.com/AhmedMerza/laravel-logscope/blob/master/CHANGELOG.md).
 
 ---
 
