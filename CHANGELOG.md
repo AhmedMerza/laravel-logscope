@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Redaction gaps closed, MariaDB < 10.10 support fixed, and an opt-in minimum
+level for capture-all mode. **Has a migration** — run `php artisan migrate`.
+It changes nothing on MySQL 8, MariaDB 10.10+, Postgres or SQLite.
+
+### Security
+
+- **A header bag logged as an array kept the session cookie and the Basic-auth password.** `Log::info('…', ['headers' => $request->headers->all()])` is matched by `sensitive_keys`, not `sensitive_headers`, and none of `cookie`, `set-cookie`, `x-xsrf-token` or `php-auth-pw` (which splits into php/auth/pw) matched a default key. `cookie`, `session`, `xsrf` and `php_auth_pw` are now default keys. Because keys match as a fragment inside a word, fields such as `session_count` or `cookie_consent` now read `[REDACTED]` too; name them in `sensitive_keys_except` to keep them.
+- **The Referer header was stored with its query string.** `referer` is in the default header allowlist, so a page's `?token=…` reached the `headers` column. Its query now goes through `sensitive_keys` like the entry's own `url`, keeping the origin, path and other parameters. This also applies to a logged Request's headers. `code` is not a default key (it would blank `status_code`, `country_code`), so an OAuth server should add it to `sensitive_keys` to cover `?code=` in both the url and the Referer.
+
+### Fixed
+
+- **MariaDB before 10.10: `occurred_at` changed on every update, and `log_groups` could not be created.** With `explicit_defaults_for_timestamp` off (the default before MariaDB 10.10, and on MySQL 5.7) the server gave `log_entries.occurred_at` `ON UPDATE CURRENT_TIMESTAMP`, so a status change, note or fingerprint backfill overwrote when the log happened; the 2.3.0 migration then failed with `Invalid default value for 'last_seen_at'`. New installs create these columns as `datetime`. The new migration repairs `occurred_at`, `first_seen_at` and `last_seen_at` only where the server gave them a default, which rebuilds those tables once; healthy installs are left alone. A failed 2.3.x migration now completes on the next `migrate`. Times already overwritten can't be recovered.
+
+### Added
+
+- **`ignore.min_level` (`LOGSCOPE_MIN_LEVEL`).** Capture-all mode reads every log the app writes, so your channels' `LOG_LEVEL` never applied and `Log::debug()` filled the table. Set `LOGSCOPE_MIN_LEVEL=info`, or `"${LOG_LEVEL}"` to follow your channels. Unset by default, so nothing changes on upgrade. An unknown name is reported to `error_log` and filters nothing.
+
 ## [2.3.3] — 2026-11-02
 
 ### Fixed
