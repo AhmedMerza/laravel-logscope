@@ -108,7 +108,10 @@ LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
 # Filter out noisy logs
 LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip PHP deprecation notices (default: true)
 LOGSCOPE_IGNORE_NULL_CHANNEL=false # Skip logs without a channel (default: false)
+LOGSCOPE_MIN_LEVEL=                # Skip logs below this level, e.g. info (default: every level)
 ```
+
+**Minimum level.** In capture-all mode LogScope reads every log the app writes, so the `LOG_LEVEL` your channels use doesn't filter it, and `Log::debug()` calls land in the table even when your log files skip them. Set `LOGSCOPE_MIN_LEVEL=info` (or `LOGSCOPE_MIN_LEVEL="${LOG_LEVEL}"` to follow your channels) to drop anything below. It is off by default, so upgrading captures exactly what it did before. In `channel` capture mode, set the `level` of the `logscope` channel instead.
 
 **How the deprecations filter decides.** It does *not* drop anything containing the words "is deprecated" — that was the behaviour before v1.5.5, and it silently swallowed real logs like `Log::warning('Account 42 is deprecated for billing')`. A log is now ignored if either:
 
@@ -335,6 +338,7 @@ LOGSCOPE_FEATURE_SEARCH_SYNTAX=true
 LOGSCOPE_FEATURE_REGEX=true
 LOGSCOPE_IGNORE_DEPRECATIONS=true
 LOGSCOPE_IGNORE_NULL_CHANNEL=false
+LOGSCOPE_MIN_LEVEL=
 
 # Database & Retention
 LOGSCOPE_TABLE=log_entries

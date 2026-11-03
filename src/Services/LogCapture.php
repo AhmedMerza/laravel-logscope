@@ -13,6 +13,7 @@ use LogScope\Logging\ChannelContextProcessor;
 use LogScope\Logging\LogScopeHandler;
 use LogScope\LogScope;
 use LogScope\Models\LogEntry;
+use Monolog\Level;
 use Throwable;
 
 /**
@@ -171,6 +172,12 @@ class LogCapture
 
     protected function matchesIgnoreConfig(MessageLogged $event, ?string $channel): bool
     {
+        $minLevel = config('logscope.ignore.min_level');
+
+        if (is_string($minLevel) && $minLevel !== '' && $this->isBelowLevel($event->level, $minLevel)) {
+            return true;
+        }
+
         // Check if we should ignore deprecation messages.
         //
         // Two-layer match:
@@ -209,6 +216,24 @@ class LogCapture
         }
 
         return false;
+    }
+
+    /**
+     * Whether a log's level is below the configured minimum.
+     *
+     * An unknown name (a typo like 'warn') is reported and filters nothing.
+     * Letting it throw would reach shouldIgnoreLog()'s catch, which skips
+     * the log — and so every log, for as long as the typo is deployed.
+     */
+    protected function isBelowLevel(string $level, string $minLevel): bool
+    {
+        try {
+            return Level::fromName($level)->isLowerThan(Level::fromName($minLevel));
+        } catch (Throwable $e) {
+            WriteFailureLogger::report($e, 'min-level');
+
+            return false;
+        }
     }
 
     /**

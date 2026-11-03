@@ -162,12 +162,22 @@ return [
     |                  no-channel path in your app and you genuinely don't
     |                  want them. Default: false.
     |
+    | 'min_level'    - Skip logs below this level ('debug', 'info', 'notice',
+    |                  'warning', 'error', 'critical', 'alert', 'emergency').
+    |                  Capture-all mode reads every log the app writes, so
+    |                  your channels' LOG_LEVEL does not apply to it. Set
+    |                  LOGSCOPE_MIN_LEVEL="${LOG_LEVEL}" to follow it. In
+    |                  'channel' mode, set the logscope channel's own 'level'
+    |                  instead. An unknown name is reported to error_log and
+    |                  filters nothing. Default: null (capture every level).
+    |
     */
 
     'ignore' => [
         'deprecations' => env('LOGSCOPE_IGNORE_DEPRECATIONS', true),
         'deprecation_channels' => ['deprecations'],
         'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', false),
+        'min_level' => env('LOGSCOPE_MIN_LEVEL'),
     ],
 
     /*
