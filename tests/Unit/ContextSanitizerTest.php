@@ -316,6 +316,41 @@ describe('request redaction', function () {
     });
 });
 
+describe('header bag logged as an array', function () {
+    // $request->headers->all() is a plain array, so it never reaches the
+    // header matcher — only the key list. Each assertion below leaked before
+    // cookie, session, xsrf and php_auth_pw joined the default keys.
+    it('redacts the session cookie and the Basic-auth password', function () {
+        $request = Request::create('/', server: [
+            'HTTP_AUTHORIZATION' => 'Basic '.base64_encode('bob:hunter2'),
+            'HTTP_COOKIE' => 'laravel_session=abc',
+            'HTTP_ACCEPT' => 'application/json',
+        ]);
+
+        $headers = $this->sanitizer->sanitize(['headers' => $request->headers->all()])['headers'];
+
+        expect($headers['cookie'])->toBe('[REDACTED]')
+            ->and($headers['php-auth-pw'])->toBe('[REDACTED]')
+            ->and($headers['authorization'])->toBe('[REDACTED]')
+            ->and($headers['php-auth-user'])->toBe(['bob'])
+            ->and($headers['accept'])->toBe(['application/json']);
+    });
+
+    it('redacts set-cookie, a bare xsrf and session values', function () {
+        $context = $this->sanitizer->sanitize([
+            'response_headers' => ['set-cookie' => ['laravel_session=abc; path=/']],
+            'xsrf' => 'abc',
+            'session' => ['id' => 'abc'],
+            'laravel_session' => 'abc',
+        ]);
+
+        expect($context['response_headers']['set-cookie'])->toBe('[REDACTED]')
+            ->and($context['xsrf'])->toBe('[REDACTED]')
+            ->and($context['session'])->toBe('[REDACTED]')
+            ->and($context['laravel_session'])->toBe('[REDACTED]');
+    });
+});
+
 describe('context redaction', function () {
     it('redacts a sensitive key at the top level of logged context', function () {
         $result = (new ContextSanitizer)->sanitize(['password' => 'hunter2', 'user_id' => 7]);

@@ -111,6 +111,15 @@ class ContextSanitizer implements ContextSanitizerInterface
         'card_number',
         'cvv',
         'ssn',
+        // The header names below are redacted in a Request's headers by
+        // DEFAULT_SENSITIVE_HEADERS, but a header bag logged as an array
+        // ($request->headers->all()) only goes through this list. Without
+        // them the session cookie, a Set-Cookie and the Basic-auth password
+        // Symfony copies into php-auth-pw were stored in the clear.
+        'cookie',
+        'session',
+        'xsrf',
+        'php_auth_pw',
     ];
 
     /**

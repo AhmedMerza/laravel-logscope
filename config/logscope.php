@@ -536,7 +536,7 @@ return [
     |                    class_name nor ['class' => ['name' => …]].
     |                    Keys over 256 characters are redacted unexamined.
     |                    Entries ADD to the defaults, they never replace
-    |                    them, so adding one key keeps the other eleven.
+    |                    them, so adding one key keeps all fifteen.
     |                    To stop a default redacting a field of yours, name
     |                    that field in 'sensitive_keys_except' below — that
     |                    is what it is for, and it is precise where dropping
@@ -583,7 +583,7 @@ return [
 
         // Added to the defaults: password, password_confirmation, secret,
         // token, api_key, apikey, authorization, credit_card, card_number,
-        // cvv, ssn
+        // cvv, ssn, cookie, session, xsrf, php_auth_pw
         'sensitive_keys' => [],
 
         // Added to the defaults: prompt_tokens, completion_tokens,
