@@ -301,3 +301,83 @@ it('converts a v0.5 install to the new schema and resets it', function (string $
     expect(Artisan::call('migrate:reset', ['--path' => $migrations, '--realpath' => true]))->toBe(0)
         ->and(Schema::hasTable($table))->toBeFalse();
 })->with(logScopeTables());
+
+// MariaDB before 10.10 (and MySQL 5.7) give the first NOT NULL timestamp in a
+// table ON UPDATE CURRENT_TIMESTAMP, so changing an entry's status rewrote
+// when it happened. The server's own default decides, so this only fails
+// against such a server; CI's MySQL 8 and Postgres pass either way.
+it('keeps occurred_at and first_seen_at when a row is updated', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+
+    expect(Artisan::call('migrate', ['--path' => __DIR__.'/../../database/migrations', '--realpath' => true]))->toBe(0);
+
+    $at = '2026-01-01 00:00:00';
+    DB::table($table)->insert([
+        'id' => '01J00000000000000000000000', 'level' => 'error', 'message' => 'm',
+        'occurred_at' => $at, 'created_at' => $at,
+    ]);
+    DB::table('log_groups')->insert([
+        'id' => '01J00000000000000000000000', 'fingerprint' => 'f', 'sample_message' => 'm', 'level' => 'error',
+        'first_seen_at' => $at, 'last_seen_at' => $at,
+    ]);
+
+    DB::table($table)->update(['status' => 'resolved']);
+    DB::table('log_groups')->update(['status' => 'resolved', 'last_seen_at' => '2026-02-01 00:00:00']);
+
+    expect((string) DB::table($table)->value('occurred_at'))->toBe($at)
+        ->and((string) DB::table('log_groups')->value('first_seen_at'))->toBe($at);
+})->with(logScopeTables());
+
+// An install that already ran the old migrations on such a server has the
+// auto-updating columns; the repair migration has to take the ON UPDATE off
+// without losing the times already stored.
+it('repairs timestamp columns the server made auto-updating', function (string $table, string $prefix) {
+    skipUnqualifiableTable($table);
+
+    if (! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+        test()->markTestSkipped('ON UPDATE CURRENT_TIMESTAMP is MySQL/MariaDB-only.');
+    }
+
+    config(['logscope.table' => $table]);
+    useTablePrefix($prefix);
+    resetLogScopeSchema($table);
+    $migrations = __DIR__.'/../../database/migrations';
+
+    expect(Artisan::call('migrate', ['--path' => $migrations, '--realpath' => true]))->toBe(0);
+
+    // The shape such a server gave the 2.3.3 migrations. log_groups only got
+    // created without strict mode, and kept last_seen_at's zero default — which
+    // a per-column repair trips over once strict mode is back on.
+    $grammar = DB::getQueryGrammar();
+    DB::statement("set session sql_mode = ''");
+    DB::statement(sprintf(
+        'alter table %s modify occurred_at timestamp not null default current_timestamp on update current_timestamp',
+        $grammar->wrapTable($table),
+    ));
+    DB::statement(sprintf(
+        "alter table %s modify first_seen_at timestamp not null default current_timestamp on update current_timestamp, modify last_seen_at timestamp not null default '0000-00-00 00:00:00'",
+        $grammar->wrapTable('log_groups'),
+    ));
+    DB::reconnect();
+
+    $at = '2026-01-01 00:00:00';
+    DB::table($table)->insert([
+        'id' => '01J00000000000000000000000', 'level' => 'error', 'message' => 'm',
+        'occurred_at' => $at, 'created_at' => $at,
+    ]);
+
+    (require $migrations.'/2026_11_03_000001_fix_auto_updating_timestamps.php')->up();
+
+    DB::table($table)->update(['status' => 'resolved']);
+
+    $columns = collect(Schema::getColumns($table))->keyBy('name');
+
+    expect((string) DB::table($table)->value('occurred_at'))->toBe($at)
+        ->and($columns['occurred_at']['type_name'])->toBe('datetime')
+        ->and($columns['occurred_at']['default'])->toBeNull()
+        ->and(collect(Schema::getColumns('log_groups'))->whereIn('name', ['first_seen_at', 'last_seen_at'])->pluck('type_name')->all())
+        ->toBe(['datetime', 'datetime']);
+})->with(logScopeTables());

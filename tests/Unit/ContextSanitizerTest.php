@@ -270,6 +270,32 @@ describe('request redaction', function () {
             ->and($headers['authorization'])->toBe(['[REDACTED]']);
     });
 
+    it('redacts sensitive query parameters in a logged request\'s referer', function () {
+        $request = Request::create('/', server: ['HTTP_REFERER' => 'https://app.test/reset?token=abc&page=2']);
+
+        $headers = $this->sanitizer->sanitize(['request' => $request])['request']['headers'];
+
+        expect(urldecode($headers['referer'][0]))->toBe('https://app.test/reset?token=[REDACTED]&page=2');
+    });
+
+    it('redacts a configured key in a captured referer, before truncating', function () {
+        // 'code' is not a default — it would blank status_code and
+        // country_code — so an OAuth app opts in and the referer follows.
+        config([
+            'logscope.context.sensitive_keys' => ['code'],
+            'logscope.context.headers.allowlist' => ['referer'],
+            'logscope.context.headers.max_value_length' => 60,
+        ]);
+
+        $captured = (new ContextSanitizer)->captureHeaders([
+            'referer' => ['https://app.test/callback?code=auth-code-123&state='.str_repeat('x', 100)],
+        ]);
+
+        expect($captured['referer'])->not->toContain('auth-code-123')
+            ->and(urldecode($captured['referer']))->toStartWith('https://app.test/callback?code=[REDACTED]&state=')
+            ->and($captured['referer'])->toEndWith('…[truncated]');
+    });
+
     it('redacts custom credential headers by name fragment', function () {
         // Each header contains exactly one default fragment, so dropping any
         // fragment from the defaults fails this test.
@@ -313,6 +339,100 @@ describe('request redaction', function () {
 
         expect($input['pin'])->toBe('[REDACTED]')
             ->and($input['prompt_tokens'])->toBe('150');
+    });
+});
+
+describe('header bag logged as an array', function () {
+    // $request->headers->all() is a plain array, so it never reaches the
+    // header matcher — only the key list. Each assertion below leaked before
+    // cookie, session, xsrf and php_auth_pw joined the default keys.
+    it('redacts the session cookie and the Basic-auth password', function () {
+        $request = Request::create('/', server: [
+            'HTTP_AUTHORIZATION' => 'Basic '.base64_encode('bob:hunter2'),
+            'HTTP_COOKIE' => 'laravel_session=abc',
+            'HTTP_ACCEPT' => 'application/json',
+        ]);
+
+        $headers = $this->sanitizer->sanitize(['headers' => $request->headers->all()])['headers'];
+
+        expect($headers['cookie'])->toBe('[REDACTED]')
+            ->and($headers['php-auth-pw'])->toBe('[REDACTED]')
+            ->and($headers['authorization'])->toBe('[REDACTED]')
+            ->and($headers['php-auth-user'])->toBe(['bob'])
+            ->and($headers['accept'])->toBe(['application/json']);
+    });
+
+    it('redacts set-cookie, a bare xsrf and session values', function () {
+        $context = $this->sanitizer->sanitize([
+            'response_headers' => ['set-cookie' => ['laravel_session=abc; path=/']],
+            'xsrf' => 'abc',
+            'session' => ['id' => 'abc'],
+            'laravel_session' => 'abc',
+        ]);
+
+        expect($context['response_headers']['set-cookie'])->toBe('[REDACTED]')
+            ->and($context['xsrf'])->toBe('[REDACTED]')
+            ->and($context['session'])->toBe('[REDACTED]')
+            ->and($context['laravel_session'])->toBe('[REDACTED]');
+    });
+
+    it('redacts sensitive query parameters in a header bag\'s referer', function () {
+        $request = Request::create('/', server: ['HTTP_REFERER' => 'https://app.test/reset?token=T2&page=2']);
+
+        $headers = $this->sanitizer->sanitize(['h' => $request->headers->all()])['h'];
+
+        expect(urldecode($headers['referer'][0]))->toBe('https://app.test/reset?token=[REDACTED]&page=2');
+    });
+
+    it('redacts the referer, request URI and query string of a server bag', function () {
+        $request = Request::create('https://app.test/reset?token=T1&page=2', server: [
+            'HTTP_REFERER' => 'https://app.test/login?token=T2&page=3',
+        ]);
+
+        $server = $this->sanitizer->sanitize(['s' => $request->server->all()])['s'];
+
+        expect(json_encode($server))->not->toContain('T1')->not->toContain('T2')
+            ->and(urldecode($server['HTTP_REFERER']))->toBe('https://app.test/login?token=[REDACTED]&page=3')
+            ->and(urldecode($server['REQUEST_URI']))->toBe('/reset?token=[REDACTED]&page=2')
+            ->and(urldecode($server['QUERY_STRING']))->toBe('token=[REDACTED]&page=2');
+    });
+
+    it('leaves a URL-valued key alone when redaction is off, and other url keys always', function () {
+        $context = $this->sanitizer->sanitize([
+            'referer' => 'https://app.test/?token=T3',
+            'url' => 'https://app.test/?token=T4',
+        ]);
+
+        expect(urldecode($context['referer']))->toBe('https://app.test/?token=[REDACTED]')
+            ->and($context['url'])->toBe('https://app.test/?token=T4');
+
+        config(['logscope.context.redact_sensitive' => false]);
+
+        expect((new ContextSanitizer)->sanitize(['referer' => 'https://app.test/?token=T3'])['referer'])
+            ->toBe('https://app.test/?token=T3');
+    });
+
+    // parse_url() gives no scheme+host for these, and redactUrl() used to
+    // hand them back unchanged with the secret still in them.
+    it('redacts the query of a referer that is not an absolute URL', function (string $referer, string $expected) {
+        $context = $this->sanitizer->sanitize(['referer' => $referer]);
+
+        expect($context['referer'])->not->toContain('S4')
+            ->and(urldecode($context['referer']))->toBe($expected);
+    })->with([
+        'path' => ['/cb?token=S4&page=2', '/cb?token=[REDACTED]&page=2'],
+        'bare query' => ['?token=S4', '?token=[REDACTED]'],
+        'protocol-relative' => ['//x.t/p?token=S4', '//x.t/p?token=[REDACTED]'],
+        'scheme-less' => ['x.t/p?token=S4', 'x.t/p?token=[REDACTED]'],
+        'unparseable port' => ['https://x.t:99999/?token=S4', 'https://x.t:99999/?token=[REDACTED]'],
+        'fragment kept' => ['/cb?token=S4#top', '/cb?token=[REDACTED]#top'],
+    ]);
+
+    it('keeps a leading ? on a query_string', function () {
+        $context = $this->sanitizer->sanitize(['query_string' => '?token=S4&page=2']);
+
+        // Raw, not urldecode()d: the bug stored the '?' as '%3F'.
+        expect($context['query_string'])->toBe('?token=%5BREDACTED%5D&page=2');
     });
 });
 

@@ -162,12 +162,22 @@ return [
     |                  no-channel path in your app and you genuinely don't
     |                  want them. Default: false.
     |
+    | 'min_level'    - Skip logs below this level ('debug', 'info', 'notice',
+    |                  'warning', 'error', 'critical', 'alert', 'emergency').
+    |                  Capture-all mode reads every log the app writes, so
+    |                  your channels' LOG_LEVEL does not apply to it. Set
+    |                  LOGSCOPE_MIN_LEVEL="${LOG_LEVEL}" to follow it. In
+    |                  'channel' mode, set the logscope channel's own 'level'
+    |                  instead. An unknown name is reported to error_log and
+    |                  filters nothing. Default: null (capture every level).
+    |
     */
 
     'ignore' => [
         'deprecations' => env('LOGSCOPE_IGNORE_DEPRECATIONS', true),
         'deprecation_channels' => ['deprecations'],
         'null_channel' => env('LOGSCOPE_IGNORE_NULL_CHANNEL', false),
+        'min_level' => env('LOGSCOPE_MIN_LEVEL'),
     ],
 
     /*
@@ -536,7 +546,7 @@ return [
     |                    class_name nor ['class' => ['name' => …]].
     |                    Keys over 256 characters are redacted unexamined.
     |                    Entries ADD to the defaults, they never replace
-    |                    them, so adding one key keeps the other eleven.
+    |                    them, so adding one key keeps all fifteen.
     |                    To stop a default redacting a field of yours, name
     |                    that field in 'sensitive_keys_except' below — that
     |                    is what it is for, and it is precise where dropping
@@ -574,6 +584,9 @@ return [
     |             php-auth-pw, table growth). Add what you need to 'allowlist'.
     |             Anything matching sensitive_headers is stored as [REDACTED]
     |             even when you allowlist it explicitly.
+    |             A referer's query goes through sensitive_keys like the
+    |             entry's url, so ?token=… is stored as [REDACTED]. 'code' is
+    |             not a default: an OAuth server should add it.
     |
     */
 
@@ -583,7 +596,7 @@ return [
 
         // Added to the defaults: password, password_confirmation, secret,
         // token, api_key, apikey, authorization, credit_card, card_number,
-        // cvv, ssn
+        // cvv, ssn, cookie, session, xsrf, php_auth_pw
         'sensitive_keys' => [],
 
         // Added to the defaults: prompt_tokens, completion_tokens,

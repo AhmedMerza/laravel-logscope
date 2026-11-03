@@ -111,6 +111,15 @@ class ContextSanitizer implements ContextSanitizerInterface
         'card_number',
         'cvv',
         'ssn',
+        // The header names below are redacted in a Request's headers by
+        // DEFAULT_SENSITIVE_HEADERS, but a header bag logged as an array
+        // ($request->headers->all()) only goes through this list. Without
+        // them the session cookie, a Set-Cookie and the Basic-auth password
+        // Symfony copies into php-auth-pw were stored in the clear.
+        'cookie',
+        'session',
+        'xsrf',
+        'php_auth_pw',
     ];
 
     /**
@@ -151,6 +160,21 @@ class ContextSanitizer implements ContextSanitizerInterface
         'password',
         'session',
     ];
+
+    /**
+     * Headers whose value is a URL, and so can carry a secret in its query.
+     *
+     * A Referer is the page the request came from — an OAuth callback's
+     * ?code=, a reset link's ?token= — so its query goes through the same
+     * key redaction as the entry's own url, keeping the origin and path.
+     */
+    protected const URL_HEADERS = ['referer'];
+
+    /**
+     * Keys of a header or server bag logged as an array whose value is a
+     * URL or a query string. See redactUrlValue().
+     */
+    protected const URL_KEYS = ['referer', 'http_referer', 'request_uri', 'query_string'];
 
     public function __construct()
     {
@@ -241,9 +265,10 @@ class ContextSanitizer implements ContextSanitizerInterface
                 continue;
             }
 
+            $childPath = $this->childPath('', $key, $value);
             $sanitized[$key] = $this->shouldRedactKey($key)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($value, 0, $this->childPath('', $key, $value));
+                : $this->redactUrlValue($key, $this->sanitizeValue($value, 0, $childPath), $childPath);
         }
 
         return $sanitized;
@@ -304,12 +329,68 @@ class ContextSanitizer implements ContextSanitizerInterface
     {
         $result = [];
         foreach ($value as $key => $item) {
+            $childPath = $this->childPath($path, $key, $item);
             $result[$key] = $this->shouldRedactKey($key, $path)
                 ? '[REDACTED]'
-                : $this->sanitizeValue($item, $depth + 1, $this->childPath($path, $key, $item));
+                : $this->redactUrlValue($key, $this->sanitizeValue($item, $depth + 1, $childPath), $childPath);
         }
 
         return $result;
+    }
+
+    /**
+     * Redact the query of a URL-valued key in a header or server bag.
+     *
+     * $request->headers->all() and $request->server->all() are plain arrays,
+     * so their Referer, request URI and query string never reach
+     * sanitizeHeaders() or the entry's url — a ?token= in them was stored
+     * in the clear. Only these exact names are touched: a generic 'url' key
+     * is the application's own data, and the session's _previous url is
+     * already under 'session'.
+     */
+    protected function redactUrlValue(mixed $key, mixed $value, string $path): mixed
+    {
+        $key = strtolower((string) $key);
+
+        if (! $this->redactSensitive || ! in_array($key, self::URL_KEYS, true)) {
+            return $value;
+        }
+
+        $redact = fn ($url) => is_string($url) ? match ($key) {
+            // A leading '?' is kept, not encoded into the first key as '%3F'.
+            'query_string' => str_starts_with($url, '?')
+                ? $this->redactQueryAfterMark($url, $path)
+                : $this->redactQuery($url, $path),
+            'request_uri' => $this->redactQueryAfterMark($url, $path),
+            default => $this->redactUrl($url, $path),
+        } : $url;
+
+        return is_array($value) ? array_map($redact, $value) : $redact($value);
+    }
+
+    protected function redactQuery(string $query, string $path): string
+    {
+        parse_str($query, $params);
+
+        return http_build_query($this->redactSensitive($params, $path));
+    }
+
+    /**
+     * Redact whatever follows the first '?' of a URL that parse_url() can't
+     * split into scheme and host: a path ('/cb?token='), a bare query, a
+     * protocol-relative or scheme-less URL, or one it rejects outright
+     * (port 99999). A '#fragment' after the query is kept as-is.
+     */
+    protected function redactQueryAfterMark(string $url, string $path): string
+    {
+        if (! str_contains($url, '?')) {
+            return $url;
+        }
+
+        [$base, $rest] = explode('?', $url, 2);
+        [$query, $fragment] = array_pad(explode('#', $rest, 2), 2, null);
+
+        return $base.'?'.$this->redactQuery($query, $path).($fragment === null ? '' : '#'.$fragment);
     }
 
     /**
@@ -778,6 +859,11 @@ class ContextSanitizer implements ContextSanitizerInterface
         foreach ($headers as $name => $values) {
             if ($this->isSensitiveHeader((string) $name)) {
                 $result[$name] = ['[REDACTED]'];
+            } elseif (in_array(strtolower((string) $name), self::URL_HEADERS, true)) {
+                $result[$name] = array_map(
+                    fn ($value) => is_string($value) ? $this->redactUrl($value) : $value,
+                    (array) $values
+                );
             } else {
                 $result[$name] = $values;
             }
@@ -913,8 +999,16 @@ class ContextSanitizer implements ContextSanitizerInterface
                 continue;
             }
 
+            $value = $this->toValidUtf8(implode(', ', (array) $values));
+
+            if (in_array($name, self::URL_HEADERS, true)) {
+                $value = $this->redactUrl($value);
+            }
+
+            // Cut after redacting, so a long query can't push a secret past
+            // the point where the URL still parses.
             $captured[$name] = Str::limit(
-                $this->toValidUtf8(implode(', ', (array) $values)),
+                $value,
                 $maxLength,
                 '…[truncated]'
             );
@@ -946,9 +1040,10 @@ class ContextSanitizer implements ContextSanitizerInterface
 
         $parsed = parse_url($url);
 
-        // Return original URL if we can't parse it properly
+        // Not an absolute URL (or not one parse_url() accepts): returning it
+        // unchanged kept '/cb?token=…' in the clear.
         if (! isset($parsed['scheme']) || ! isset($parsed['host'])) {
-            return $url;
+            return $this->redactQueryAfterMark($url, $path);
         }
 
         if (! isset($parsed['query'])) {

@@ -108,7 +108,10 @@ LOGSCOPE_FEATURE_NOTES=true        # Add notes to logs
 # Filter out noisy logs
 LOGSCOPE_IGNORE_DEPRECATIONS=true  # Skip PHP deprecation notices (default: true)
 LOGSCOPE_IGNORE_NULL_CHANNEL=false # Skip logs without a channel (default: false)
+LOGSCOPE_MIN_LEVEL=                # Skip logs below this level, e.g. info (default: every level)
 ```
+
+**Minimum level.** In capture-all mode LogScope reads every log the app writes, so the `LOG_LEVEL` your channels use doesn't filter it, and `Log::debug()` calls land in the table even when your log files skip them. Set `LOGSCOPE_MIN_LEVEL=info` (or `LOGSCOPE_MIN_LEVEL="${LOG_LEVEL}"` to follow your channels) to drop anything below. It is off by default, so upgrading captures exactly what it did before. In `channel` capture mode, set the `level` of the `logscope` channel instead.
 
 **How the deprecations filter decides.** It does *not* drop anything containing the words "is deprecated" — that was the behaviour before v1.5.5, and it silently swallowed real logs like `Log::warning('Account 42 is deprecated for billing')`. A log is now ignored if either:
 
@@ -230,7 +233,7 @@ Log::info('User action', ['user' => $user]);
 // Context: { "user": { "name": "John", "email": "..." } }
 ```
 
-**Sensitive data is automatically redacted** (password, token, api_key, credit_card, etc.) — anywhere in an entry's context, at any depth:
+**Sensitive data is automatically redacted** (password, token, api_key, credit_card, cookie, session, etc.) — anywhere in an entry's context, at any depth. That includes a header bag logged as a plain array, such as `$request->headers->all()`: its `cookie`, `set-cookie`, `x-xsrf-token`, `authorization` and `php-auth-pw` values are redacted like any other key.
 
 ```php
 Log::info('Login', ['request' => $request]);
@@ -269,7 +272,7 @@ That is deliberately broad, because a missed secret is invisible and a redacted 
 
 `sensitive_keys_except` ships with `prompt_tokens`, `completion_tokens`, `total_tokens`, `token_count` and `tokenizer` — the LLM-era fields that `token` would otherwise catch. Your entries add to those.
 
-All three lists **add to their defaults** — adding `pin` to `sensitive_keys` keeps `password`, `token` and the other nine. (Before v2.2.0 `sensitive_keys` replaced its defaults instead, so adding one key silently dropped eleven; see the CHANGELOG if you are upgrading.) To see what is redacted in a given environment rather than inferring it from config:
+All three lists **add to their defaults** — adding `pin` to `sensitive_keys` keeps `password`, `token` and the other thirteen. (Before v2.2.0 `sensitive_keys` replaced its defaults instead, so adding one key silently dropped eleven; see the CHANGELOG if you are upgrading.) To see what is redacted in a given environment rather than inferring it from config:
 
 ```bash
 php artisan logscope:doctor
@@ -335,6 +338,7 @@ LOGSCOPE_FEATURE_SEARCH_SYNTAX=true
 LOGSCOPE_FEATURE_REGEX=true
 LOGSCOPE_IGNORE_DEPRECATIONS=true
 LOGSCOPE_IGNORE_NULL_CHANNEL=false
+LOGSCOPE_MIN_LEVEL=
 
 # Database & Retention
 LOGSCOPE_TABLE=log_entries
